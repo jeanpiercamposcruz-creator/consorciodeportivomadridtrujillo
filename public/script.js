@@ -571,6 +571,19 @@ async function pull() {
     c: {},
   };
   for (var t of TB) t.load(t.n === "ajustes" ? aj : await all(t.n));
+  
+  // AUTO-SEED: Si Supabase está vacío, poblar con datos iniciales automáticamente
+  if (!S.alu.length && !S.sedes.length) {
+    var seeded = seed();
+    S.sedes = seeded.sedes;
+    S.deportes = seeded.deportes;
+    S.personal = seeded.personal;
+    S.hor = seeded.hor;
+    S.alu = seeded.alu;
+    SN = {};
+    await flush();
+  }
+
   SN = {};
   TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
   await ver();
