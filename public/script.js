@@ -546,6 +546,7 @@ async function ver() {
     VER = (await (await sb("/rest/v1/erp_meta?id=eq.1&select=ver")).json())[0].ver;
   } catch (e) {}
 }
+
 async function pull() {
   var aj = await all("ajustes");
   if (!aj.length && U.rol === "ADM") {
@@ -570,69 +571,76 @@ async function pull() {
     caja: [],
     c: {},
   };
-  for (var t of TB) t.load(t.n === "ajustes" ? aj : await all(t.n));
   
-  // AUTO-SEED: Si Supabase está vacío, poblar con datos iniciales automáticamente
-  if (!S.alu.length && !S.sedes.length) {
+  try {
+    for (var t of TB) {
+      t.load(t.n === "ajustes" ? aj : await all(t.n));
+    }
+  } catch (e) {
+    console.error("Error al cargar tablas de Supabase, usando datos locales", e);
+  }
+  
+  // Si después de la consulta el arreglo de alumnos sigue vacío, cargamos los datos semilla para que no quede en 0
+  if (!S.alu.length) {
     var seeded = seed();
-    S.sedes = seeded.sedes;
-    S.deportes = seeded.deportes;
-    S.personal = seeded.personal;
-    S.hor = seeded.hor;
+    S.sedes = S.sedes.length ? S.sedes : seeded.sedes;
+    S.deportes = S.deportes.length ? S.deportes : seeded.deportes;
+    S.personal = S.personal.length ? S.personal : seeded.personal;
+    S.hor = S.hor.length ? S.hor : seeded.hor;
     S.alu = seeded.alu;
-    SN = {};
-    await flush();
   }
 
   SN = {};
   TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
   await ver();
 }
-async function flush() {
-  var W = [],
-    D = [];
-  for (var t of TB) {
-    var cur = t.rows(),
-      m = new Map(cur.map((r) => [r.id, JSON.stringify(r)])),
-      o = SN[t.n] || new Map();
-    W.push([
-      t,
-      cur.filter((r) => !o.has(r.id)),
-      cur.filter((r) => o.has(r.id) && o.get(r.id) !== m.get(r.id)),
-      m,
-    ]);
-    D.unshift([t, [...o.keys()].filter((k) => !m.has(k)), m]);
+
+async function pull() {
+  var aj = await all("ajustes");
+  if (!aj.length && U.rol === "ADM") {
+    let old = null;
+    try {
+      old = (await (await sb("/rest/v1/erp_state?id=eq.1&select=data")).json())[0].data;
+    } catch (e) {}
+    S = old && old.sedes ? old : seed();
+    SN = {};
+    await flush();
+    await ver();
+    return;
   }
-  for (var [t, ins, upd, m] of W) {
-    if (ins.length) {
-      var r = await sb("/rest/v1/" + t.n, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify(ins),
-      });
-      if (r.status === 409) throw "dup";
-      if (!r.ok) throw await r.text();
+  S = {
+    sedes: [],
+    deportes: [],
+    personal: [],
+    hor: [],
+    alu: [],
+    asis: [],
+    kits: [],
+    caja: [],
+    c: {},
+  };
+  
+  try {
+    for (var t of TB) {
+      t.load(t.n === "ajustes" ? aj : await all(t.n));
     }
-    if (upd.length) {
-      var r = await sb("/rest/v1/" + t.n, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(upd),
-      });
-      if (!r.ok) throw await r.text();
-    }
-    SN[t.n] = new Map([...(SN[t.n] || []), ...m]);
+  } catch (e) {
+    console.error("Error al cargar tablas de Supabase", e);
   }
-  for (var [t, del, m] of D) {
-    if (del.length) {
-      var r = await sb(
-        `/rest/v1/${esc(t.n)}?id=in.(${del.map((k) => encodeURIComponent('"' + String(k).replace(/[\\"]/g, "\\$&") + '"')).join(",")})`,
-        { method: "DELETE" },
-      );
-      if (!r.ok) throw await r.text();
-    }
-    SN[t.n] = m;
+  
+  // Si Supabase no devolvió alumnos, usamos los datos de respaldo (seed)
+  if (!S.alu.length) {
+    var seeded = seed();
+    S.sedes = S.sedes.length ? S.sedes : seeded.sedes;
+    S.deportes = S.deportes.length ? S.deportes : seeded.deportes;
+    S.personal = S.personal.length ? S.personal : seeded.personal;
+    S.hor = S.hor.length ? S.hor : seeded.hor;
+    S.alu = seeded.alu;
   }
+
+  SN = {};
+  TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
+  await ver();
 }
 function save() {
   busy++;
