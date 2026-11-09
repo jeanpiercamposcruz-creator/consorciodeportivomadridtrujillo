@@ -1641,12 +1641,16 @@ async function boot() {
   } catch (e) {
     U = null;
   }
+  
+  // Fuerza el redibujado de la interfaz para que pinte los datos reales
   R();
-
-  // Forzar actualización de contadores tras el arranque
+  
+  // Segundo reintento por seguridad para asegurar que el DOM tome los datos de Supabase
   setTimeout(() => {
-    if (typeof R === 'function' && U) R();
-  }, 200);
+    if (typeof R === 'function' && U) {
+      R();
+    }
+  }, 300);
 }
 setInterval(async () => {
   if (!U || document.hidden || V === "mat" || busy) return;
