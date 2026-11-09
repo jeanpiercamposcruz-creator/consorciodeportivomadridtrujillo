@@ -308,17 +308,16 @@ function ck(e) {
 /* ==================================================================
    4. CAPA DE DATOS (Supabase: autenticación, sincronización y respaldo)
    ================================================================== */
-var SB = "https://wuoqjcqniacsassxhrvs.supabase.co",
-  KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1b3FqY3FuaWFjc2Fzc3hocnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzODc2MjgsImV4cCI6MjEwODk2MzYyOH0.q8JRxory1AKAVy4oLKkAKfHXvHzW18NMMNqm95H_uIM";
-TK = null,
-  RT = null,
-  UID = null,
-  EM = "",
-  VER = 0,
-  SN = {},
-  busy = 0,
-  sv = Promise.resolve();
+var SB = "https://wuoqjcqniacsassxhrvs.supabase.co";
+var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1b3FqY3FuaWFjc2Fzc3hocnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzODc2MjgsImV4cCI6MjEwODk2MzYyOH0.q8JRxory1AKAVy4oLKkAKfHXvHzW18NMMNqm95H_uIM";
+var TK = null;
+var RT = null;
+var UID = null;
+var EM = "";
+var VER = 0;
+var SN = {};
+var busy = 0;
+var sv = Promise.resolve();
 async function sb(path, o = {}, retry = 1) {
   var r = await fetch(SB + path, {
     ...o,
@@ -687,7 +686,7 @@ var ADJ = [
     ["dfm", "Ficha de notaría", "Ficha"],
   ],
   ADJ_T = { dnf: "dni", dsg: "seguro", dfm: "ficha" };
-DW = null,
+var DW = null,
   DP = {},
   DWK = null,
   DDEL = [],
@@ -1068,7 +1067,7 @@ var kRes = () => {
 /* ==================================================================
    8. CÁMARA Y LECTURA DE CÓDIGOS QR
    ================================================================== */
-CAMID = 0,
+var CAMID = 0,
   CAMN = 0,
   CAMLAST = 0,
   CAMT0 = 0,
@@ -1523,7 +1522,7 @@ async function enviarPre() {
 /* ==================================================================
    10. NAVEGACIÓN LATERAL, RESTAURACIÓN, SESIÓN Y ARRANQUE
    ================================================================== */
-SIDE =
+var SIDE =
   innerWidth > 900 &&
   (() => {
     try {
@@ -2849,7 +2848,7 @@ Object.assign(FN, {
 /* ==================================================================
    17. ANIMACIONES Y COMPONENTES VISUALES (solo apariencia)
    ================================================================== */
-LASTV = null,
+var LASTV = null,
   NAVF = false,
   SPY = null,
   SPH = 0,
@@ -3359,7 +3358,79 @@ function initBackgroundVideo() {
     addEventListener(ev, resume, { passive: true }),
   );
 }
+/* ==================================================================
+   - FUNCIONES FALTANTES (Control de inactividad y Restauración)
+   ================================================================== */
 
+/* Control de inactividad (Cierre de sesión automático tras 30 min) */
+var idleTimer = null;
+function rIdle() {
+  if (!U) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    out();
+    toast("Sesión cerrada por inactividad.");
+  }, 30 * 60 * 1000);
+}
+
+/* Restauración de respaldo desde archivo JSON */
+async function restaurar(el) {
+  var f = el.files && el.files[0];
+  el.value = "";
+  if (!f) return;
+  if (!confirm("¿Restaurar el sistema desde este respaldo? Se sobrescribirán los datos actuales.")) return;
+  
+  try {
+    var txt = await f.text();
+    var json = JSON.parse(txt);
+    
+    // Validar estructura básica del respaldo
+    if (!json.tablas || !json.tablas.sedes) {
+      throw new Error("Formato de archivo inválido");
+    }
+    
+    // Cargar tablas en memoria
+    for (var t of TB) {
+      if (json.tablas[t.n]) {
+        t.load(json.tablas[t.n]);
+      }
+    }
+    
+    // Guardar estado en Supabase / almacenamiento local
+    await flush();
+    await pull();
+    toast("Sistema restaurado exitosamente");
+    R();
+  } catch (e) {
+    console.error(e);
+    toast("No se pudo restaurar el archivo: formato incorrecto o error de lectura.");
+  }
+}
+/* ==================================================================
+   - FUNCIÓN DE SINCRONIZACIÓN (FLUSH)
+   ================================================================== */
+async function flush() {
+  if (!U || U.rol !== "ADM") return;
+  
+  // Guardado de estado general en erp_state si se requiere respaldo en nube
+  try {
+    var payload = {
+      id: 1,
+      data: S,
+      actualizado: new Date().toISOString()
+    };
+    
+    await sb("/rest/v1/erp_state", {
+      method: "POST",
+      headers: {
+        "Prefer": "resolution=merge-duplicates"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.error("Error al sincronizar estado global (flush):", e);
+  }
+}
 /* ==================================================================
    19. ARRANQUE
    ================================================================== */
