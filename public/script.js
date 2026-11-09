@@ -2090,12 +2090,14 @@ function charts() {
 }
 function home() {
   var adm = U.rol === "ADM",
-    act = S.alu.filter((a) => a.est === "Activo"),
-    K3 = [
-      ["Alumnos activos", act.length, { e: "Activo" }],
-      ["Con datos pendientes", S.alu.filter((a) => falta(a).length).length, { e: "Incompleto" }],
-      ["Morosos", act.filter((a) => deuda(a) > 0).length, { e: "Activo", p: "Moroso" }],
-    ];
+      // Aseguramos que si S o S.alu aún no cargan por completo, tome un arreglo vacío en vez de fallar
+      alumnos = (S && Array.isArray(S.alu)) ? S.alu : [],
+      act = alumnos.filter((a) => a.est === "Activo"),
+      K3 = [
+        ["Alumnos activos", act.length, { e: "Activo" }],
+        ["Con datos pendientes", alumnos.filter((a) => falta(a).length).length, { e: "Incompleto" }],
+        ["Morosos", act.filter((a) => deuda(a) > 0).length, { e: "Activo", p: "Moroso" }],
+      ];
   return `${adm ? `<div class="row u-m-0-0-14"><button class="g u-text-white"  data-f=backup>Descargar respaldo completo (JSON)</button><input type="file" id="rf" accept="application/json,.json" hidden data-ch=restaurar><button class="g u-text-white"  data-f=pickRestore>Restaurar respaldo (JSON)</button></div>` : ""}${U.rol === "ENT" ? "" : `<div class="grid t3 kp">${K3.map(([l, n, f]) => `<button class=tile data-f=kpiFilter data-i="${esc(JSON.stringify(f))}"><span class=stat>${n}</span><b>${l}</b></button>`).join("")}</div>`}<div class="grid t3 u-mt-14">${M.filter(
     (x) => x[3].includes(U.rol) && !x[5],
   )
