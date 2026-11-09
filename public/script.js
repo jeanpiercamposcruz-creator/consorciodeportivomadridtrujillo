@@ -1,37 +1,37 @@
 /* ==================================================================
    1. CONFIGURACIÓN, REFERENCIAS AL DOM Y UTILIDADES
    ================================================================== */
-var K = "cdmt_erp_v2",
+const K = "cdmt_erp_v2",
   Y = new Date().getFullYear(),
   $ = (s) => document.querySelector(s);
 
 /* Referencias a los nodos estáticos de index.html */
-var DOM = {
+const DOM = {
   app: $("#app"),
   mod: $("#mod"),
   toast: $("#toast"),
   video: $("#bgv"),
 };
-var v = (id) => {
-  var e = document.getElementById(id);
+const v = (id) => {
+  const e = document.getElementById(id);
   return e ? e.value.trim() : "";
 };
-var today = () => new Date().toISOString().slice(0, 10),
+const today = () => new Date().toISOString().slice(0, 10),
   money = (n) => "S/ " + (+n || 0).toFixed(2);
-var esc = (s) =>
+const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"'`]/g,
     (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;" })[c],
   );
-var limpiar = (s, max = 80) =>
+const limpiar = (s, max = 80) =>
   String(s ?? "")
     .normalize("NFC")
     .replace(/[\u0000-\u001F\u007F]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max);
-var RX = {
+const RX = {
     nombre: /^[\p{L}][\p{L} .'-]{0,59}$/u,
     dni: /^\d{8}$/,
     cel: /^\d{1,9}$/,
@@ -39,21 +39,21 @@ var RX = {
     fecha: /^\d{4}-\d{2}-\d{2}$/,
   },
   IMG_OK = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]{0,200000}$/;
-var LISTAS = {
+const LISTAS = {
   sex: ["M", "F"],
   mod: ["Formativo", "Competitivo"],
   con: ["Ninguna", "Media Beca", "Becado"],
   est: ["Activo", "Inactivo"],
 };
-var monto = (v) => {
-  var n = Number(String(v).replace(",", "."));
+const monto = (v) => {
+  const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) && n >= 0 && n <= 99999 ? Math.round(n * 100) / 100 : null;
 };
 /* ==================================================================
    2. VALIDACIÓN Y SANEAMIENTO DE DATOS
    ================================================================== */
 function validarAlumno(f) {
-  var d = {
+  const d = {
       nom: limpiar(f.nom, 60),
       ape: limpiar(f.ape, 60),
       dni: limpiar(f.dni, 8),
@@ -74,30 +74,30 @@ function validarAlumno(f) {
   if (d.ac && !RX.cel.test(d.ac)) e.push("El celular admite hasta 9 dígitos");
   if (d.am && !RX.mail.test(d.am)) e.push("Correo inválido");
   if (!RX.fecha.test(d.nac)) e.push("Fecha de nacimiento inválida");
-  for (var k in LISTAS) if (!LISTAS[k].includes(d[k])) e.push("Valor no permitido en " + k);
-  for (var k of ["cm", "cmen", "pag"]) {
+  for (const k in LISTAS) if (!LISTAS[k].includes(d[k])) e.push("Valor no permitido en " + k);
+  for (const k of ["cm", "cmen", "pag"]) {
     d[k] = monto(f[k]);
     if (d[k] === null) e.push("Monto inválido");
   }
   return { d, e };
 }
 function validarPago(f) {
-  var m = monto(f.m),
+  const m = monto(f.m),
     e = [];
   if (m === null || m <= 0) e.push("Monto inválido");
   if (!["I", "E"].includes(f.t)) e.push("Tipo inválido");
   return { d: { m, t: f.t, c: limpiar(f.c, 60), d: limpiar(f.d, 120) }, e };
 }
-var o = (a, val, ph) =>
+const o = (a, val, ph) =>
   (ph !== undefined ? `<option value="">${ph}</option>` : "") +
   a
     .map(([x, y]) => `<option value="${esc(x)}"${x == val ? " selected" : ""}>${esc(y)}</option>`)
     .join("");
-var fl = (l, h) => `<label>${l}${h}</label>`;
+const fl = (l, h) => `<label>${l}${h}</label>`;
 /* ==================================================================
    3. ESTADO DE LA APLICACIÓN Y DATOS SEMILLA
    ================================================================== */
-var S,
+let S,
   U = null,
   V = "home",
   ED = null,
@@ -118,10 +118,10 @@ var S,
   CAM = null,
   FOTO = null,
   DF = {},
-  AS = {};
- window.GM = today().slice(0, 7);
+  AS = {},
+  GM = today().slice(0, 7);
 function seed() {
-  var s = {
+  const s = {
     c: { ALU: 3, "PER-ADM": 1, "PER-REC": 1, "PER-ENT": 1, HOR: 2 },
     sedes: [
       ["CSJ", "San Juan", 1200],
@@ -198,7 +198,7 @@ function seed() {
     kits: [],
     caja: [],
   };
-  var mk = (n, a, ap, dni, nac, h, seg, an, ac, pag) => ({
+  const mk = (n, a, ap, dni, nac, h, seg, an, ac, pag) => ({
     id: `${String(Y).slice(2)}000${n}`,
     nom: a,
     ape: ap,
@@ -264,9 +264,9 @@ function load() {
   }
 }
 function mig() {
-  var m = {};
+  const m = {};
   S.alu.forEach((a) => {
-    var n = a.id.match(/ALU-(\d{4})-(\d+)/),
+    const n = a.id.match(/ALU-(\d{4})-(\d+)/),
       o = a.id;
     if (n) a.id = n[1].slice(2) + n[2];
     m[o] = a.id;
@@ -283,8 +283,8 @@ function mig() {
   });
   S.personal.forEach((p) => delete p.pass);
 }
-var nid = () => {
-  var p = String(Y).slice(2);
+const nid = () => {
+  const p = String(Y).slice(2);
   return (
     p +
     String(
@@ -292,8 +292,8 @@ var nid = () => {
     ).padStart(4, "0")
   );
 };
-var age = (d) => {
-  var [y, m, x] = d.split("-").map(Number),
+const age = (d) => {
+  const [y, m, x] = d.split("-").map(Number),
     t = new Date();
   return (
     t.getFullYear() -
@@ -308,18 +308,19 @@ function ck(e) {
 /* ==================================================================
    4. CAPA DE DATOS (Supabase: autenticación, sincronización y respaldo)
    ================================================================== */
-var SB = "https://wuoqjcqniacsassxhrvs.supabase.co";
-var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1b3FqY3FuaWFjc2Fzc3hocnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzODc2MjgsImV4cCI6MjEwODk2MzYyOH0.q8JRxory1AKAVy4oLKkAKfHXvHzW18NMMNqm95H_uIM";
-var TK = null;
-var RT = null;
-var UID = null;
-var EM = "";
-var VER = 0;
-var SN = {};
-var busy = 0;
-var sv = Promise.resolve();
+const SB = "https://wuoqjcqniacsassxhrvs.supabase.co",
+  KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1b3FqY3FuaWFjc2Fzc3hocnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzODc2MjgsImV4cCI6MjEwODk2MzYyOH0.q8JRxory1AKAVy4oLKkAKfHXvHzW18NMMNqm95H_uIM";
+let TK = null,
+  RT = null,
+  UID = null,
+  EM = "",
+  VER = 0,
+  SN = {},
+  busy = 0,
+  sv = Promise.resolve();
 async function sb(path, o = {}, retry = 1) {
-  var r = await fetch(SB + path, {
+  const r = await fetch(SB + path, {
     ...o,
     headers: {
       apikey: KEY,
@@ -335,7 +336,7 @@ async function sb(path, o = {}, retry = 1) {
   return r;
 }
 async function auth(body, q) {
-  var r = await fetch(SB + "/auth/v1/token?grant_type=" + q, {
+  const r = await fetch(SB + "/auth/v1/token?grant_type=" + q, {
     method: "POST",
     headers: { apikey: KEY, "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -351,7 +352,7 @@ async function auth(body, q) {
       m: e.msg || e.message || e.error_description || "",
     };
   }
-  var j = await r.json();
+  const j = await r.json();
   TK = j.access_token;
   RT = j.refresh_token;
   UID = j.user && j.user.id;
@@ -361,37 +362,37 @@ async function auth(body, q) {
   } catch (e) {}
 }
 async function sess() {
-  var r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`),
+  const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`),
     j = await r.json();
   if (!r.ok || !j.length || j[0].rol !== "ADM") throw "rol";
   U = { id: "ADMIN", nom: EM, rol: "ADM" };
   V = "home";
 }
-var uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-var G = (n, a, c) => ({
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const G = (n, a, c) => ({
   n,
   rows: () =>
     S[a].map((x) => {
       if ("_id" in c && !x._id) x._id = uid();
-      var r = {};
-      for (var f in c) {
-        var v = x[f];
+      const r = {};
+      for (const f in c) {
+        const v = x[f];
         r[c[f]] = v === "" || v === undefined ? null : v;
       }
       return r;
     }),
   load: (d) => {
     S[a] = d.map((r) => {
-      var x = {};
-      for (var f in c) {
-        var v = r[c[f]];
+      const x = {};
+      for (const f in c) {
+        const v = r[c[f]];
         x[f] = v === null ? "" : v;
       }
       return x;
     });
   },
 });
-var HOR = G("horarios", "hor", {
+const HOR = G("horarios", "hor", {
   id: "id",
   sede: "sede_id",
   dep: "deporte_id",
@@ -399,7 +400,7 @@ var HOR = G("horarios", "hor", {
   ini: "hora_inicio",
   fin: "hora_fin",
 });
-var TB = [
+const TB = [
   G("sedes", "sedes", {
     id: "id",
     nombre: "nombre",
@@ -434,7 +435,7 @@ var TB = [
       ),
     load: (d) =>
       d.forEach((r) => {
-        var h = S.hor.find((h) => h.id === r.horario_id);
+        const h = S.hor.find((h) => h.id === r.horario_id);
         if (h) h.profs.push(r.personal_id);
       }),
   },
@@ -523,7 +524,7 @@ var TB = [
     n: "ajustes",
     rows: () => [{ id: "fee", valor: S.fee ?? 5 }],
     load: (d) => {
-      var f = d.find((r) => r.id === "fee");
+      const f = d.find((r) => r.id === "fee");
       S.fee = f ? f.valor : 5;
     },
   },
@@ -532,9 +533,9 @@ async function all(n) {
   let o = [],
     i = 0;
   for (;;) {
-    var r = await sb(`/rest/v1/${n}?select=*&order=id&limit=1000&offset=${i}`);
+    const r = await sb(`/rest/v1/${n}?select=*&order=id&limit=1000&offset=${i}`);
     if (!r.ok) throw n;
-    var j = await r.json();
+    const j = await r.json();
     o = o.concat(j);
     if (j.length < 1000) return o;
     i += 1000;
@@ -545,9 +546,8 @@ async function ver() {
     VER = (await (await sb("/rest/v1/erp_meta?id=eq.1&select=ver")).json())[0].ver;
   } catch (e) {}
 }
-
 async function pull() {
-  var aj = await all("ajustes");
+  const aj = await all("ajustes");
   if (!aj.length && U.rol === "ADM") {
     let old = null;
     try {
@@ -570,28 +570,56 @@ async function pull() {
     caja: [],
     c: {},
   };
-  
-  try {
-    for (var t of TB) {
-      t.load(t.n === "ajustes" ? aj : await all(t.n));
-    }
-  } catch (e) {
-    console.error("Error al cargar tablas de Supabase", e);
-  }
-  
-  // Si Supabase no devolvió alumnos, usamos los datos de respaldo (seed)
-  if (!S.alu.length) {
-    var seeded = seed();
-    S.sedes = S.sedes.length ? S.sedes : seeded.sedes;
-    S.deportes = S.deportes.length ? S.deportes : seeded.deportes;
-    S.personal = S.personal.length ? S.personal : seeded.personal;
-    S.hor = S.hor.length ? S.hor : seeded.hor;
-    S.alu = seeded.alu;
-  }
-
+  for (const t of TB) t.load(t.n === "ajustes" ? aj : await all(t.n));
   SN = {};
   TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
   await ver();
+}
+async function flush() {
+  const W = [],
+    D = [];
+  for (const t of TB) {
+    const cur = t.rows(),
+      m = new Map(cur.map((r) => [r.id, JSON.stringify(r)])),
+      o = SN[t.n] || new Map();
+    W.push([
+      t,
+      cur.filter((r) => !o.has(r.id)),
+      cur.filter((r) => o.has(r.id) && o.get(r.id) !== m.get(r.id)),
+      m,
+    ]);
+    D.unshift([t, [...o.keys()].filter((k) => !m.has(k)), m]);
+  }
+  for (const [t, ins, upd, m] of W) {
+    if (ins.length) {
+      const r = await sb("/rest/v1/" + t.n, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(ins),
+      });
+      if (r.status === 409) throw "dup";
+      if (!r.ok) throw await r.text();
+    }
+    if (upd.length) {
+      const r = await sb("/rest/v1/" + t.n, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify(upd),
+      });
+      if (!r.ok) throw await r.text();
+    }
+    SN[t.n] = new Map([...(SN[t.n] || []), ...m]);
+  }
+  for (const [t, del, m] of D) {
+    if (del.length) {
+      const r = await sb(
+        `/rest/v1/${esc(t.n)}?id=in.(${del.map((k) => encodeURIComponent('"' + String(k).replace(/[\\"]/g, "\\$&") + '"')).join(",")})`,
+        { method: "DELETE" },
+      );
+      if (!r.ok) throw await r.text();
+    }
+    SN[t.n] = m;
+  }
 }
 function save() {
   busy++;
@@ -618,7 +646,7 @@ async function backup() {
   try {
     await pull();
   } catch (e) {}
-  var o = {
+  const o = {
       sistema: "ERP Consorcio Deportivo Madrid Trujillo",
       generado: new Date().toISOString(),
       tablas: Object.fromEntries(TB.map((t) => [t.n, t.rows()])),
@@ -633,9 +661,9 @@ async function backup() {
   a.remove();
   toast("Respaldo descargado");
 }
-var tok = () =>
+const tok = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => (b % 36).toString(36)).join("");
-var base = () => location.href.split("#")[0],
+const base = () => location.href.split("#")[0],
   carnetUrl = (a) => {
     if (!a.qt) {
       a.qt = tok();
@@ -643,11 +671,11 @@ var base = () => location.href.split("#")[0],
     }
     return base() + "#c=" + a.qt;
   };
-var DOC_OK = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf" };
+const DOC_OK = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf" };
 async function subirArch(f, carpeta, tipo) {
-  var ext = DOC_OK[f.type];
+  const ext = DOC_OK[f.type];
   if (!ext || f.size > 5e6) throw "archivo";
-  var path = `${carpeta}/${tipo}-${Date.now()}.${ext}`,
+  const path = `${carpeta}/${tipo}-${Date.now()}.${ext}`,
     r = await sb("/storage/v1/object/documentos/" + path, {
       method: "POST",
       headers: { "Content-Type": f.type },
@@ -657,14 +685,14 @@ async function subirArch(f, carpeta, tipo) {
   return path;
 }
 async function verDoc(path) {
-  var w = window.open("", "_blank");
+  const w = window.open("", "_blank");
   try {
-    var r = await sb("/storage/v1/object/sign/documentos/" + path, {
+    const r = await sb("/storage/v1/object/sign/documentos/" + path, {
       method: "POST",
       body: JSON.stringify({ expiresIn: 120 }),
     });
     if (!r.ok) throw 0;
-    var j = await r.json(),
+    const j = await r.json(),
       u = SB + "/storage/v1" + j.signedURL;
     if (!w) return toast("Permite las ventanas emergentes para ver el archivo");
     w.opener = null;
@@ -677,16 +705,16 @@ async function verDoc(path) {
 /* ==================================================================
    5. ARCHIVOS ADJUNTADOS (foto + 3 documentos)
    ================================================================== */
-var DOC_PATH = /^(?!.*\.\.)[\w\-./]{3,160}\/(dni|seguro|ficha)-\d+\.(jpg|png|pdf)$/,
+const DOC_PATH = /^(?!.*\.\.)[\w\-./]{3,160}\/(dni|seguro|ficha)-\d+\.(jpg|png|pdf)$/,
   PRE_OK = /^preregistro\/[a-z0-9]+\/(dni|seguro|ficha)-\d+\.(jpg|png|pdf)$/;
-var ADJ = [
+const ADJ = [
     ["foto", "Foto del alumno", "Foto"],
     ["dnf", "DNI (AMBOS LADOS)", "DNI"],
     ["dsg", "Documento del seguro médico", "Seguro"],
     ["dfm", "Ficha de notaría", "Ficha"],
   ],
   ADJ_T = { dnf: "dni", dsg: "seguro", dfm: "ficha" };
-var DW = null,
+let DW = null,
   DP = {},
   DWK = null,
   DDEL = [],
@@ -695,7 +723,7 @@ var DW = null,
   ADJ_IN = null;
 /* DW = referencias vigentes (foto = data URL, resto = ruta en Storage). DP = cambios pendientes: File (reemplazo) o null (eliminar). */
 function adjInit(a) {
-  var k = ED || (PREID ? "pre:" + PREID : "nuevo");
+  const k = ED || (PREID ? "pre:" + PREID : "nuevo");
   if (DW && DWK === k) return;
   DWK = k;
   DP = {};
@@ -708,37 +736,37 @@ function adjInit(a) {
     dfm: a.dfm || "",
   };
 }
-var adjHas = (k) =>
+const adjHas = (k) =>
   k === "foto" ? !!DW.foto : DP[k] === null ? false : DP[k] instanceof File || !!DW[k];
 function adjBoton() {
-  var f = ADJ.filter((x) => !adjHas(x[0]));
+  const f = ADJ.filter((x) => !adjHas(x[0]));
   return `<button data-f="adjAbrir" id=ad_b>Archivos adjuntados (${4 - f.length}/4)</button><span class="b ${f.length ? "no" : "ok"}">${f.length ? "Faltan: " + f.map((x) => x[2]).join(", ") : "Archivos completos"}</span>`;
 }
 function adjHtml(m = "") {
-  var n = ADJ.filter((x) => adjHas(x[0])).length;
+  const n = ADJ.filter((x) => adjHas(x[0])).length;
   return `<h3>Archivos adjuntados</h3><p class=mu>${n} de 4 cargados · JPG, PNG o PDF, máx. 5 MB${ED ? "" : " · se guardan al presionar Guardar"}</p><div class=adj>${ADJ.map(
     ([k, t]) => {
-      var ok = adjHas(k),
+      const ok = adjHas(k),
         pd = DP[k] instanceof File;
       return `<div class="adj-i${ok ? "" : " miss"}"><div class=adj-h><b>${t}</b><span class="b ${ok ? "ok" : "no"}">${ok ? (pd ? "Cargado (pendiente de guardar)" : "Cargado") : "Faltante"}</span></div><div class=adj-a>${ok ? `<button class="s g" data-f=adjVer data-i=${k}>Ver</button>` : ""}<button class=s data-f=adjCamb data-i=${k}>${ok ? "Reemplazar" : "Subir"}</button>${ok ? `<button class="s r" data-f=adjDel data-i=${k}>Eliminar</button>` : ""}</div></div>`;
     },
   ).join("")}</div><p id=adj_m class=mu>${m}</p>`;
 }
 function adjRefrescar() {
-  var r = $("#ad_r");
+  const r = $("#ad_r");
   if (r) r.innerHTML = adjBoton();
   if ($("#adj_m") && DOM.mod.classList.contains("o")) modal(adjHtml());
 }
 function abrirBlob(b) {
-  var u = URL.createObjectURL(b);
+  const u = URL.createObjectURL(b);
   window.open(u, "_blank");
   setTimeout(() => URL.revokeObjectURL(u), 60000);
 }
 function adjVer(k) {
   if (k === "foto") {
-    var m = /^data:([^;]+);base64,(.*)$/.exec(DW.foto || "");
+    const m = /^data:([^;]+);base64,(.*)$/.exec(DW.foto || "");
     if (!m) return;
-    var b = atob(m[2]),
+    const b = atob(m[2]),
       u = new Uint8Array(b.length);
     for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
     return abrirBlob(new Blob([u], { type: m[1] }));
@@ -753,7 +781,7 @@ function adjCamb(k) {
     ADJ_IN.type = "file";
     ADJ_IN.className = "offscreen-file-input";
     ADJ_IN.addEventListener("change", () => {
-      var f = ADJ_IN.files && ADJ_IN.files[0];
+      const f = ADJ_IN.files && ADJ_IN.files[0];
       ADJ_IN.value = "";
       if (f) adjSet(ADJ_K, f);
     });
@@ -787,10 +815,10 @@ async function adjDel(k) {
 /* Ficha existente: el cambio se guarda al instante. Matrícula nueva / desde pre-registro: queda pendiente hasta "Guardar". */
 async function adjAplicar() {
   if (!ED) return adjRefrescar();
-  var a = S.alu.find((x) => x.id === ED);
+  const a = S.alu.find((x) => x.id === ED);
   if (!a) return;
   ADJ_BUSY = true;
-  var m = $("#adj_m");
+  const m = $("#adj_m");
   if (m) m.textContent = "Guardando…";
   try {
     await adjCommit(a.id);
@@ -807,11 +835,11 @@ async function adjAplicar() {
   adjRefrescar();
 }
 async function adjCommit(id) {
-  for (var [k, t] of Object.entries(ADJ_T)) {
-    var p = DP[k];
+  for (const [k, t] of Object.entries(ADJ_T)) {
+    const p = DP[k];
     if (p === undefined) continue;
     if (p instanceof File) {
-      var n = await subirArch(p, id, t);
+      const n = await subirArch(p, id, t);
       if (DW[k]) DDEL.push(DW[k]);
       DW[k] = n;
     } else {
@@ -823,20 +851,20 @@ async function adjCommit(id) {
 }
 /* Borra de Storage lo reemplazado/eliminado, solo si la ficha guardada ya no lo referencia */
 async function adjLimpiar(id) {
-  var del = [...new Set(DDEL)].filter((x) => DOC_PATH.test(x || ""));
+  const del = [...new Set(DDEL)].filter((x) => DOC_PATH.test(x || ""));
   DDEL = [];
   if (!del.length) return;
   try {
     await sv;
-    var r = await sb(
+    const r = await sb(
       "/rest/v1/alumnos?id=eq." +
         encodeURIComponent(id) +
         "&select=doc_dni_frente,doc_seguro,doc_ficha",
     );
     if (!r.ok) return;
-    var j = (await r.json())[0];
+    const j = (await r.json())[0];
     if (!j) return;
-    var en = new Set([j.doc_dni_frente, j.doc_seguro, j.doc_ficha]),
+    const en = new Set([j.doc_dni_frente, j.doc_seguro, j.doc_ficha]),
       b = del.filter((x) => !en.has(x));
     if (b.length)
       await sb("/storage/v1/object/documentos", {
@@ -848,13 +876,13 @@ async function adjLimpiar(id) {
 /* Foto: recorte cuadrado centrado, 200x200 JPEG (se guarda en alumnos.foto como antes) */
 function fotoData(f) {
   return new Promise((ok, no) => {
-    var u = URL.createObjectURL(f),
+    const u = URL.createObjectURL(f),
       im = new Image();
     im.onload = () => {
       URL.revokeObjectURL(u);
-      var s = Math.min(im.naturalWidth, im.naturalHeight);
+      const s = Math.min(im.naturalWidth, im.naturalHeight);
       if (!s) return no();
-      var c = document.createElement("canvas");
+      const c = document.createElement("canvas");
       c.width = c.height = 200;
       c.getContext("2d").drawImage(
         im,
@@ -867,7 +895,7 @@ function fotoData(f) {
         200,
         200,
       );
-      var d = c.toDataURL("image/jpeg", 0.8);
+      const d = c.toDataURL("image/jpeg", 0.8);
       IMG_OK.test(d) ? ok(d) : no();
     };
     im.onerror = () => {
@@ -880,7 +908,7 @@ function fotoData(f) {
 /* ==================================================================
    6. PRE-REGISTRO DE ALUMNOS (staff)
    ================================================================== */
-var preAlu = (p) => ({
+const preAlu = (p) => ({
     est: "Activo",
     con: "Ninguna",
     mod: "Formativo",
@@ -912,7 +940,7 @@ var preAlu = (p) => ({
       PRE_OK.test(p.doc_ficha || ""),
     ].filter(Boolean).length;
 function qrPadres() {
-  var u = base() + "#prereg";
+  const u = base() + "#prereg";
   modal(
     "<h3>Pre-registro para padres</h3>" +
       qr(u) +
@@ -922,17 +950,17 @@ function qrPadres() {
 async function contarPre() {
   if (!U) return;
   try {
-    var r = await sb("/rest/v1/preregistros?select=id");
+    const r = await sb("/rest/v1/preregistros?select=id");
     if (!r.ok) return;
     PRN = (await r.json()).length;
-    var e = $("#pb");
+    const e = $("#pb");
     if (e) e.textContent = PRN ? " (" + PRN + ")" : "";
   } catch (e) {}
 }
 setInterval(contarPre, 30000);
 async function cargarPre() {
   try {
-    var r = await sb("/rest/v1/preregistros?select=*&order=fecha_hora.asc,id.asc&limit=1000");
+    const r = await sb("/rest/v1/preregistros?select=*&order=fecha_hora.asc,id.asc&limit=1000");
     PR = r.ok ? await r.json() : [];
   } catch (e) {
     PR = [];
@@ -940,8 +968,8 @@ async function cargarPre() {
   PRN = PR.length;
   if (V === "pre") R();
 }
-var preL = () => {
-  var q = PF.q.toLowerCase().trim();
+const preL = () => {
+  const q = PF.q.toLowerCase().trim();
   return (PR || []).filter(
     (p) =>
       (!PF.m || p.modalidad === PF.m) &&
@@ -951,7 +979,7 @@ var preL = () => {
           .includes(q)),
   );
 };
-var preT = () =>
+const preT = () =>
   tbl(
     [
       "N.°",
@@ -970,10 +998,10 @@ var preT = () =>
         `<tr><td>${i + 1}</td><td>${esc(new Date(p.fecha_hora).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" }))}</td><td><span class="b ${p.modalidad === "Presencial" ? "ok" : "no"}">${esc(p.modalidad)}</span></td><td>${esc(p.nombres + " " + p.apellidos)}</td><td>${esc(p.dni || "")}</td><td>${esc(dn(p.deporte_id))} / ${esc(sn(p.sede_id))}</td><td>${esc(p.apoderado || "")}</td><td>${esc(p.celular_apoderado || "")}</td><td><span class="b ${preN(p) === 4 ? "ok" : "no"}">${preN(p)}/4</span></td><td><button class=s data-f="preOk" data-i="${esc(p.id)}">Aceptar</button> <button class="s r" data-f="preDel" data-i="${esc(p.id)}">Eliminar</button></td></tr>`,
     ),
   );
-var preF = () => {
+const preF = () => {
   $("#pt").innerHTML = preT();
 };
-var vwPre = () =>
+const vwPre = () =>
   PR === null
     ? "<div class=card><p class=mu>Cargando...</p></div>"
     : `<div class=card><div class=fg>${fl("Buscar", `<input placeholder="Nombre, DNI o apoderado" value="${esc(PF.q)}" data-in=preQ>`)}${fl(
@@ -990,7 +1018,7 @@ var vwPre = () =>
           "</select>",
       )}</div><div class=row><button class=g data-f=cargarPre>Actualizar</button><button class=g data-f=qrPadres>QR para padres</button></div></div><div class=card><div id=pt>${preT()}</div><p class=mu>Orden de llegada: primero quien llenó el formulario antes. Eliminar solo quita la solicitud, no afecta a los alumnos oficiales.</p></div>`;
 function preBorrarArch(p) {
-  var l = [p.doc_dni_frente, p.doc_seguro, p.doc_ficha].filter((x) => PRE_OK.test(x || ""));
+  const l = [p.doc_dni_frente, p.doc_seguro, p.doc_ficha].filter((x) => PRE_OK.test(x || ""));
   if (l.length)
     sb("/storage/v1/object/documentos", {
       method: "DELETE",
@@ -999,7 +1027,7 @@ function preBorrarArch(p) {
 }
 async function preDel(id) {
   if (!confirm("¿Eliminar este pre-registro y sus archivos?")) return;
-  var q = (PR || []).find((x) => x.id === id),
+  const q = (PR || []).find((x) => x.id === id),
     r = await sb("/rest/v1/preregistros?id=eq." + encodeURIComponent(id), { method: "DELETE" });
   if (!r.ok) return toast("No se pudo eliminar");
   if (q) preBorrarArch(q);
@@ -1010,12 +1038,12 @@ async function preDel(id) {
 /* ==================================================================
    7. KITS: NÚMEROS DE CAMISETA DISPONIBLES
    ================================================================== */
-var ocup = (a) => {
-  var y = +a.nac.slice(0, 4),
+const ocup = (a) => {
+  const y = +a.nac.slice(0, 4),
     o = new Set();
   if (a.mod !== "Competitivo") return o;
   S.kits.forEach((k) => {
-    var b = S.alu.find((x) => x.id === k.aid);
+    const b = S.alu.find((x) => x.id === k.aid);
     if (
       b &&
       b.id !== a.id &&
@@ -1028,8 +1056,8 @@ var ocup = (a) => {
   });
   return o;
 };
-var matriz = (a) => {
-  var oc = ocup(a);
+const matriz = (a) => {
+  const oc = ocup(a);
   return (
     "<div class=nm>" +
     Array.from({ length: 100 }, (_, i) => i + 1)
@@ -1042,13 +1070,13 @@ var matriz = (a) => {
     "</div>"
   );
 };
-var kSelHtml = () => {
-  var a = S.alu.find((x) => x.id === KSEL);
+const kSelHtml = () => {
+  const a = S.alu.find((x) => x.id === KSEL);
   if (!a) return "";
   return `<div class="card u-col-full u-m-0"><b>${esc(a.nom + " " + a.ape)}</b> · ${esc(a.id)} · DNI ${esc(a.dni || "sin DNI")}<br><span class=mu>${esc(dn(a.dep))} · CAT-${esc(a.nac.slice(0, 4))} · ${esc(a.mod)}</span><p class="mu u-m-6-0">${a.mod === "Competitivo" ? "Los números en rojo ya están usados en su categoría o en las de ±2 años y no se pueden elegir." : "Modalidad formativo: no hay restricción de números."}</p>${matriz(a)}</div>`;
 };
-var kRes = () => {
-  var q = KQ.toLowerCase().trim(),
+const kRes = () => {
+  const q = KQ.toLowerCase().trim(),
     r =
       q.length < 2
         ? []
@@ -1067,7 +1095,7 @@ var kRes = () => {
 /* ==================================================================
    8. CÁMARA Y LECTURA DE CÓDIGOS QR
    ================================================================== */
-var CAMID = 0,
+let CAMID = 0,
   CAMN = 0,
   CAMLAST = 0,
   CAMT0 = 0,
@@ -1086,7 +1114,7 @@ async function scan() {
     '<h3>Escanear asistencia</h3><video id=cv playsinline muted autoplay class="scan-video"></video><p id=cs class=mu>Apunta la cámara al QR del carnet</p>',
   );
   stopCam();
-  var id = CAMID;
+  const id = CAMID;
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
       throw new Error("sin-mediadevices");
@@ -1119,9 +1147,9 @@ async function scan() {
       return;
     }
     CAM = st;
-    var tr = st.getVideoTracks()[0];
+    const tr = st.getVideoTracks()[0];
     try {
-      var cp = tr.getCapabilities ? tr.getCapabilities() : {},
+      const cp = tr.getCapabilities ? tr.getCapabilities() : {},
         adv = {};
       if (cp.focusMode && cp.focusMode.includes("continuous")) adv.focusMode = "continuous";
       if (cp.exposureMode && cp.exposureMode.includes("continuous"))
@@ -1130,7 +1158,7 @@ async function scan() {
         adv.whiteBalanceMode = "continuous";
       if (Object.keys(adv).length) await tr.applyConstraints({ advanced: [adv] });
     } catch (_) {}
-    var v = $("#cv");
+    const v = $("#cv");
     v.srcObject = st;
     v.setAttribute("playsinline", "");
     v.muted = true;
@@ -1147,14 +1175,14 @@ async function scan() {
     loopCam(id);
   } catch (e) {
     stopCam();
-    var m = $("#cs");
+    const m = $("#cs");
     if (m)
       m.textContent =
         "No se pudo abrir la cámara. Permite el acceso en el navegador (requiere HTTPS).";
   }
 }
 function camGrab(v, sx, sy, sw, sh, maxW) {
-  var k = Math.min(1, maxW / sw),
+  const k = Math.min(1, maxW / sw),
     tw = Math.max(1, Math.round(sw * k)),
     th = Math.max(1, Math.round(sh * k));
   if (CAMC.width !== tw) CAMC.width = tw;
@@ -1165,19 +1193,19 @@ function camGrab(v, sx, sy, sw, sh, maxW) {
   return CAMX.getImageData(0, 0, tw, th);
 }
 function camStretch(im) {
-  var d = im.data,
+  const d = im.data,
     n = d.length >> 2,
     h = new Uint32Array(256),
     g = new Uint8Array(n);
   for (let i = 0, j = 0; i < n; i++, j += 4) {
-    var y = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8;
+    const y = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8;
     g[i] = y;
     h[y]++;
   }
   let a = 0,
     lo = 0,
     hi = 255;
-  var c = n * 0.02;
+  const c = n * 0.02;
   for (let k = 0; k < 256; k++) {
     a += h[k];
     if (a >= c) {
@@ -1194,7 +1222,7 @@ function camStretch(im) {
     }
   }
   if (hi - lo < 30) return im;
-  var f = 255 / (hi - lo);
+  const f = 255 / (hi - lo);
   for (let i = 0, j = 0; i < n; i++, j += 4) {
     let y = (g[i] - lo) * f;
     y = y < 0 ? 0 : y > 255 ? 255 : y;
@@ -1204,21 +1232,21 @@ function camStretch(im) {
 }
 function loopCam(id) {
   if (id !== CAMID || !CAM) return;
-  var v = $("#cv");
+  const v = $("#cv");
   if (!v) return;
-  var again = () => {
+  const again = () => {
     if (id !== CAMID || !CAM) return;
     if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => loopCam(id));
     else setTimeout(() => loopCam(id), 100);
   };
-  var now = performance.now();
+  const now = performance.now();
   if (now - CAMLAST < 110 || v.readyState < 2 || !v.videoWidth || !window.jsQR || v.paused) {
     if (v.paused) v.play().catch(() => {});
     return again();
   }
   CAMLAST = now;
   try {
-    var W = v.videoWidth,
+    const W = v.videoWidth,
       H = v.videoHeight,
       p = CAMN++ % 3;
     let im,
@@ -1230,7 +1258,7 @@ function loopCam(id) {
       im = camGrab(v, 0, 0, W, H, 560);
       q = jsQR(im.data, im.width, im.height, { inversionAttempts: "dontInvert" });
     } else {
-      var s = Math.round(Math.min(W, H) * 0.8),
+      const s = Math.round(Math.min(W, H) * 0.8),
         sx = (W - s) >> 1,
         sy = (H - s) >> 1;
       im = camStretch(camGrab(v, sx, sy, s, s, 720));
@@ -1240,7 +1268,7 @@ function loopCam(id) {
       CAMHIT = true;
       qrLeido(q.data);
     } else if (!CAMHIT && Date.now() - CAMT0 > 8000) {
-      var m = $("#cs");
+      const m = $("#cs");
       if (m && m.dataset.h !== "1") {
         m.dataset.h = "1";
         m.textContent =
@@ -1251,17 +1279,17 @@ function loopCam(id) {
   again();
 }
 function qrLeido(t) {
-  var m = /#c=([a-z0-9]{16})/.exec(String(t));
+  const m = /#c=([a-z0-9]{16})/.exec(String(t));
   if (!m) {
-    var z = $("#cs");
+    const z = $("#cs");
     if (z) z.textContent = "QR leído, pero no es un carnet de la academia";
     return;
   }
-  var n = Date.now();
+  const n = Date.now();
   if (m[1] === LASTQ && n - LASTT < 4000) return;
   LASTQ = m[1];
   LASTT = n;
-  var e = $("#cs"),
+  const e = $("#cs"),
     a = S.alu.find((x) => x.qt === m[1]);
   if (!a) {
     e.textContent = "QR no reconocido";
@@ -1271,7 +1299,7 @@ function qrLeido(t) {
     e.textContent = a.nom + " " + a.ape + ": inactivo o sin horario asignado";
     return;
   }
-  var x = S.asis.find((x) => x.f === today() && x.t === "A" && x.ref === a.id && x.h === a.hor);
+  const x = S.asis.find((x) => x.f === today() && x.t === "A" && x.ref === a.id && x.h === a.hor);
   if (x && x.ok === true) {
     e.textContent = "Ya registrado hoy: " + a.nom + " " + a.ape;
     return;
@@ -1287,7 +1315,7 @@ function qrLeido(t) {
   } catch (_) {}
   R();
 }
-var QFIN = null;
+let QFIN = null;
 function qrFotoAbrir() {
   if (!QFIN) {
     QFIN = document.createElement("input");
@@ -1296,7 +1324,7 @@ function qrFotoAbrir() {
     QFIN.setAttribute("capture", "environment");
     QFIN.className = "offscreen-file-input";
     QFIN.addEventListener("change", () => {
-      var f = QFIN.files && QFIN.files[0];
+      const f = QFIN.files && QFIN.files[0];
       QFIN.value = "";
       if (f) qrFoto(f);
     });
@@ -1310,7 +1338,7 @@ async function qrDecodeFoto(f) {
     bmp = await createImageBitmap(f);
   } catch (_) {
     bmp = await new Promise((ok, no) => {
-      var u = URL.createObjectURL(f),
+      const u = URL.createObjectURL(f),
         im = new Image();
       im.onload = () => {
         URL.revokeObjectURL(u);
@@ -1324,26 +1352,26 @@ async function qrDecodeFoto(f) {
     });
   }
   try {
-    var W = bmp.naturalWidth || bmp.width,
+    const W = bmp.naturalWidth || bmp.width,
       H = bmp.naturalHeight || bmp.height;
     if ("BarcodeDetector" in window) {
       try {
-        var d = new BarcodeDetector({ formats: ["qr_code"] }),
+        const d = new BarcodeDetector({ formats: ["qr_code"] }),
           r = await d.detect(bmp);
         if (r.length && r[0].rawValue) return r[0].rawValue;
       } catch (_) {}
     }
     if (!window.jsQR) return null;
-    var c = document.createElement("canvas"),
+    const c = document.createElement("canvas"),
       x = c.getContext("2d", { willReadFrequently: true });
-    for (var [mw, st] of [
+    for (const [mw, st] of [
       [1600, 0],
       [900, 0],
       [500, 0],
       [1200, 1],
       [700, 1],
     ]) {
-      var k = Math.min(1, mw / Math.max(W, H)),
+      const k = Math.min(1, mw / Math.max(W, H)),
         tw = Math.max(1, Math.round(W * k)),
         th = Math.max(1, Math.round(H * k));
       c.width = tw;
@@ -1353,7 +1381,7 @@ async function qrDecodeFoto(f) {
       x.drawImage(bmp, 0, 0, tw, th);
       let im = x.getImageData(0, 0, tw, th);
       if (st) im = camStretch(im);
-      var q = jsQR(im.data, tw, th, { inversionAttempts: st ? "attemptBoth" : "dontInvert" });
+      const q = jsQR(im.data, tw, th, { inversionAttempts: st ? "attemptBoth" : "dontInvert" });
       if (q && q.data) return q.data;
       await new Promise((r) => setTimeout(r, 0));
     }
@@ -1367,7 +1395,7 @@ async function qrFoto(f) {
   modal(
     '<h3>Escanear asistencia</h3><p id=cs class=mu>Procesando foto…</p><div class="row u-jc-center"><button data-f=qrFotoAbrir>Escanear otro</button></div>',
   );
-  var cs = $("#cs");
+  const cs = $("#cs");
   let t = null;
   try {
     t = await qrDecodeFoto(f);
@@ -1388,7 +1416,7 @@ async function pubCarnet(t) {
   DOM.app.innerHTML = `<main class=login><section class="card u-text-center"><img src="${LOGO}" class=lg alt="CDMT"><p class=mu>Cargando carnet...</p></section></main>`;
   let a = null;
   try {
-    var r = await sb("/rest/v1/rpc/carnet_publico", {
+    const r = await sb("/rest/v1/rpc/carnet_publico", {
       method: "POST",
       body: JSON.stringify({ t }),
     });
@@ -1403,7 +1431,7 @@ async function pubPre() {
   try {
     cat = await (await sb("/rest/v1/catalogo_publico?select=*")).json();
   } catch (e) {}
-  var op = (t) =>
+  const op = (t) =>
     o(
       cat.filter((x) => x.tipo === t).map((x) => [x.id, x.nombre]),
       "",
@@ -1429,7 +1457,7 @@ async function pubPre() {
 }
 async function enviarPre() {
   if (v("pp_w")) return;
-  var { d, e } = validarAlumno({
+  const { d, e } = validarAlumno({
     nom: v("pp_n"),
     ape: v("pp_a"),
     dni: v("pp_d"),
@@ -1452,15 +1480,15 @@ async function enviarPre() {
   if (!d.an) e.push("Escribe el nombre del apoderado");
   if (!["Presencial", "Virtual"].includes(v("pp_m"))) e.push("Elige Presencial o Virtual");
   if (e.length) return toast(e[0]);
-  var b = $("#pp_b"),
+  const b = $("#pp_b"),
     fs = {
       foto: $("#pp_fo").files[0],
       dnf: $("#pp_dn").files[0],
       dsg: $("#pp_sf").files[0],
       dfm: $("#pp_fm").files[0],
     };
-  for (var k in fs) {
-    var f = fs[k];
+  for (const k in fs) {
+    const f = fs[k];
     if (!f) continue;
     if (f.size > 5e6) return toast("Cada archivo debe pesar máximo 5 MB");
     if (!(k === "foto" ? /^image\/(jpeg|png)$/.test(f.type) : DOC_OK[f.type]))
@@ -1468,17 +1496,17 @@ async function enviarPre() {
         k === "foto" ? "La foto debe ser JPG o PNG" : "Los documentos deben ser JPG, PNG o PDF",
       );
   }
-  var pid = uid(),
+  const pid = uid(),
     tx = b.textContent;
   b.disabled = true;
   try {
     let foto = null;
-    var ps = {};
+    const ps = {};
     if (fs.foto) {
       b.textContent = "Procesando foto...";
       foto = await fotoData(fs.foto);
     }
-    for (var [k, t] of [
+    for (const [k, t] of [
       ["dnf", "dni"],
       ["dsg", "seguro"],
       ["dfm", "ficha"],
@@ -1488,7 +1516,7 @@ async function enviarPre() {
         ps[k] = await subirArch(fs[k], "preregistro/" + pid, t);
       }
     b.textContent = "Enviando...";
-    var r = await sb("/rest/v1/preregistros", {
+    const r = await sb("/rest/v1/preregistros", {
       method: "POST",
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
@@ -1522,7 +1550,7 @@ async function enviarPre() {
 /* ==================================================================
    10. NAVEGACIÓN LATERAL, RESTAURACIÓN, SESIÓN Y ARRANQUE
    ================================================================== */
-var SIDE =
+let SIDE =
   innerWidth > 900 &&
   (() => {
     try {
@@ -1531,7 +1559,7 @@ var SIDE =
       return true;
     }
   })();
-var sideHtml = () =>
+const sideHtml = () =>
   `<aside class="side ${SIDE ? "" : "off"}"><nav aria-label="Módulos"><i class=side-pill></i>${M.filter(
     (x) => x[3].includes(U.rol) && !x[5],
   )
@@ -1545,40 +1573,82 @@ function tgSide() {
   try {
     localStorage.setItem("cdmt_side", SIDE ? "1" : "0");
   } catch (e) {}
-  var a = $(".side");
+  const a = $(".side");
   if (a) a.classList.toggle("off", !SIDE);
-  var nv = $(".side nav");
+  const nv = $(".side nav");
   if (nv && nv._pl) requestAnimationFrame(nv._pl);
 }
+async function restaurar(inp) {
+  const f = inp.files[0];
+  inp.value = "";
+  if (!f) return;
+  if (f.size > 20e6) return toast("El archivo es demasiado grande");
+  let o;
+  try {
+    o = JSON.parse(await f.text());
+  } catch (e) {
+    return toast("El archivo no es un JSON válido");
+  }
+  const T = o && o.tablas;
+  if (
+    !T ||
+    typeof T !== "object" ||
+    TB.some((t) => !Array.isArray(T[t.n]) || T[t.n].some((r) => !r || typeof r.id !== "string"))
+  )
+    return toast("El archivo no parece un respaldo de este sistema");
+  if (
+    !confirm(
+      `Se reemplazarán TODOS los datos actuales por los del respaldo (${T.alumnos.length} alumnos, generado el ${esc(String(o.generado || "").slice(0, 10))}). Antes se descargará una copia de lo actual. ¿Continuar?`,
+    )
+  )
+    return;
+  busy++;
+  try {
+    await backup();
+    T.alumnos.forEach((r) => {
+      if (r.foto && !IMG_OK.test(r.foto)) r.foto = null;
+    });
+    for (const t of TB) t.load(T[t.n]);
+    await flush();
+    await ver();
+    toast("Respaldo restaurado correctamente");
+  } catch (e) {
+    console.error(e);
+    toast("No se pudo restaurar el respaldo. Se recargó el estado actual.");
+    try {
+      await pull();
+    } catch (_) {}
+  }
+  busy--;
+  R();
+}
+let idle;
+const rIdle = () => {
+  clearTimeout(idle);
+  if (U) idle = setTimeout(out, 30 * 60 * 1000);
+};
 async function boot() {
-  var h = location.hash;
+  const h = location.hash;
   if (/^#c=[a-z0-9]{16}$/.test(h)) return pubCarnet(h.slice(3));
   if (h === "#prereg") return pubPre();
-
-  // 1. Cargar datos locales de respaldo
-  load();
-
   try {
     RT = sessionStorage.getItem("cdmt_rt");
     if (RT && !KEY.startsWith("PEGA")) {
       await auth({ refresh_token: RT }, "refresh_token");
       await sess();
-      
-      // 2. ESPERAR a que baje de Supabase ANTES de pintar por primera vez
       await pull();
     }
   } catch (e) {
     U = null;
   }
-  // 3. Renderizar únicamente cuando los datos ya están en memoria
   R();
 }
 setInterval(async () => {
   if (!U || document.hidden || V === "mat" || busy) return;
-  var a = document.activeElement;
+  const a = document.activeElement;
   if (a && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return;
   try {
-    var j = await (await sb("/rest/v1/erp_meta?id=eq.1&select=ver")).json();
+    const j = await (await sb("/rest/v1/erp_meta?id=eq.1&select=ver")).json();
     if (j[0] && j[0].ver > VER) {
       await pull();
       R();
@@ -1588,26 +1658,26 @@ setInterval(async () => {
 /* ==================================================================
    11. HELPERS DE NEGOCIO Y UI (toast, modal, QR, exportar a Excel)
    ================================================================== */
-var nx = (k, p) => {
-  var L = k === "HOR" ? S.hor : S.personal.filter((x) => x.id.startsWith(k + "-"));
+const nx = (k, p) => {
+  const L = k === "HOR" ? S.hor : S.personal.filter((x) => x.id.startsWith(k + "-"));
   return String(Math.max(0, ...L.map((x) => +x.id.split("-").pop())) + 1).padStart(p, "0");
 };
-var cats = () => {
-  var r = [];
+const cats = () => {
+  const r = [];
   for (let y = Y - 17; y <= Y - 5; y++) r.push(y);
   return r;
 };
-var catOk = (y) => y >= Y - 17 && y <= Y - 5;
-var sn = (id) => (S.sedes.find((x) => x.id === id) || {}).nombre || "-",
+const catOk = (y) => y >= Y - 17 && y <= Y - 5;
+const sn = (id) => (S.sedes.find((x) => x.id === id) || {}).nombre || "-",
   dn = (id) => (S.deportes.find((x) => x.id === id) || {}).nombre || "-";
-var hrs = (h) => {
-  var t = (x) => +x.slice(0, 2) + x.slice(3) / 60;
+const hrs = (h) => {
+  const t = (x) => +x.slice(0, 2) + x.slice(3) / 60;
   return Math.max(0, t(h.fin) - t(h.ini));
 };
-var hl = (h) =>
+const hl = (h) =>
   `${esc(sn(h.sede))} · ${esc(dn(h.dep))} ${esc(h.cat)} · ${esc(h.ini)}-${esc(h.fin)}`;
-var falta = (a) => {
-  var f = [];
+const falta = (a) => {
+  const f = [];
   if (!/^\d{8}$/.test(a.dni || "")) f.push("DNI");
   if (!a.foto) f.push("Foto");
   if (!a.seg) f.push("Seguro");
@@ -1619,25 +1689,25 @@ var falta = (a) => {
   if (!a.dfm) f.push("Arch. ficha");
   return f;
 };
-var deuda = (a) => (+a.cm || 0) + (+a.cmen || 0) * (+a.mes || 0) - (+a.pag || 0);
+const deuda = (a) => (+a.cm || 0) + (+a.cmen || 0) * (+a.mes || 0) - (+a.pag || 0);
 function toast(m) {
-  var t = DOM.toast;
+  const t = DOM.toast;
   t.textContent = m;
   t.classList.add("show");
   clearTimeout(toast.t);
   toast.t = setTimeout(() => t.classList.remove("show"), 2600);
 }
-var cl = () => {
+const cl = () => {
   stopCam();
   DOM.mod.classList.remove("o", "rcm");
 };
-var modal = (h) => {
+const modal = (h) => {
   DOM.mod.innerHTML = `<div class=card>${h}<div class="row u-jc-center"><button class=g data-f=cl>Cerrar</button></div></div>`;
   DOM.mod.classList.add("o");
 };
-var qr = (t) => {
+const qr = (t) => {
   try {
-    var q = qrcode(0, "M");
+    const q = qrcode(0, "M");
     q.addData(t);
     q.make();
     return '<div class="qr-box">' + q.createSvgTag(6) + "</div>";
@@ -1645,7 +1715,7 @@ var qr = (t) => {
     return "<p class=mu>(" + esc(t) + ")</p>";
   }
 };
-var XL = {
+const XL = {
   sedes: () => [
     ["Código", "Sede", "Dirección", "Contacto", "Tipo de alquiler", "Alquiler mensual (S/)"],
     S.sedes.map((s) => [s.id, s.nombre, s.dir, s.con, s.tipo, +s.costo]),
@@ -1735,7 +1805,7 @@ var XL = {
     ),
   ],
   caja: () => {
-    var s = AS.cs || S.sedes[0].id;
+    const s = AS.cs || S.sedes[0].id;
     return [
       ["Fecha", "Sede", "Tipo", "Concepto", "Detalle", "Monto (S/)"],
       S.caja
@@ -1745,7 +1815,7 @@ var XL = {
   },
 };
 function cp(k) {
-  var [h, r0] = XL[k](),
+  const [h, r0] = XL[k](),
     r = r0.map((x) => x.map((c) => (typeof c === "string" && /^[=+\-@]/.test(c) ? "'" + c : c))),
     t = [h, ...r]
       .map((x) => x.map((c) => String(c ?? "").replace(/[\t\r\n]+/g, " ")).join("\t"))
@@ -1773,7 +1843,7 @@ function cp(k) {
 /* ==================================================================
    12. ÍCONOS, MÓDULOS Y ENRUTADOR
    ================================================================== */
-var IC = {
+const IC = {
   sedes: '<path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6M12 9v2"/>',
   personal:
     '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.5 0 4 2 4 5"/>',
@@ -1786,9 +1856,9 @@ var IC = {
   pre: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM12 11v6M9 14h6"/>',
   ger: '<path d="M4 20V10M10 20V4M16 20v-7M2 20h20"/>',
 };
-var ico = (k, z = 34) =>
+const ico = (k, z = 34) =>
   `<svg width="${z}" height="${z}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
-var M = [
+const M = [
   ["sedes", "Sedes y Alquileres", "Sedes de terceros y costos fijos", ["ADM"], "sedes"],
   ["personal", "Personal y Planillas", "Entrenadores, horas y pago", ["ADM"], "personal"],
   ["horarios", "Horarios y Categorías", "Sede, deporte, categoría y hora", ["ADM"], "horarios"],
@@ -1800,7 +1870,7 @@ var M = [
   ["ger", "Dashboard Gerencial", "Utilidad neta por sede", ["ADM"], "ger"],
   ["pre", "Pre-registro", "Solicitudes de los padres", ["ADM"], "pre", 1],
 ];
-var go = (x) => {
+const go = (x) => {
   V = x;
   if (innerWidth <= 900) SIDE = false;
   ED = ES = EP = null;
@@ -1811,9 +1881,9 @@ var go = (x) => {
   R();
   if (x === "pre") cargarPre();
 };
-var LOGO = "assets/logo.png";
-var SHIRT_SRC = "assets/shirt.png";
-var sha = async (t) =>
+const LOGO = "assets/logo.png";
+const SHIRT_SRC = "assets/shirt.png";
+const sha = async (t) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -1824,13 +1894,13 @@ function login() {
   return `<main class=login><section class=card><img src="${LOGO}" alt="Consorcio Deportivo Madrid Trujillo" class=lg><div class="fg fg--single">${fl("Usuario", "<input id=lu autocomplete=username autofocus>")}${fl("Contraseña", '<div class=pw><input id=lp type=password autocomplete=current-password data-kd=enterLogin><button type=button class=eye aria-label="Mostrar u ocultar contraseña" data-f=eye><svg width=22 height=22 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx=12 cy=12 r=3 /><path id=sl d="M3 3l18 18"/></svg></button></div>')}</div><div class=row><button id=lb data-f=doLogin>Iniciar sesión</button></div></section><div id=ball class=ball><svg viewBox="0 0 100 100" aria-label="Cargando"><defs><radialGradient id="bgr" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff"/><stop offset=".7" stop-color="#e3e7ea"/><stop offset="1" stop-color="#aab2b9"/></radialGradient><clipPath id="bcl"><circle cx="50" cy="50" r="46"/></clipPath></defs><circle cx="50" cy="50" r="46" fill="url(#bgr)"/><g clip-path="url(#bcl)" fill="#1f252b" stroke="#1f252b" stroke-width="1.4" stroke-linejoin="round"><polygon points="50.0,37.0 62.4,46.0 57.6,60.5 42.4,60.5 37.6,46.0"/><polygon points="50.0,18.0 37.6,9.0 42.4,-5.5 57.6,-5.5 62.4,9.0"/><polygon points="80.4,40.1 85.2,25.6 100.4,25.6 105.2,40.1 92.8,49.1"/><polygon points="68.8,75.9 84.1,75.9 88.8,90.4 76.5,99.4 64.1,90.4"/><polygon points="31.2,75.9 35.9,90.4 23.5,99.4 11.2,90.4 15.9,75.9"/><polygon points="19.6,40.1 7.2,49.1 -5.2,40.1 -0.4,25.6 14.8,25.6"/><path fill="none" d="M50.0 37.0L50.0 18.0M62.4 46.0L80.4 40.1M57.6 60.5L68.8 75.9M42.4 60.5L31.2 75.9M37.6 46.0L19.6 40.1M37.6 9.0L92.8 49.1M85.2 25.6L64.1 90.4M84.1 75.9L15.9 75.9M35.9 90.4L14.8 25.6M7.2 49.1L62.4 9.0"/></g><ellipse cx="36" cy="30" rx="16" ry="9" fill="#fff" opacity=".35" transform="rotate(-30 36 30)"/><circle cx="50" cy="50" r="46" fill="none" stroke="#8d969e" stroke-width="1.5"/></svg><span>Autenticando...</span></div></main>`;
 }
 function eye() {
-  var p = $("#lp"),
+  const p = $("#lp"),
     h = p.type === "password";
   p.type = h ? "text" : "password";
   $("#sl").classList.toggle("u-hidden", h);
 }
 async function doLogin() {
-  var b = $("#lb"),
+  const b = $("#lb"),
     l = $("#ball");
   if (b.disabled) return;
   b.disabled = true;
@@ -1876,7 +1946,7 @@ async function doLogin2() {
   }
   R();
 }
-var out = () => {
+const out = () => {
   U = null;
   TK = RT = null;
   KS = 0;
@@ -1887,14 +1957,14 @@ var out = () => {
   R();
 };
 function R() {
-  var a = DOM.app;
+  const a = DOM.app;
   if (!U) {
     NAVF = true;
     a.innerHTML = login();
     postR();
     return;
   }
-  var m = M.find((x) => x[0] === V);
+  const m = M.find((x) => x[0] === V);
   if (m && !m[3].includes(U.rol)) V = "home";
   NAVF = V !== LASTV;
   a.innerHTML = `<header>${V !== "home" ? '<button class="g ib" data-f=tgSide aria-label="Mostrar u ocultar el menú lateral"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>' : ""}<img src="${LOGO}" alt="Consorcio Deportivo Madrid Trujillo" class=hl data-f=go data-i=home><span class=sp></span><span class=mu>${esc(U.nom)}</span>${V !== "home" ? "<button class=g data-f=go data-i=home>← Menú</button>" : ""}<button class=g data-f=out>Salir</button></header><div class=shell>${V === "home" ? "" : sideHtml()}<main class="${V === "home" ? "hm" : ""}">${V === "home" ? home() : `<h2 class=h2><span class=hi>${ico(m[4], 28)}</span> ${m[1]}</h2>` + VW[V]()}</main></div>${U ? "<button class=fab data-f=go data-i=pre>PRE-REGISTRO<span id=pb>" + (PRN ? " (" + PRN + ")" : "") + "</span></button>" : ""}`;
@@ -1911,25 +1981,25 @@ function R() {
 /* ==================================================================
    14. DASHBOARD Y GRÁFICOS
    ================================================================== */
-var MS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-var CS = { u: null, m: null, r: 6, v: "d", mo: today().slice(0, 7) };
-var uMes = (m) => {
-  var c = S.caja.filter((x) => x.f.startsWith(m)),
+const MS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+let CS = { u: null, m: null, r: 6, v: "d", mo: today().slice(0, 7) };
+const uMes = (m) => {
+  const c = S.caja.filter((x) => x.f.startsWith(m)),
     ing = c.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
     eg = c.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
     kc = S.kits.filter((k) => k.f.startsWith(m)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
       .filter((x) => x.t === "P" && x.ok && x.f.startsWith(m))
       .reduce((t, x) => {
-        var h = S.hor.find((h) => h.id === x.h),
+        const h = S.hor.find((h) => h.id === x.h),
           p = S.personal.find((p) => p.id === x.ref);
         return h && p ? t + hrs(h) * p.precio : t;
       }, 0),
     al = S.sedes.reduce((t, s) => t + +s.costo, 0);
   return { ing, u: ing - eg - kc - pl - al };
 };
-var bars = (d, k) => {
-  var W = 600,
+const bars = (d, k) => {
+  const W = 600,
     H = 190,
     pm = Math.max(0, ...d.map((x) => x.v)),
     mn = Math.min(0, ...d.map((x) => x.v)),
@@ -1940,7 +2010,7 @@ var bars = (d, k) => {
     `<svg viewBox="0 0 ${W} ${H + 22}" width="100%" role="img"><line x1="0" x2="${W}" y1="${z}" y2="${z}" stroke="var(--bd)"/>` +
     d
       .map((x, i) => {
-        var h = (Math.abs(x.v) / rg) * (H - 30),
+        const h = (Math.abs(x.v) / rg) * (H - 30),
           y = x.v >= 0 ? z - h : z;
         return `<g data-f=chSel data-i=${k} data-j=${i} class="u-pointer"><rect x="${i * w + w * 0.14}" y="${y}" width="${w * 0.72}" height="${Math.max(h, 2)}" rx="3" fill="${x.v < 0 ? "var(--rd)" : "var(--ac)"}" opacity="${CS[k] === i ? 1 : 0.72}" class="${NAVF ? "gb" + (x.v < 0 ? " neg" : "") : ""}" data-dx=${i}><title>${esc(x.n)}: ${esc(x.t)}</title></rect><text x="${i * w + w / 2}" y="${H + 15}" text-anchor="middle" font-size="11" fill="var(--mu)">${esc(x.l)}</text></g>`;
       })
@@ -1948,7 +2018,7 @@ var bars = (d, k) => {
     "</svg>"
   );
 };
-var chSel = (k, i) => {
+const chSel = (k, i) => {
     CS[k] = CS[k] === i ? null : i;
     rc();
   },
@@ -1958,9 +2028,9 @@ var chSel = (k, i) => {
     applyDynamicStyles($("#ch"));
   };
 function charts() {
-  var n = new Date(),
+  const n = new Date(),
     ud = [...Array(CS.r)].map((_, j) => {
-      var d = new Date(n.getFullYear(), n.getMonth() - (CS.r - 1 - j), 1),
+      const d = new Date(n.getFullYear(), n.getMonth() - (CS.r - 1 - j), 1),
         r = uMes(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"));
       return {
         l: MS[d.getMonth()],
@@ -1972,10 +2042,10 @@ function charts() {
     });
   let md;
   if (CS.v === "d") {
-    var [y, m] = CS.mo.split("-").map(Number),
+    const [y, m] = CS.mo.split("-").map(Number),
       nd = new Date(y, m, 0).getDate();
     md = [...Array(nd)].map((_, i) => {
-      var c = S.alu.filter(
+      const c = S.alu.filter(
         (a) => a.fecha === `${CS.mo}-${String(i + 1).padStart(2, "0")}`,
       ).length;
       return {
@@ -1987,12 +2057,12 @@ function charts() {
     });
   } else
     md = MS.map((x, i) => {
-      var c = S.alu.filter((a) =>
+      const c = S.alu.filter((a) =>
         a.fecha.startsWith(`${Y}-${String(i + 1).padStart(2, "0")}`),
       ).length;
       return { l: x, v: c, t: c + " matrículas", n: x + " " + Y };
     });
-  var mx = md.reduce((a, b) => (b.v > a.v ? b : a), md[0]),
+  const mx = md.reduce((a, b) => (b.v > a.v ? b : a), md[0]),
     su = ud[CS.u],
     sm = md[CS.m];
   return `<div class=g2><div class=card><div class="row u-m-0-0-8"><h3 class="u-m-0 u-flex-1">Utilidad neta por mes</h3><select data-ch=csR>${o(
@@ -2010,18 +2080,13 @@ function charts() {
   )}</select>${CS.v === "d" ? `<input type="month" value="${CS.mo}" data-ch=csMo>` : ""}</div>${bars(md, "m")}<p class=mu>${sm ? `<b>${esc(sm.n)}</b>: ${esc(sm.t)}.` : mx.v ? `Mayor flujo: <b>${esc(mx.n)}</b> con ${esc(mx.v)} matrículas. Toca una barra para ver el detalle.` : "Sin matrículas en este período."}</p></div></div>`;
 }
 function home() {
-  var adm = U.rol === "ADM",
-      alumnos = (S && Array.isArray(S.alu)) ? S.alu : [],
-      // Flexible: cuenta como activo si dice "activo", viene vacío o no está marcado como inactivo
-      act = alumnos.filter((a) => {
-        var est = String(a.est || a.estado || "").trim().toLowerCase();
-        return est === "activo" || est === "" || est !== "inactivo";
-      }),
-      K3 = [
-        ["Alumnos activos", act.length, { e: "Activo" }],
-        ["Con datos pendientes", alumnos.filter((a) => falta(a).length).length, { e: "Incompleto" }],
-        ["Morosos", act.filter((a) => deuda(a) > 0).length, { e: "Activo", p: "Moroso" }],
-      ];
+  const adm = U.rol === "ADM",
+    act = S.alu.filter((a) => a.est === "Activo"),
+    K3 = [
+      ["Alumnos activos", act.length, { e: "Activo" }],
+      ["Con datos pendientes", S.alu.filter((a) => falta(a).length).length, { e: "Incompleto" }],
+      ["Morosos", act.filter((a) => deuda(a) > 0).length, { e: "Activo", p: "Moroso" }],
+    ];
   return `${adm ? `<div class="row u-m-0-0-14"><button class="g u-text-white"  data-f=backup>Descargar respaldo completo (JSON)</button><input type="file" id="rf" accept="application/json,.json" hidden data-ch=restaurar><button class="g u-text-white"  data-f=pickRestore>Restaurar respaldo (JSON)</button></div>` : ""}${U.rol === "ENT" ? "" : `<div class="grid t3 kp">${K3.map(([l, n, f]) => `<button class=tile data-f=kpiFilter data-i="${esc(JSON.stringify(f))}"><span class=stat>${n}</span><b>${l}</b></button>`).join("")}</div>`}<div class="grid t3 u-mt-14">${M.filter(
     (x) => x[3].includes(U.rol) && !x[5],
   )
@@ -2036,12 +2101,12 @@ function home() {
 /* ==================================================================
    15. VISTAS (un módulo por pantalla)
    ================================================================== */
-var tbl = (h, r) =>
+const tbl = (h, r) =>
   `<div class=tw><table><tr>${h.map((x) => `<th>${x}</th>`).join("")}</tr>${r.join("") || `<tr><td colspan=${esc(h.length)} class=mu>Sin registros todavía.</td></tr>`}</table></div>`;
-var VW = {};
+const VW = {};
 VW.pre = () => vwPre();
 VW.sedes = () => {
-  var e = S.sedes.find((s) => s.id === ES) || {};
+  const e = S.sedes.find((s) => s.id === ES) || {};
   return `<div class=card><h3>${ES ? "Modificar " + esc(ES) : "Nueva sede"}</h3><div class=fg>${fl("Nombre", `<input id=s_n value="${esc(e.nombre || "")}">`)}${fl("Código corto (3 letras)", `<input id=s_c maxlength=3 value="${esc(ES ? ES.slice(4) : "")}" ${ES ? "disabled" : ""}>`)}${fl("Dirección", `<input id=s_d value="${esc(e.dir || "")}">`)}${fl("Contacto", `<input id=s_t value="${esc(e.con || "")}">`)}${fl(
     "Tipo de alquiler",
     "<select id=s_k>" +
@@ -2059,10 +2124,10 @@ VW.sedes = () => {
   )}<div class=row><button class=g data-f=cp data-i=sedes>Copiar para Excel</button></div><p><b>Costos fijos de alquiler: ${money(S.sedes.reduce((t, s) => t + +s.costo, 0))} al mes</b></p></div>`;
 };
 function addSede() {
-  var n = limpiar(v("s_n"), 60),
+  const n = limpiar(v("s_n"), 60),
     c = v("s_c").toUpperCase();
   if (!n) return toast("Ingresa el nombre");
-  var d = {
+  const d = {
     nombre: n,
     dir: limpiar(v("s_d"), 120),
     con: limpiar(v("s_t"), 80),
@@ -2098,16 +2163,16 @@ function delSede(id) {
   toast("Sede eliminada");
   R();
 }
-var hsem = (p) => {
-  var d = new Date();
+const hsem = (p) => {
+  const d = new Date();
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  var w = d.toISOString().slice(0, 10);
+  const w = d.toISOString().slice(0, 10);
   return S.asis
     .filter((x) => x.t === "P" && x.ref === p.id && x.ok && x.f >= w)
     .reduce((t, x) => t + hrs(S.hor.find((h) => h.id === x.h) || { ini: "0:00", fin: "0:00" }), 0);
 };
 VW.personal = () => {
-  var e = S.personal.find((p) => p.id === EP) || {},
+  const e = S.personal.find((p) => p.id === EP) || {},
     dg = "data-in=digits inputmode=numeric";
   return `<div class=card><h3>${EP ? "Modificar " + esc(EP) : "Nuevo personal"}</h3><div class=fg>${fl("Nombres", `<input id=p_n value="${esc(e.nom || "")}">`)}${fl("DNI", `<input id=p_d maxlength=8 ${dg} value="${esc(e.dni || "")}">`)}${fl("Teléfono", `<input id=p_t maxlength=9 ${dg} value="${esc(e.tel || "")}">`)}${fl("Especialidad", `<input id=p_e value="${esc(e.esp || "")}">`)}${fl(
     "Rol",
@@ -2136,13 +2201,13 @@ VW.personal = () => {
       "",
     ],
     S.personal.map((p) => {
-      var h = hsem(p);
+      const h = hsem(p);
       return `<tr><td>${esc(p.id)}</td><td>${esc(p.dni)}</td><td>${esc(p.nom)}</td><td>${esc(p.tel || "")}</td><td>${esc(p.rol)}</td><td>${esc(p.esp)}</td><td>${money(p.precio)}</td><td>${h.toFixed(1)}</td><td>${money(h * p.precio)}</td><td><span class="b ${p.activo ? "ok" : "no"}">${p.activo ? "Activo" : "Inactivo"}</span></td><td><button class="s g" data-f="perEd" data-i="${esc(p.id)}">Modificar</button> <button class="s g" data-f="togP" data-i="${esc(p.id)}">${p.activo ? "Desactivar" : "Activar"}</button></td></tr>`;
     }),
   )}<div class=row><button class=g data-f=cp data-i=personal>Copiar para Excel</button></div></div>`;
 };
 function addPer() {
-  var n = limpiar(v("p_n"), 60),
+  const n = limpiar(v("p_n"), 60),
     d = v("p_d"),
     r = v("p_r");
   if (!RX.nombre.test(n) || !RX.dni.test(d))
@@ -2152,7 +2217,7 @@ function addPer() {
     return toast("Rol o precio inválido");
   if (S.personal.some((p) => p.dni === d && p.id !== EP))
     return toast("Ese DNI ya está registrado");
-  var x = {
+  const x = {
     nom: n,
     dni: d,
     tel: v("p_t"),
@@ -2174,8 +2239,8 @@ function addPer() {
   save();
   R();
 }
-var togP = (id) => {
-  var p = S.personal.find((x) => x.id === id);
+const togP = (id) => {
+  const p = S.personal.find((x) => x.id === id);
   if (p === U) return toast("No puedes desactivarte");
   p.activo = p.activo ? 0 : 1;
   save();
@@ -2194,7 +2259,7 @@ VW.horarios = () =>
     ),
   )}<div class=row><button class=g data-f=cp data-i=hor>Copiar para Excel</button></div></div>`;
 function addDep() {
-  var c = v("d_c").toUpperCase(),
+  const c = v("d_c").toUpperCase(),
     n = limpiar(v("d_n"), 40);
   if (!n || !/^[A-Z]{3}$/.test(c)) return toast("Nombre y código de 3 letras");
   if (S.deportes.some((d) => d.id === "DEP-" + c)) return toast("Código repetido");
@@ -2203,7 +2268,7 @@ function addDep() {
   R();
 }
 function addHor() {
-  var ps = [...$("#h_p").selectedOptions].map((x) => x.value);
+  const ps = [...$("#h_p").selectedOptions].map((x) => x.value);
   if (v("h_i") >= v("h_f")) return toast("La hora de fin debe ser posterior");
   if (!ps.length) return toast("Asigna al menos un profesor");
   S.hor.push({
@@ -2219,7 +2284,7 @@ function addHor() {
   toast("Horario guardado");
   R();
 }
-var delHor = (id) => {
+const delHor = (id) => {
   if (S.alu.some((a) => a.hor === id))
     return toast("Hay alumnos en este horario; reasígnalos primero");
   S.hor = S.hor.filter((h) => h.id !== id);
@@ -2227,7 +2292,7 @@ var delHor = (id) => {
   R();
 };
 VW.mat = () => {
-  var a = ED
+  const a = ED
     ? S.alu.find((x) => x.id === ED)
     : PRE
       ? preAlu(PRE)
@@ -2243,7 +2308,7 @@ VW.mat = () => {
           sede: S.sedes[0].id,
           dep: S.deportes[0].id,
         };
-  var r = (k, x, t = "text", e = "") =>
+  const r = (k, x, t = "text", e = "") =>
     `<input id=m_${k} type=${t} value="${esc(x)}" data-r=1 class="${x ? "" : "bad"}" data-in=ck ${e}>`;
   adjInit(a);
   return `<div class=card><h3>${ED ? "Ficha " + esc(ED) : PRE ? "Matrícula desde pre-registro (" + esc(PRE.modalidad) + ")" : "Nueva matrícula"} <span class=mu>· fecha ${esc(a.fecha || today())}</span></h3><p class=mu>Puedes guardar con datos pendientes: los campos en rojo se completan después.</p><div class=fg>${fl("Nombres", `<input id=m_nom value="${esc(a.nom || "")}">`)}${fl("Apellidos", `<input id=m_ape value="${esc(a.ape || "")}">`)}${fl("DNI", r("dni", a.dni || "", "text", "maxlength=8 inputmode=numeric data-d=1"))}${fl(
@@ -2301,7 +2366,7 @@ VW.mat = () => {
 };
 
 function upHor() {
-  var y = +v("m_nac").slice(0, 4),
+  const y = +v("m_nac").slice(0, 4),
     c = $("#m_cat");
   if (!c) return;
   c.textContent = y
@@ -2310,8 +2375,8 @@ function upHor() {
       : "Fuera de rango (5 a 17 años)"
     : "-";
   c.classList.toggle("u-neg", !!(y && !catOk(y)));
-  var cur = ED ? (S.alu.find((x) => x.id === ED) || {}).hor : "";
-  var hs = S.hor.filter(
+  const cur = ED ? (S.alu.find((x) => x.id === ED) || {}).hor : "";
+  const hs = S.hor.filter(
     (h) => h.sede === v("m_sed") && h.dep === v("m_dep") && (!y || h.cat === y),
   );
   $("#m_hor").innerHTML = o(
@@ -2321,7 +2386,7 @@ function upHor() {
   );
 }
 async function saveAlu() {
-  var { d, e } = validarAlumno({
+  const { d, e } = validarAlumno({
       nom: v("m_nom"),
       ape: v("m_ape"),
       dni: v("m_dni"),
@@ -2344,7 +2409,7 @@ async function saveAlu() {
   if (!S.sedes.some((s) => s.id === v("m_sed")) || !S.deportes.some((x) => x.id === v("m_dep")))
     e.push("Sede o deporte inválido");
   if (e.length) return toast(e[0]);
-  var old = ED ? S.alu.find((x) => x.id === ED) : null,
+  const old = ED ? S.alu.find((x) => x.id === ED) : null,
     hh = S.hor.find((h) => h.id === v("m_hor"));
   Object.assign(d, {
     dep: v("m_dep"),
@@ -2355,7 +2420,7 @@ async function saveAlu() {
   });
   if (d.dni && S.alu.some((x) => x.dni === d.dni && x.id !== ED))
     return toast("Ese DNI ya está registrado");
-  var id = old ? old.id : nid(),
+  const id = old ? old.id : nid(),
     delta = d.pag - (old ? old.pag : 0),
     dc = { qt: old && old.qt ? old.qt : tok() };
   try {
@@ -2378,10 +2443,10 @@ async function saveAlu() {
     });
   save();
   adjLimpiar(id);
-  var pf = falta(d);
+  const pf = falta(d);
   toast(pf.length ? "Guardada con datos pendientes: " + pf.join(", ") : "Matrícula completa");
   if (PREID) {
-    var pid = PREID;
+    const pid = PREID;
     PREID = PRE = null;
     sb("/rest/v1/preregistros?id=eq." + encodeURIComponent(pid), { method: "DELETE" }).then(() => {
       if (PR) PR = PR.filter((x) => x.id !== pid);
@@ -2396,18 +2461,18 @@ async function saveAlu() {
   } else go("dir");
 }
 function carnet(id) {
-  var a = S.alu.find((x) => x.id === id);
+  const a = S.alu.find((x) => x.id === id);
   modal(
     `<h3>${esc(a.nom + " " + a.ape)}</h3>${IMG_OK.test(a.foto || "") ? `<img src="${esc(a.foto)}" width=90 height=90 class="u-rounded-6">` : "<p class=mu>Sin foto</p>"}<p><b>${esc(a.id)}</b><br>${esc(dn(a.dep))} · CAT-${esc(a.nac.slice(0, 4))} · ${esc(sn(a.sede))}</p>${qr(carnetUrl(a))}<div class="row u-jc-center"><button data-f=print>Imprimir (PVC / papel)</button></div>`,
   );
 }
-var ed = (id) => {
+const ed = (id) => {
   V = "mat";
   ED = id;
   R();
 };
-var dirL = () => {
-  var q = (DF.q || "").toLowerCase().trim();
+const dirL = () => {
+  const q = (DF.q || "").toLowerCase().trim();
   return S.alu.filter(
     (a) =>
       (!DF.s || a.sede === DF.s) &&
@@ -2421,17 +2486,17 @@ var dirL = () => {
         a.id.includes(q)),
   );
 };
-var dirT = () =>
+const dirT = () =>
   tbl(
     ["Código", "Alumno", "DNI", "Sede", "Deporte", "Cat.", "Edad", "Estado", "Datos", "Pago", ""],
     dirL().map((a) => {
-      var f = falta(a),
+      const f = falta(a),
         dd = deuda(a);
       return `<tr class="${f.length ? "inc" : ""}"><td>${esc(a.id)}</td><td>${esc(a.nom + " " + a.ape)}</td><td>${a.dni ? esc(a.dni) : "<b class=u-neg>falta</b>"}</td><td>${esc(sn(a.sede))}</td><td>${esc(dn(a.dep))}</td><td>${esc(a.nac.slice(0, 4))}</td><td>${age(a.nac)}</td><td>${esc(a.est)}</td><td>${f.length ? `<span class="b no">Falta: ${f.join(", ")}</span>` : '<span class="b ok">Completa</span>'}</td><td><span class="b ${dd > 0 ? "no" : "ok"}">${dd > 0 ? "Moroso " + money(dd) : "Al día"}</span></td><td><button class="s" data-f="ed" data-i="${esc(a.id)}">Abrir</button></td></tr>`;
     }),
   );
 VW.dir = () => {
-  var sel = (k, l, a) =>
+  const sel = (k, l, a) =>
     fl(l, `<select data-ch=dfSet data-i=${k}>${o(a, DF[k], "Todos")}</select>`);
   return `<div class=card><div class=fg>${fl("Buscar por nombre, DNI o código", `<input id=q placeholder="Ej. Luis, 71234567 o 260001" value="${esc(DF.q || "")}" data-in=dirQ>`)}${sel(
     "s",
@@ -2456,7 +2521,7 @@ VW.dir = () => {
   )}</div><div class=row><button data-f=go data-i=mat>+ Nueva matrícula</button><button class=g data-f=clearDF>Limpiar filtros</button></div></div><div class=card><div id=dt>${dirT()}</div><div class=row><button class=g data-f=cp data-i=dir>Copiar para Excel</button></div></div>`;
 };
 VW.asis = () => {
-  var hs = S.hor.filter((h) => U.rol !== "ENT" || h.profs.includes(U.id)),
+  const hs = S.hor.filter((h) => U.rol !== "ENT" || h.profs.includes(U.id)),
     ss = [...new Set(hs.map((h) => h.sede))],
     g = hs.filter((h) => h.sede === AS.s),
     gk = [
@@ -2468,8 +2533,8 @@ VW.asis = () => {
     H = hh.find((h) => h.id === AS.h),
     rec = (t, r) =>
       S.asis.find((x) => x.f === today() && x.t === t && x.ref === r && x.h === AS.h) || {};
-  var row = (t, r, n) => {
-    var c = rec(t, r);
+  const row = (t, r, n) => {
+    const c = rec(t, r);
     return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">Pagó</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
   };
   let list = "";
@@ -2488,7 +2553,7 @@ VW.asis = () => {
         .filter((p) => U.rol !== "ENT" || p === U.id)
         .map((p) => row("P", p, esc((S.personal.find((x) => x.id === p) || {}).nom))),
     );
-  var sl = (k, l, a, ph) => fl(l, `<select data-ch=setA data-i=${k}>${o(a, AS[k], ph)}</select>`);
+  const sl = (k, l, a, ph) => fl(l, `<select data-ch=setA data-i=${k}>${o(a, AS[k], ph)}</select>`);
   return `<div class=card><div class=fg>${sl(
     "s",
     "1. Sede",
@@ -2509,7 +2574,7 @@ VW.asis = () => {
     "Elige",
   )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>Al marcar "Pagó" se registra un ingreso en la caja de la sede. Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
 };
-var setA = (k, x) => {
+const setA = (k, x) => {
   AS[k] = x;
   if (k === "s") AS.g = AS.h = "";
   if (k === "g") AS.h = "";
@@ -2529,17 +2594,17 @@ function mkP(r, pc) {
     S.asis.push(x);
   }
   x.pc = pc;
-  var k = `campo|${today()}|${r}|${AS.h}`;
+  const k = `campo|${today()}|${r}|${AS.h}`;
   S.caja = S.caja.filter((c) => c.k !== k);
   if (pc) {
-    var a = S.alu.find((a) => a.id === r);
+    const a = S.alu.find((a) => a.id === r);
     S.caja.push({ f: today(), sede: a.sede, t: "I", c: "Pago de campo", d: r, m: S.fee ?? 5, k });
   }
   save();
   R();
 }
 VW.kits = () => {
-  var adm = KS && U.rol === "ADM";
+  const adm = KS && U.rol === "ADM";
   return `<div class=card><h3>Nueva venta</h3><div class=kitw><div class=kitf><div class=fg><label class="u-col-full">Buscar alumno (código, DNI, nombres o apellidos)<input id=k_q value="${esc(KQ)}" data-in=kitQ autocomplete=off placeholder="Escribe al menos 2 letras o números"></label><div id=k_res class="u-col-full"></div><input type=hidden id=k_a value="${esc(KSEL)}">${kSelHtml()}${fl("Prenda", "<select id=k_p>" + o(["Kit completo", "Polo", "Short", "Calcetines"].map((x) => [x, x])) + "</select>")}${fl("Talla", "<select id=k_t>" + o(["6", "8", "10", "12", "14", "S", "M", "L", "XL"].map((x) => [x, x])) + "</select>")}${fl("Nombre en camiseta", '<input id=k_n autocomplete=off placeholder="Ej. JUAN" data-in=shirtDraw>')}${fl("Número elegido", '<input id=k_u inputmode=numeric autocomplete=off maxlength=3 placeholder="00" data-in=kNumTyped value="' + esc(KNUM) + '">')}${fl("Fecha de pedido", `<input id=k_f type=date value=${today()}>`)}${fl("Fecha de entrega", "<input id=k_e type=date>")}${fl("Precio público (S/)", "<input id=k_pr type=number min=0 value=90>")}${fl("Costo de confección (S/)", "<input id=k_c type=number min=0 value=45>")}</div><div class=row><button data-f=kitPay>Registrar venta</button></div></div>${shirtHtml()}</div></div><div class=card>${tbl(
     ["Código", "Alumno", "Prenda", "Talla", "Camiseta", "Pedido", "Entrega", "Cobrado"].concat(
       adm ? ["Costo", "Utilidad"] : [],
@@ -2551,9 +2616,9 @@ VW.kits = () => {
   )}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
 };
 function addKit() {
-  var a = S.alu.find((x) => x.id === v("k_a"));
+  const a = S.alu.find((x) => x.id === v("k_a"));
   if (!a) return toast("Elige un alumno");
-  var pr = monto(v("k_pr") || 0),
+  const pr = monto(v("k_pr") || 0),
     cc = monto(v("k_c") || 0);
   if (pr === null || cc === null) return toast("Precio o costo inválido");
   if (
@@ -2561,7 +2626,7 @@ function addKit() {
     !["6", "8", "10", "12", "14", "S", "M", "L", "XL"].includes(v("k_t"))
   )
     return toast("Prenda o talla inválida");
-  var nu = KNUM ? +KNUM : "";
+  const nu = KNUM ? +KNUM : "";
   if (nu && a.mod === "Competitivo" && ocup(a).has(nu))
     return toast("Ese número ya está ocupado en su categoría (±2 años)");
   if (!RX.fecha.test(v("k_f")) || (v("k_e") && !RX.fecha.test(v("k_e"))))
@@ -2587,7 +2652,7 @@ function addKit() {
   R();
 }
 VW.caja = () => {
-  var s = AS.cs || S.sedes[0].id,
+  const s = AS.cs || S.sedes[0].id,
     L = S.caja.filter((x) => x.sede === s),
     b = L.reduce((t, x) => t + (x.t === "I" ? x.m : -x.m), 0);
   return `<div class=card><div class=fg>${fl(
@@ -2615,7 +2680,7 @@ VW.caja = () => {
   )}<div class=row><button class=g data-f=cp data-i=caja>Copiar para Excel</button></div></div>`;
 };
 function addCaja(s) {
-  var { d, e } = validarPago({ m: v("c_m"), t: v("c_t"), c: v("c_c"), d: v("c_d") });
+  const { d, e } = validarPago({ m: v("c_m"), t: v("c_t"), c: v("c_c"), d: v("c_d") });
   if (e.length) return toast(e[0]);
   if (!S.sedes.some((x) => x.id === s)) return toast("Sede inválida");
   S.caja.push({ f: today(), sede: s, t: d.t, c: d.c, d: d.d, m: d.m });
@@ -2623,24 +2688,24 @@ function addCaja(s) {
   R();
 }
 VW.ger = () => {
-  var rows = S.sedes.map((s) => {
-      var mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(window.GM)),
+  const rows = S.sedes.map((s) => {
+      const mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(GM)),
         ing = mc.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
         eg = mc.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
         kc = S.kits
-          .filter((k) => k.sede === s.id && k.f.startsWith(window.GM))
+          .filter((k) => k.sede === s.id && k.f.startsWith(GM))
           .reduce((t, k) => t + k.c, 0),
         pl = S.asis
-          .filter((x) => x.t === "P" && x.ok && x.f.startsWith(window.GM))
+          .filter((x) => x.t === "P" && x.ok && x.f.startsWith(GM))
           .reduce((t, x) => {
-            var h = S.hor.find((h) => h.id === x.h);
-            var p = S.personal.find((p) => p.id === x.ref);
+            const h = S.hor.find((h) => h.id === x.h);
+            const p = S.personal.find((p) => p.id === x.ref);
             return h && p && h.sede === s.id ? t + hrs(h) * p.precio : t;
           }, 0);
       return { s, ing, eg, kc, pl, al: +s.costo, u: ing - eg - kc - pl - s.costo };
     }),
     mx = Math.max(1, ...rows.map((r) => Math.abs(r.u)));
-  return `<div class=card><div class="row u-m-0">${fl("Mes", "<input type=month value=" + window.GM + " data-ch=setGM>")}</div></div><div class=card>${tbl(
+  return `<div class=card><div class="row u-m-0">${fl("Mes", "<input type=month value=" + GM + " data-ch=setGM>")}</div></div><div class=card>${tbl(
     [
       "Sede",
       "Ingresos",
@@ -2660,7 +2725,7 @@ VW.ger = () => {
 /* ==================================================================
    16. ACCIONES DELEGADAS (data-f) Y REGISTROS DE EVENTOS
    ================================================================== */
-var FN = {
+const FN = {
   nav: (i) => go(i),
   kSel: (i) => {
     KSEL = i;
@@ -2677,7 +2742,7 @@ var FN = {
     shirtDraw();
   },
   preOk: (i) => {
-    var p = (PR || []).find((x) => x.id === i);
+    const p = (PR || []).find((x) => x.id === i);
     if (!p) return;
     PRE = p;
     PREID = p.id;
@@ -2759,7 +2824,7 @@ Object.assign(FN, {
 });
 
 /* Acciones de teclado (data-in): antes oninput="..." */
-var ON_INPUT = {
+const ON_INPUT = {
   digits: (el) => {
     el.value = el.value.replace(/\D/g, "");
   },
@@ -2781,7 +2846,7 @@ var ON_INPUT = {
 };
 
 /* Cambios de valor (data-ch): antes onchange="..." */
-var ON_CHANGE = {
+const ON_CHANGE = {
   upHor: () => upHor(),
   restaurar: (el) => restaurar(el),
   setFee: (el) => {
@@ -2793,7 +2858,7 @@ var ON_CHANGE = {
     preF();
   },
   setGM: (el) => {
-    window.GM = el.value;
+    GM = el.value;
     R();
   },
   csV: (el) => {
@@ -2823,7 +2888,7 @@ var ON_CHANGE = {
 };
 
 /* Teclas (data-kd): antes onkeydown="..." */
-var ON_KEYDOWN = {
+const ON_KEYDOWN = {
   enterLogin: (el, i, e) => {
     if (e.key === "Enter") doLogin();
   },
@@ -2844,7 +2909,7 @@ Object.assign(FN, {
 /* ==================================================================
    17. ANIMACIONES Y COMPONENTES VISUALES (solo apariencia)
    ================================================================== */
-var LASTV = null,
+let LASTV = null,
   NAVF = false,
   SPY = null,
   SPH = 0,
@@ -2853,16 +2918,16 @@ var LASTV = null,
 
 /* ---- 1. Menú lateral: píldora líquida ---- */
 function sideInit() {
-  var nav = document.querySelector(".side nav");
+  const nav = document.querySelector(".side nav");
   if (!nav) return;
-  var vis = !!nav.offsetParent;
+  const vis = !!nav.offsetParent;
   if (!vis) SPY = null;
-  var pill = nav.querySelector(".side-pill"),
+  const pill = nav.querySelector(".side-pill"),
     items = [...nav.querySelectorAll(".si")];
   if (!pill || !items.length) return;
-  var act = items.find((i) => i.classList.contains("on")) || items[0];
+  const act = items.find((i) => i.classList.contains("on")) || items[0];
   let cur = act;
-  var put = (el, track) => {
+  const put = (el, track) => {
     pill.style.setProperty("--py", el.offsetTop + "px");
     pill.style.height = el.offsetHeight + "px";
     items.forEach((i) => {
@@ -2907,13 +2972,13 @@ function sideInit() {
 
 /* ---- 3. Aparición escalonada ---- */
 function stagger() {
-  var els = [
+  const els = [
     ...document.querySelectorAll(
       "main>h2,main>h3,main>.row,main>.card,main>.grid>*,main>.g2>*,main>#ch>.g2>*,#app>.login>.card",
     ),
   ];
   els.forEach((e, i) => {
-    var d = Math.min(i, 16) * 70;
+    const d = Math.min(i, 16) * 70;
     e.style.setProperty("--d", d + "ms");
     e.style.setProperty("--bd", d + "ms");
     e.classList.add("rv");
@@ -2925,29 +2990,29 @@ function stagger() {
 
 /* ---- 4. Contadores desde cero ---- */
 function counters() {
-  var els = [...document.querySelectorAll("main .stat,main td,main b,main h3")]
+  const els = [...document.querySelectorAll("main .stat,main td,main b,main h3")]
     .filter((e) => !e.children.length)
     .slice(0, 120);
-  for (var e of els) {
-    var t = e.textContent;
+  for (const e of els) {
+    const t = e.textContent;
     let pre, num;
     if (e.classList.contains("stat")) {
       if (!/^-?\d+$/.test(t)) continue;
       pre = "";
       num = t;
     } else {
-      var m = /^(.*?S\/ )(-?\d+\.\d\d)$/.exec(t);
+      const m = /^(.*?S\/ )(-?\d+\.\d\d)$/.exec(t);
       if (!m) continue;
       pre = m[1];
       num = m[2];
     }
-    var to = parseFloat(num),
+    const to = parseFloat(num),
       dec = num.includes(".") ? 2 : 0,
       t0 = performance.now() + 250;
     e.textContent = pre + (0).toFixed(dec);
-    var step = (now) => {
+    const step = (now) => {
       if (!e.isConnected) return;
-      var p = Math.min(1, Math.max(0, (now - t0) / 1000)),
+      const p = Math.min(1, Math.max(0, (now - t0) / 1000)),
         k = 1 - Math.pow(1 - p, 3);
       if (p < 1) {
         e.textContent = pre + (to * k).toFixed(dec);
@@ -2972,7 +3037,7 @@ function postR() {
 
 /* ---- 2. Botón de pago -> ¡PAGADO! -> recibo ---- */
 function payBtn(b) {
-  var w = b.offsetWidth,
+  const w = b.offsetWidth,
     h = b.offsetHeight,
     html = b.innerHTML,
     cls = b.className,
@@ -2985,10 +3050,10 @@ function payBtn(b) {
   b.classList.add("paybtn", "paying");
   b.innerHTML = "<i class=pf></i><span class=pl>Procesando…</span>";
   b.style.width = Math.max(w, small ? 112 : 196) + "px";
-  var t0 = performance.now();
+  const t0 = performance.now();
   return {
     finish() {
-      var wait = Math.max(0, 950 - (performance.now() - t0));
+      const wait = Math.max(0, 950 - (performance.now() - t0));
       return new Promise((res) =>
         setTimeout(() => {
           b.classList.remove("paying");
@@ -3011,7 +3076,7 @@ function payBtn(b) {
 /* Ejecuta la acción original (sin cambiarla), retiene el re-dibujado y anima solo si hubo un cobro real */
 function payRun(b, fn, metric, tk) {
   if (PAYB || !b || !b.isConnected) return fn();
-  var m0 = metric(),
+  const m0 = metric(),
     R0 = R;
   let pend = false;
   R = () => {
@@ -3024,14 +3089,14 @@ function payRun(b, fn, metric, tk) {
     R = R0;
     throw e;
   }
-  var end = () => {
+  const end = () => {
       R = R0;
     },
     ok = () => metric() > m0,
     flush = () => {
       if (pend) R0();
     };
-  var done = (ctl) =>
+  const done = (ctl) =>
     ctl.finish().then(() => {
       end();
       flush();
@@ -3044,7 +3109,7 @@ function payRun(b, fn, metric, tk) {
     });
   if (r && typeof r.then === "function") {
     PAYB = 1;
-    var ctl = payBtn(b);
+    const ctl = payBtn(b);
     r.then(
       () => {
         if (ok()) done(ctl);
@@ -3074,14 +3139,14 @@ function payRun(b, fn, metric, tk) {
   return r;
 }
 
-var kitPay = (b) =>
+const kitPay = (b) =>
   payRun(
     b,
     addKit,
     () => S.kits.length,
     () => ({ k: S.kits[S.kits.length - 1] }),
   );
-var cajaPay = (s, b) =>
+const cajaPay = (s, b) =>
   v("c_t") === "I"
     ? payRun(
         b,
@@ -3090,7 +3155,7 @@ var cajaPay = (s, b) =>
         () => ({ c: S.caja[S.caja.length - 1] }),
       )
     : addCaja(s);
-var campoPay = (r, b) =>
+const campoPay = (r, b) =>
   payRun(
     b,
     () => mkP(r, true),
@@ -3098,7 +3163,7 @@ var campoPay = (r, b) =>
     () => ({ c: S.caja[S.caja.length - 1] }),
   );
 function matPay(b) {
-  var old = ED ? S.alu.find((x) => x.id === ED) : null,
+  const old = ED ? S.alu.find((x) => x.id === ED) : null,
     m = monto(v("m_pag") || 0),
     d = (m || 0) - (old ? old.pag : 0);
   return d > 0
@@ -3113,11 +3178,11 @@ function matPay(b) {
 
 function barcode(s) {
   let h = 2166136261;
-  for (var c of s) {
+  for (const c of s) {
     h ^= c.charCodeAt(0);
     h = Math.imul(h, 16777619);
   }
-  var r = () => {
+  const r = () => {
     h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0;
     h = Math.imul(h ^ (h >>> 13), 3266489917) >>> 0;
     return (h >>> 0) / 4294967296;
@@ -3125,7 +3190,7 @@ function barcode(s) {
   let w = 0,
     o = "";
   while (w < 196) {
-    var bw = 1 + Math.floor(r() * 3),
+    const bw = 1 + Math.floor(r() * 3),
       g = 1 + Math.floor(r() * 2);
     o += `<rect x="${w}" y="0" width="${bw}" height="46"/>`;
     w += bw + g;
@@ -3134,7 +3199,7 @@ function barcode(s) {
 }
 
 function recibo(t) {
-  var d = new Date(),
+  const d = new Date(),
     f = d.toLocaleDateString("es-PE"),
     h = d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
     num = String(Date.now()).slice(-9);
@@ -3144,7 +3209,7 @@ function recibo(t) {
     total,
     notas = [];
   if (t.k) {
-    var k = t.k,
+    const k = t.k,
       a = S.alu.find((x) => x.id === k.aid);
     tit = "Venta de indumentaria";
     sede = sn(k.sede);
@@ -3154,7 +3219,7 @@ function recibo(t) {
     notas.push("Alumno: " + k.al + (a ? " (" + a.id + ")" : ""));
     total = k.pr;
   } else {
-    var c = t.c,
+    const c = t.c,
       a = S.alu.find((x) => x.id === c.d);
     tit = c.t === "I" ? "Comprobante de pago" : "Comprobante";
     sede = sn(c.sede);
@@ -3164,8 +3229,8 @@ function recibo(t) {
     total = c.m;
   }
   let i = 0;
-  var L = (x) => `<div class=rl data-dx=${i++}>${x}</div>`;
-  var html = `<div class=rcw><div class=rc-slot></div><div class=rc-win><div class=rc id=rc>
+  const L = (x) => `<div class=rl data-dx=${i++}>${x}</div>`;
+  const html = `<div class=rcw><div class=rc-slot></div><div class=rc-win><div class=rc id=rc>
 ${L(`<div class=rc-h><b>CDMT</b><span>Consorcio Deportivo<br>Madrid Trujillo</span></div>`)}
 ${L("<div class=rc-sep></div>")}
 ${L(`<div class=rc-m><span>${esc(tit)}</span><span>N.° ${esc(num)}</span></div>`)}
@@ -3179,7 +3244,7 @@ ${L(`<div class=rc-t><span>TOTAL</span><b>${money(total)}</b></div>`)}
 ${L(barcode(num) + `<p class=rc-code>${esc(num)}</p>`)}
 ${L("<p class=rc-ty>¡Gracias por tu pago!</p>")}
 </div></div><div class=row><button data-f=print>Imprimir</button><button class=g data-f=cl>Cerrar</button></div></div>`;
-  var m = DOM.mod;
+  const m = DOM.mod;
   m.innerHTML = html;
   applyDynamicStyles(m);
   m.classList.add("o", "rcm");
@@ -3196,7 +3261,7 @@ function shirtInit() {
       .then(shirtDraw)
       .catch(() => {});
   if (SHIRT_IM) return shirtDraw();
-  var im = new Image();
+  const im = new Image();
   im.onload = () => {
     SHIRT_IM = im;
     shirtDraw();
@@ -3204,14 +3269,14 @@ function shirtInit() {
   im.src = SHIRT_SRC;
 }
 function shirtDraw() {
-  var c = document.getElementById("shirt");
+  const c = document.getElementById("shirt");
   if (!c || !SHIRT_IM) return;
-  var dpr = Math.min(2, window.devicePixelRatio || 1),
+  const dpr = Math.min(2, window.devicePixelRatio || 1),
     cw = c.clientWidth || 340,
     iw = SHIRT_IM.width,
     ih = SHIRT_IM.height,
     pad = 0.05;
-  var W = Math.round(cw * dpr),
+  const W = Math.round(cw * dpr),
     sw = W * (1 - 2 * pad),
     sc = sw / iw,
     sh = ih * sc,
@@ -3220,9 +3285,9 @@ function shirtDraw() {
     c.width = W;
     c.height = H;
   }
-  var x = c.getContext("2d");
+  const x = c.getContext("2d");
   x.clearRect(0, 0, W, H);
-  var ox = W * pad,
+  const ox = W * pad,
     oy = W * pad * 0.9;
   x.save();
   x.shadowColor = "rgba(0,0,0,.45)";
@@ -3230,21 +3295,21 @@ function shirtDraw() {
   x.shadowOffsetY = 12 * dpr;
   x.drawImage(SHIRT_IM, ox, oy, sw, sh);
   x.restore();
-  var name = (document.getElementById("k_n") || { value: "" }).value
+  const name = (document.getElementById("k_n") || { value: "" }).value
       .trim()
       .toUpperCase()
       .slice(0, 30),
     num = (document.getElementById("k_u") || { value: "" }).value.trim();
   if (!name && !num) return;
-  var o = document.createElement("canvas");
+  const o = document.createElement("canvas");
   o.width = W;
   o.height = H;
-  var q = o.getContext("2d");
-  var FF = 'Anton,Impact,"Arial Narrow",sans-serif',
+  const q = o.getContext("2d");
+  const FF = 'Anton,Impact,"Arial Narrow",sans-serif',
     BLUE = "#1f4fae";
-  var fit = (txt, capH, maxW) => {
+  const fit = (txt, capH, maxW) => {
     q.font = "100px " + FF;
-    var m = q.measureText(txt),
+    const m = q.measureText(txt),
       hh = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent || 70,
       w = m.width || 1;
     return {
@@ -3255,11 +3320,11 @@ function shirtDraw() {
   q.fillStyle = BLUE;
   q.textAlign = "center";
   q.textBaseline = "alphabetic";
-  var cx = ox + sc * 226;
-  var ANT = !document.fonts || document.fonts.check("100px Anton");
+  const cx = ox + sc * 226;
+  const ANT = !document.fonts || document.fonts.check("100px Anton");
   q.lineJoin = "round";
   q.strokeStyle = BLUE;
-  var put = (t, g, y) => {
+  const put = (t, g, y) => {
     q.font = g.fs + "px " + FF;
     q.fillText(t, cx, y);
     if (!ANT) {
@@ -3268,11 +3333,11 @@ function shirtDraw() {
     }
   };
   if (name) {
-    var g = fit(name, sc * 27, sc * 178);
+    const g = fit(name, sc * 27, sc * 178);
     put(name, g, oy + sc * 72 + g.asc / 2);
   }
   if (num) {
-    var g = fit(num, sc * 172, sc * 190);
+    const g = fit(num, sc * 172, sc * 190);
     put(num, g, oy + sc * 190 + g.asc / 2);
   }
   q.globalCompositeOperation = "source-atop";
@@ -3285,7 +3350,7 @@ function shirtDraw() {
     q.stroke();
   }
   q.globalCompositeOperation = "source-atop";
-  var gr = q.createLinearGradient(0, oy, 0, oy + sh);
+  const gr = q.createLinearGradient(0, oy, 0, oy + sh);
   gr.addColorStop(0, "rgba(255,255,255,.10)");
   gr.addColorStop(1, "rgba(0,0,30,.10)");
   q.fillStyle = gr;
@@ -3302,9 +3367,9 @@ function kNumTyped(e) {
   if (e.value && +e.value > 100) e.value = "100";
   KNUM = e.value ? +e.value : "";
   document.querySelectorAll(".n.sel").forEach((n) => n.classList.remove("sel"));
-  var b = KNUM ? document.querySelector('.n[data-i="' + KNUM + '"]') : null;
+  const b = KNUM ? document.querySelector('.n[data-i="' + KNUM + '"]') : null;
   if (b) b.classList.add("sel");
-  var a = S.alu.find((x) => x.id === KSEL);
+  const a = S.alu.find((x) => x.id === KSEL);
   e.classList.toggle("bad", !!(KNUM && a && a.mod === "Competitivo" && ocup(a).has(KNUM)));
   shirtDraw();
 }
@@ -3316,13 +3381,13 @@ function kNumTyped(e) {
 /* Delegación: un único listener por tipo de evento resuelve el [data-*] más cercano */
 function delegate(type, attr, registry) {
   document.addEventListener(type, (e) => {
-    var el = e.target.closest("[" + attr + "]");
-    var fn = el && registry[el.getAttribute(attr)];
+    const el = e.target.closest("[" + attr + "]");
+    const fn = el && registry[el.getAttribute(attr)];
     if (fn) fn(el, el.dataset.i, e);
   });
 }
 document.addEventListener("click", (e) => {
-  var b = e.target.closest("[data-f]");
+  const b = e.target.closest("[data-f]");
   if (b && FN[b.dataset.f]) FN[b.dataset.f](b.dataset.i, b.dataset.j, b.dataset.k, b);
 });
 delegate("input", "data-in", ON_INPUT);
@@ -3339,12 +3404,12 @@ DOM.mod.addEventListener("click", (e) => {
 
 /* Video de fondo: reintenta la reproducción (autoplay bloqueado / pestaña oculta) */
 function initBackgroundVideo() {
-  var vid = DOM.video;
+  const vid = DOM.video;
   if (!vid) return;
   vid.muted = true;
   vid.defaultMuted = true;
   vid.play().catch(() => {});
-  var resume = () => {
+  const resume = () => {
     if (vid.paused) vid.play().catch(() => {});
   };
   document.addEventListener("visibilitychange", () => {
@@ -3354,79 +3419,7 @@ function initBackgroundVideo() {
     addEventListener(ev, resume, { passive: true }),
   );
 }
-/* ==================================================================
-   - FUNCIONES FALTANTES (Control de inactividad y Restauración)
-   ================================================================== */
 
-/* Control de inactividad (Cierre de sesión automático tras 30 min) */
-var idleTimer = null;
-function rIdle() {
-  if (!U) return;
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    out();
-    toast("Sesión cerrada por inactividad.");
-  }, 30 * 60 * 1000);
-}
-
-/* Restauración de respaldo desde archivo JSON */
-async function restaurar(el) {
-  var f = el.files && el.files[0];
-  el.value = "";
-  if (!f) return;
-  if (!confirm("¿Restaurar el sistema desde este respaldo? Se sobrescribirán los datos actuales.")) return;
-  
-  try {
-    var txt = await f.text();
-    var json = JSON.parse(txt);
-    
-    // Validar estructura básica del respaldo
-    if (!json.tablas || !json.tablas.sedes) {
-      throw new Error("Formato de archivo inválido");
-    }
-    
-    // Cargar tablas en memoria
-    for (var t of TB) {
-      if (json.tablas[t.n]) {
-        t.load(json.tablas[t.n]);
-      }
-    }
-    
-    // Guardar estado en Supabase / almacenamiento local
-    await flush();
-    await pull();
-    toast("Sistema restaurado exitosamente");
-    R();
-  } catch (e) {
-    console.error(e);
-    toast("No se pudo restaurar el archivo: formato incorrecto o error de lectura.");
-  }
-}
-/* ==================================================================
-   - FUNCIÓN DE SINCRONIZACIÓN (FLUSH)
-   ================================================================== */
-async function flush() {
-  if (!U || U.rol !== "ADM") return;
-  
-  // Guardado de estado general en erp_state si se requiere respaldo en nube
-  try {
-    var payload = {
-      id: 1,
-      data: S,
-      actualizado: new Date().toISOString()
-    };
-    
-    await sb("/rest/v1/erp_state", {
-      method: "POST",
-      headers: {
-        "Prefer": "resolution=merge-duplicates"
-      },
-      body: JSON.stringify(payload)
-    });
-  } catch (e) {
-    console.error("Error al sincronizar estado global (flush):", e);
-  }
-}
 /* ==================================================================
    19. ARRANQUE
    ================================================================== */
