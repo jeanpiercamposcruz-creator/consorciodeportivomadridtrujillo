@@ -1642,6 +1642,11 @@ async function boot() {
     U = null;
   }
   R();
+  
+  // Forzar actualización de contadores tras el arranque
+  setTimeout(() => {
+    if (typeof R === 'function' && U) R();
+  }, 200);
 }
 setInterval(async () => {
   if (!U || document.hidden || V === "mat" || busy) return;
