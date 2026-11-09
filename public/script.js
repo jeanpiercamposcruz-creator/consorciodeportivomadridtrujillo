@@ -1555,7 +1555,7 @@ async function boot() {
   if (/^#c=[a-z0-9]{16}$/.test(h)) return pubCarnet(h.slice(3));
   if (h === "#prereg") return pubPre();
 
-  // 1. Cargar datos locales o semilla de inmediato para que la pantalla NUNCA nazca en 0
+  // 1. Cargar datos locales de respaldo
   load();
 
   try {
@@ -1564,17 +1564,13 @@ async function boot() {
       await auth({ refresh_token: RT }, "refresh_token");
       await sess();
       
-      // Pintar de inmediato con lo que hay en memoria en el navegador
-      R(); 
-
-      // 2. Sincronizar datos frescos de Supabase en segundo plano
+      // 2. ESPERAR a que baje de Supabase ANTES de pintar por primera vez
       await pull();
     }
   } catch (e) {
     U = null;
   }
-
-  // 3. Renderizado final con los datos ya sincronizados con Supabase
+  // 3. Renderizar únicamente cuando los datos ya están en memoria
   R();
 }
 setInterval(async () => {
