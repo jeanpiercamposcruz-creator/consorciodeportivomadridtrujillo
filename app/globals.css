@@ -1,26 +1,1434 @@
-@import "tailwindcss";
+/* ==========================================================================
+   ERP Consorcio Deportivo Madrid Trujillo — style.css
+   Índice:
+     1. Tokens (variables de color y tema claro/oscuro)
+     2. Reset y estilos base
+     3. Layout (estructura de página)
+     4. Componentes
+     5. Animaciones
+     6. Utilidades
+     7. Responsive y media queries (incluye impresión)
+   ========================================================================== */
 
+/* ==========================================================================
+   1. TOKENS
+   ========================================================================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f3f5f1;
+  --sf: #fff;
+  --tx: #17231c;
+  --mu: #62705f;
+  --bd: #dde3d9;
+  --ac: #14633f;
+  --ac2: #e3f1e8;
+  --rd: #c0262d;
+  --rdb: #fde8e8;
+  --gn: #14633f;
+  --ye: #b7791f;
+  --pill: #14633f;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Tema oscuro automático (si el usuario no forzó el claro) */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --bg: #0f1712;
+    --sf: #18221b;
+    --tx: #e8efe9;
+    --mu: #9aab9d;
+    --bd: #2a382d;
+    --ac: #4fc58a;
+    --ac2: #18322389;
+    --rd: #ff7a80;
+    --rdb: #3a1d20;
+    --gn: #4fc58a;
+    --ye: #e3b04b;
+    --pill: #1c7a4e;
   }
 }
 
+/* Tema oscuro forzado */
+:root[data-theme="dark"] {
+  --bg: #0f1712;
+  --sf: #18221b;
+  --tx: #e8efe9;
+  --mu: #9aab9d;
+  --bd: #2a382d;
+  --ac: #4fc58a;
+  --ac2: #183223;
+  --rd: #ff7a80;
+  --rdb: #3a1d20;
+  --gn: #4fc58a;
+  --ye: #e3b04b;
+  --pill: #1c7a4e;
+}
+
+/* ==========================================================================
+   2. RESET Y BASE
+   ========================================================================== */
+html {
+  scroll-padding-top: env(safe-area-inset-top, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: #0b3d2a;
+  color: var(--tx);
+  font:
+    15px/1.45 Barlow,
+    system-ui,
+    sans-serif;
+}
+
+h2,
+h3,
+.brand {
+  font-family: "Barlow Semi Condensed", Barlow, sans-serif;
+  margin: 0.2em 0 0.5em;
+}
+
+h2 {
+  font-size: 1.7rem;
+}
+
+h3 {
+  font-size: 1.15rem;
+}
+
+.mu {
+  color: var(--mu);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.82rem;
+  color: var(--mu);
+  gap: 3px;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 7px 8px;
+  border: 1px solid var(--bd);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--tx);
+  min-width: 0;
+}
+
+input.bad,
+select.bad {
+  border-color: var(--rd);
+  background: var(--rdb);
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 13px;
+  border-radius: 5px;
+  border: 0;
+  background: var(--ac);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.g {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+}
+
+button.r {
+  background: var(--rd);
+  color: #fff;
+}
+
+button.s {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--bd);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--mu);
+  font-weight: 600;
+}
+
+.tw {
+  overflow-x: auto;
+}
+
+.stat,
+td,
+.rc-t b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   3. LAYOUT
+   ========================================================================== */
+
+/* --- Fondo de video universal (fuera de #app: nunca se recrea al navegar) --- */
+.video-bg-container {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background-color: #0c9a0c;
+  background-image: conic-gradient(
+    #12b312 25%,
+    #0e9f0e 0 50%,
+    #12b312 0 75%,
+    #0e9f0e 0
+  );
+  background-size: 72px 72px;
+}
+
+.video-bg-container video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.video-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 30, 18, 0.6),
+    rgba(3, 30, 18, 0.74)
+  );
+  -webkit-backdrop-filter: blur(2.5px);
+  backdrop-filter: blur(2.5px);
+  pointer-events: none;
+}
+
+/* --- Cabecera --- */
+header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #17231c;
+  border-bottom: 4px solid #14633f;
+  flex-wrap: wrap;
+}
+
+header .brand {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+header .mu {
+  color: #62705f;
+}
+
+.hl {
+  height: 54px;
+  cursor: pointer;
+}
+
+.sp {
+  flex: 1;
+}
+
+.ib {
+  padding: 7px 9px;
+  color: #17231c;
+}
+
+/* --- Estructura principal --- */
+main {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.shell {
+  display: flex;
+  align-items: flex-start;
+}
+
+.shell > main {
+  flex: 1;
+  min-width: 0;
+}
+
+.h2,
+.hm {
+  color: #fff;
+}
+
+/* --- Barra lateral --- */
+.side {
+  width: 240px;
+  flex: none;
+  position: sticky;
+  top: 0;
+  align-self: stretch;
+  min-height: calc(100vh - 66px);
+  padding: 12px 10px;
+  background: color-mix(in srgb, var(--sf) 94%, transparent);
+  border-right: 1px solid var(--bd);
+  backdrop-filter: blur(6px);
+}
+
+.side.off {
+  display: none;
+}
+
+.side nav {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* --- Rejillas --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.t3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.g2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.g2 .card {
+  margin: 0;
+}
+
+.g2 select,
+.g2 input {
+  padding: 5px 7px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  align-items: center;
+}
+
+/* --- Formularios simétricos: misma altura, controles alineados al pie aunque la etiqueta ocupe 2 líneas --- */
+.fg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.fg > label {
+  justify-content: flex-end;
+  line-height: 1.2;
+}
+
+.fg input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+.fg select {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 6px;
+}
+
+.fg input[type="file"] {
+  height: 40px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.fg label > b {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 !important;
+}
+
+.fg > h4 {
+  grid-column: 1/-1;
+}
+
+/* --- Pantallas públicas (login, carnet, pre-registro) --- */
+.login {
+  max-width: 360px;
+  margin: 12vh auto;
+  padding: 0 16px;
+}
+
+.login.login--wide {
+  max-width: 560px;
+}
+
+/* --- Kits: formulario + camiseta --- */
+.kitw {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 390px);
+  gap: 20px;
+  align-items: start;
+}
+
+.kitf {
+  min-width: 0;
+}
+
+.kitp {
+  position: sticky;
+  top: 12px;
+}
+
+.kitp .mu {
+  color: var(--mu);
+}
+
+/* ==========================================================================
+   4. COMPONENTES
+   ========================================================================== */
+
+/* --- Tarjeta --- */
+.card {
+  background: color-mix(in srgb, var(--sf) 94%, transparent);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.login .card {
+  --sf: #fff;
+  --tx: #17231c;
+  --mu: #62705f;
+  --bd: #dde3d9;
+  --bg: #f3f5f1;
+  --ac: #14633f;
+  background: #fff;
+  color: #17231c;
+}
+
+.lg {
+  width: 100%;
+  max-width: 300px;
+  display: block;
+  margin: 0 auto 14px;
+}
+
+/* --- Tile (accesos del menú y KPIs) --- */
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 118px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--sf) 94%, transparent);
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  color: var(--tx);
+  font: inherit;
+}
+
+.tile:hover {
+  background: var(--ac2);
+}
+
+.tile b {
+  display: block;
+  font:
+    700 1.05rem "Barlow Semi Condensed",
+    sans-serif;
+  color: var(--tx);
+}
+
+.tile .ic,
+.hi {
+  color: #e8a21a;
+}
+
+.ic {
+  font-size: 2.3rem;
+  line-height: 1;
+}
+
+.hi {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.stat {
+  font:
+    700 2rem "Barlow Semi Condensed",
+    sans-serif;
+}
+
+.kp .tile {
+  min-height: 96px;
+}
+
+.kp .tile .stat {
+  color: var(--ac);
+}
+
+.kp .tile:nth-child(n + 2) .stat {
+  color: var(--rd);
+}
+
+/* --- Tablas: fila incompleta --- */
+tr.inc td {
+  background: var(--rdb);
+}
+
+tr.inc td:first-child {
+  border-left: 4px solid var(--rd);
+}
+
+/* --- Insignias y barras --- */
+.b {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.b.ok {
+  background: var(--ac2);
+  color: var(--gn);
+}
+
+.b.no {
+  background: var(--rdb);
+  color: var(--rd);
+}
+
+.on {
+  outline: 2px solid var(--ac);
+}
+
+.bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--ac);
+  min-width: 2px;
+}
+
+.bar.n {
+  background: var(--rd);
+}
+
+/* --- Selector de número de camiseta (debe ir después de .bar: comparten la clase .n) --- */
+.nm {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  max-width: 540px;
+}
+
+.n {
+  padding: 7px 0;
+  text-align: center;
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  background: #fff;
+  color: #17231c;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.n.x {
+  background: #c0262d;
+  color: #fff;
+  border-color: #c0262d;
+  cursor: not-allowed;
+}
+
+.n.sel {
+  background: var(--ac);
+  color: #fff;
+  border-color: var(--ac);
+}
+
+/* --- Modal y toast --- */
+#mod {
+  position: fixed;
+  inset: 0;
+  background: #0009;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9;
+  padding: 16px;
+}
+
+#mod.o {
+  display: flex;
+}
+
+#mod .card {
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  margin: 0;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  background: var(--tx);
+  color: var(--bg);
+  padding: 9px 16px;
+  border-radius: 6px;
+  display: none;
+  z-index: 10;
+}
+
+#toast.show {
+  display: block;
+}
+
+/* --- Campo de contraseña con ojo --- */
+.pw {
+  position: relative;
+  display: flex;
+}
+
+.pw input {
+  flex: 1;
+  padding-right: 44px;
+}
+
+.eye {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  bottom: 2px;
+  background: none;
+  color: #62705f;
+  padding: 0 10px;
+}
+
+/* --- Pelota de carga (login) --- */
+.ball {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.ball.on {
+  display: flex;
+}
+
+.ball svg {
+  width: 84px;
+  height: 84px;
+  filter: drop-shadow(0 6px 6px #0007);
+  animation: rot 0.9s linear infinite;
+}
+
+/* --- Botón flotante de pre-registro --- */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: #e8a21a;
+  color: #17231c;
+  font-weight: 700;
+  border-radius: 26px;
+  padding: 13px 20px;
+  box-shadow: 0 4px 14px #0007;
+  z-index: 8;
+  letter-spacing: 0.5px;
+}
+
+/* --- Menú lateral: ítems y píldora líquida con física elástica --- */
+.si {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: var(--tx);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.si svg {
+  flex: none;
+  color: #e8a21a;
+}
+
+.si:hover {
+  background: var(--ac2);
+}
+
+.si.on {
+  background: var(--ac);
+  color: #fff;
+}
+
+.si.on svg {
+  color: #fff;
+}
+
+.side-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--pill),
+    color-mix(in srgb, var(--pill) 78%, #5fe3a1)
+  );
+  box-shadow:
+    0 8px 20px -8px rgba(20, 99, 63, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform: translateY(var(--py, 0px));
+  transition:
+    transform 0.62s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.62s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+
+.side-pill.in {
+  animation: pillin 0.45s ease both;
+}
+
+.side .si {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
+  background: none;
+  transition:
+    opacity 0.38s ease,
+    filter 0.38s ease,
+    color 0.28s ease;
+}
+
+.side .si:hover,
+.side .si.on {
+  background: none;
+}
+
+.side .si svg {
+  transition: color 0.28s ease;
+}
+
+.side .si.dim {
+  opacity: 0.45;
+  filter: blur(0.5px);
+}
+
+.side .si.f,
+.side .si.f svg {
+  color: #fff;
+}
+
+.side .si.on:not(.f) {
+  color: var(--ac);
+}
+
+.side .si.on:not(.f) svg {
+  color: #e8a21a;
+}
+
+/* --- Modal "Archivos adjuntados" --- */
+.adj {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  margin: 10px 0;
+}
+
+.adj-i {
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adj-i.miss {
+  border-color: var(--rd);
+  background: var(--rdb);
+}
+
+.adj-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.adj-a {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.adj-a button {
+  flex: 1;
+  min-width: 84px;
+  padding: 9px 10px;
+}
+
+/* --- Input de archivo oculto fuera de pantalla (accesible al clic programático) --- */
+.offscreen-file-input {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* --- Barras y contadores animados --- */
+.rv {
+  animation: rv 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.gb {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: gb 1.1s cubic-bezier(0.17, 0.67, 0.83, 0.67) both;
+  animation-delay: calc(var(--bd, 0ms) + 250ms + var(--i, 0) * 45ms);
+}
+
+.gb.neg {
+  transform-origin: 50% 0;
+}
+
+.bar.ga {
+  transform-origin: 0 50%;
+  animation: gx 1.1s cubic-bezier(0.17, 0.67, 0.83, 0.67) both;
+  animation-delay: calc(var(--bd, 0ms) + 300ms + var(--i, 0) * 70ms);
+}
+
+/* --- Botón de pago -> ¡PAGADO! --- */
+.paybtn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  border: 0 !important;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition:
+    width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.35s ease,
+    color 0.3s ease;
+}
+
+.paybtn.paying {
+  background: #17231c !important;
+  color: #fff !important;
+}
+
+.paybtn .pf {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #12874f, #22c06f);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: payfill 0.9s cubic-bezier(0.45, 0.05, 0.25, 1) forwards;
+}
+
+.paybtn .pl {
+  position: relative;
+  z-index: 1;
+  animation: plin 0.3s ease both;
+  letter-spacing: 0.4px;
+}
+
+.paybtn.paid {
+  background: #16a05d !important;
+  color: #fff !important;
+  animation: paypop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pk {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 28;
+  stroke-dashoffset: 28;
+  animation: pkd 0.45s 0.12s ease forwards;
+}
+
+/* --- Recibo / comprobante de caja --- */
+#mod.rcm {
+  background: rgba(4, 24, 15, 0.66);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.rcw {
+  width: min(340px, 92vw);
+  text-align: center;
+}
+
+.rc-slot {
+  position: relative;
+  z-index: 2;
+  height: 12px;
+  margin: 0 -8px;
+  border-radius: 8px;
+  background: linear-gradient(#323833, #0e1310);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+.rc-win {
+  overflow: hidden;
+  padding: 0 8px 22px;
+  margin: -4px -8px 0;
+}
+
+.rc {
+  position: relative;
+  background: #f7f4ea;
+  color: #1b221d;
+  font:
+    12.5px/1.55 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    "Courier New",
+    monospace;
+  padding: 20px 18px 30px;
+  text-align: left;
+  transform-origin: top center;
+  -webkit-mask: conic-gradient(
+      from -45deg at bottom,
+      #0000,
+      #000 1deg 89deg,
+      #0000 90deg
+    )
+    50%/14px 100%;
+  mask: conic-gradient(
+      from -45deg at bottom,
+      #0000,
+      #000 1deg 89deg,
+      #0000 90deg
+    )
+    50%/14px 100%;
+  animation:
+    rcp 1.3s steps(30, end) both,
+    rcs 1.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.rl {
+  opacity: 0;
+  animation: rlin 0.25s ease forwards;
+  animation-delay: calc(var(--i, 0) * 85ms + 180ms);
+}
+
+.rc-h {
+  text-align: center;
+  line-height: 1.25;
+}
+
+.rc-h b {
+  display: block;
+  font:
+    700 1.55rem "Barlow Semi Condensed",
+    Barlow,
+    sans-serif;
+  letter-spacing: 3px;
+}
+
+.rc-h span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.rc-sep {
+  border-top: 1px dashed #1b221d77;
+  margin: 9px 0;
+}
+
+.rc-m,
+.rc-l,
+.rc-t {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rc-l span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rc-l b {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rc-t {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.rc-note {
+  font-size: 0.72rem;
+  color: #1b221dbb;
+  margin: 0;
+}
+
+.rc-bar {
+  display: block;
+  width: 100%;
+  height: 46px;
+  margin: 12px 0 2px;
+  fill: #1b221d;
+}
+
+.rc-code {
+  text-align: center;
+  font-size: 0.7rem;
+  letter-spacing: 3px;
+  margin: 0;
+}
+
+.rc-ty {
+  text-align: center;
+  font-size: 0.72rem;
+  margin: 10px 0 0;
+}
+
+.rcw .row {
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.rcw .row button.g {
+  color: #fff;
+}
+
+/* --- Camiseta personalizable (a la derecha del formulario) --- */
+.shirt-stage {
+  position: relative;
+  padding: 20px 14px 14px;
+  border-radius: 18px;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    #2c4a3b 0%,
+    #142319 62%,
+    #0d1610 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 14px 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+.shirt-stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shirt-tag {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  font:
+    600 0.72rem "Barlow Semi Condensed",
+    Barlow,
+    sans-serif;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #f5c542;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+/* --- Elementos que antes llevaban style="..." en línea --- */
+.scan-video {
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+}
+
+.carnet-photo {
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.link-accent {
+  color: var(--ac);
+  font-weight: 600;
+}
+
+.qr-box {
+  background: #fff;
+  padding: 14px;
+  display: inline-block;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.fg.fg--single {
+  grid-template-columns: 1fr;
+}
+
+/* ==========================================================================
+   5. ANIMACIONES
+   ========================================================================== */
+@keyframes rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pillin {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rv {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gb {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes gx {
+  from {
+    transform: scale(0, 0);
+  }
+  to {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes payfill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes plin {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes paypop {
+  0% {
+    transform: scale(0.95);
+  }
+  55% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes pkd {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rcp {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 -30px 0);
+  }
+}
+
+@keyframes rcs {
+  from {
+    transform: translateY(-30px) rotate(-1.6deg);
+  }
+  to {
+    transform: translateY(0) rotate(-1.6deg);
+  }
+}
+
+@keyframes rlin {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   6. UTILIDADES (con !important: reemplazan a los antiguos style="..." en línea)
+   ========================================================================== */
+.u-hidden {
+  display: none !important;
+}
+
+.u-pointer {
+  cursor: pointer !important;
+}
+
+.u-text-center {
+  text-align: center !important;
+}
+
+.u-text-right {
+  text-align: right !important;
+}
+
+.u-text-white {
+  color: #fff !important;
+}
+
+.u-neg {
+  color: var(--rd) !important;
+}
+
+.u-pos {
+  color: var(--gn) !important;
+}
+
+.u-accent {
+  color: var(--ac) !important;
+}
+
+.u-fw-400 {
+  font-weight: 400 !important;
+}
+
+.u-break-all {
+  word-break: break-all !important;
+}
+
+.u-rounded-6 {
+  border-radius: 6px !important;
+}
+
+.u-jc-center {
+  justify-content: center !important;
+}
+
+.u-flex-1 {
+  flex: 1 !important;
+}
+
+.u-col-full {
+  grid-column: 1/-1 !important;
+}
+
+.u-w-160 {
+  width: 160px !important;
+}
+
+.u-py-8 {
+  padding: 8px 0 !important;
+}
+
+/* Márgenes: u-m-<arriba>-<lados>-<abajo> en px */
+.u-m-0 {
+  margin: 0 !important;
+}
+
+.u-m-4-0 {
+  margin: 4px 0 !important;
+}
+
+.u-m-6-0 {
+  margin: 6px 0 !important;
+}
+
+.u-m-8-0-0 {
+  margin: 8px 0 0 !important;
+}
+
+.u-m-10-0-0 {
+  margin: 10px 0 0 !important;
+}
+
+.u-m-10-0-2 {
+  margin: 10px 0 2px !important;
+}
+
+.u-m-24-0-10 {
+  margin: 24px 0 10px !important;
+}
+
+.u-m-0-0-8 {
+  margin: 0 0 8px !important;
+}
+
+.u-m-0-0-14 {
+  margin: 0 0 14px !important;
+}
+
+.u-mt-12 {
+  margin-top: 12px !important;
+}
+
+.u-mt-14 {
+  margin-top: 14px !important;
+}
+
+/* ==========================================================================
+   7. RESPONSIVE E IMPRESIÓN
+   ========================================================================== */
+@media (max-width: 700px) {
+  .t3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .side {
+    position: fixed;
+    left: 0;
+    top: 66px;
+    bottom: 0;
+    z-index: 7;
+    overflow: auto;
+    min-height: 0;
+    box-shadow: 4px 0 14px #0006;
+  }
+
+  .kitw {
+    grid-template-columns: 1fr;
+  }
+
+  .kitp {
+    position: static;
+  }
+}
+
+@media print {
+  body > *:not(#mod) {
+    display: none !important;
+  }
+
+  #mod {
+    background: none;
+    position: static;
+    display: block;
+  }
+
+  #mod button {
+    display: none;
+  }
+
+  .rc {
+    animation: none !important;
+    clip-path: none !important;
+    transform: none !important;
+    filter: none;
+    -webkit-mask: none;
+    mask: none;
+    box-shadow: none;
+  }
+
+  .rl {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+
+  .rc-slot {
+    display: none;
+  }
+
+  .rc-win {
+    margin: 0;
+    padding: 0;
+  }
+
+  .rcw .row {
+    display: none;
+  }
 }
