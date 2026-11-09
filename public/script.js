@@ -1599,79 +1599,32 @@ function tgSide() {
   var nv = $(".side nav");
   if (nv && nv._pl) requestAnimationFrame(nv._pl);
 }
-async function restaurar(inp) {
-  var f = inp.files[0];
-  inp.value = "";
-  if (!f) return;
-  if (f.size > 20e6) return toast("El archivo es demasiado grande");
-  let o;
-  try {
-    o = JSON.parse(await f.text());
-  } catch (e) {
-    return toast("El archivo no es un JSON válido");
-  }
-  var T = o && o.tablas;
-  if (
-    !T ||
-    typeof T !== "object" ||
-    TB.some((t) => !Array.isArray(T[t.n]) || T[t.n].some((r) => !r || typeof r.id !== "string"))
-  )
-    return toast("El archivo no parece un respaldo de este sistema");
-  if (
-    !confirm(
-      `Se reemplazarán TODOS los datos actuales por los del respaldo (${T.alumnos.length} alumnos, generado el ${esc(String(o.generado || "").slice(0, 10))}). Antes se descargará una copia de lo actual. ¿Continuar?`,
-    )
-  )
-    return;
-  busy++;
-  try {
-    await backup();
-    T.alumnos.forEach((r) => {
-      if (r.foto && !IMG_OK.test(r.foto)) r.foto = null;
-    });
-    for (var t of TB) t.load(T[t.n]);
-    await flush();
-    await ver();
-    toast("Respaldo restaurado correctamente");
-  } catch (e) {
-    console.error(e);
-    toast("No se pudo restaurar el respaldo. Se recargó el estado actual.");
-    try {
-      await pull();
-    } catch (_) {}
-  }
-  busy--;
-  R();
-}
-var idle;
-var rIdle = () => {
-  clearTimeout(idle);
-  if (U) idle = setTimeout(out, 30 * 60 * 1000);
-};
 async function boot() {
   var h = location.hash;
   if (/^#c=[a-z0-9]{16}$/.test(h)) return pubCarnet(h.slice(3));
   if (h === "#prereg") return pubPre();
+
+  // 1. Cargar datos locales o semilla de inmediato para que la pantalla NUNCA nazca en 0
+  load();
+
   try {
     RT = sessionStorage.getItem("cdmt_rt");
     if (RT && !KEY.startsWith("PEGA")) {
       await auth({ refresh_token: RT }, "refresh_token");
       await sess();
+      
+      // Pintar de inmediato con lo que hay en memoria en el navegador
+      R(); 
+
+      // 2. Sincronizar datos frescos de Supabase en segundo plano
       await pull();
     }
   } catch (e) {
     U = null;
   }
-  
-  // Fuerza el redibujado de la interfaz para que pinte los datos reales
+
+  // 3. Renderizado final con los datos ya sincronizados con Supabase
   R();
-  
-  // Segundo reintento por seguridad para asegurar que el DOM tome los datos de Supabase
-  setTimeout(() => {
-    if (typeof R === 'function' && U) {
-      R();
-    }
-  }, 300);
 }
 setInterval(async () => {
   if (!U || document.hidden || V === "mat" || busy) return;
