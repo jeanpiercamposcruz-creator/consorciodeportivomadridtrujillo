@@ -2090,9 +2090,12 @@ function charts() {
 }
 function home() {
   var adm = U.rol === "ADM",
-      // Aseguramos que si S o S.alu aún no cargan por completo, tome un arreglo vacío en vez de fallar
       alumnos = (S && Array.isArray(S.alu)) ? S.alu : [],
-      act = alumnos.filter((a) => a.est === "Activo"),
+      // Flexible: cuenta como activo si dice "activo", viene vacío o no está marcado como inactivo
+      act = alumnos.filter((a) => {
+        var est = String(a.est || a.estado || "").trim().toLowerCase();
+        return est === "activo" || est === "" || est !== "inactivo";
+      }),
       K3 = [
         ["Alumnos activos", act.length, { e: "Activo" }],
         ["Con datos pendientes", alumnos.filter((a) => falta(a).length).length, { e: "Incompleto" }],
