@@ -28,13 +28,23 @@ declare global {
   }
 }
 
-function loadScript(src: string): Promise<void> {
+function loadScript(src: string, ms = 12000): Promise<void> {
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
+    const t = setTimeout(() => {
+      s.remove();
+      reject(new Error("Tiempo agotado cargando " + src));
+    }, ms);
     s.src = src;
     s.async = false;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("No se pudo cargar " + src));
+    s.onload = () => {
+      clearTimeout(t);
+      resolve();
+    };
+    s.onerror = () => {
+      clearTimeout(t);
+      reject(new Error("No se pudo cargar " + src));
+    };
     document.body.appendChild(s);
   });
 }

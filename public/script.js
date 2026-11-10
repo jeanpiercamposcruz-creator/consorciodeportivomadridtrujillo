@@ -16,7 +16,11 @@ const v = (id) => {
   const e = document.getElementById(id);
   return e ? e.value.trim() : "";
 };
-const today = () => new Date().toISOString().slice(0, 10),
+/* Fecha LOCAL (Perú UTC-5). toISOString() es UTC y después de las 19:00 devolvía el día siguiente. */
+const today = () => {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  },
   money = (n) => "S/ " + (+n || 0).toFixed(2);
 const esc = (s) =>
   String(s ?? "").replace(
@@ -45,9 +49,19 @@ const LISTAS = {
   con: ["Ninguna", "Media Beca", "Becado"],
   est: ["Activo", "Inactivo"],
 };
+/* Monto estricto: solo dígitos con hasta 2 decimales (rechaza 0x10, 1e3, "abc", negativos). */
 const monto = (v) => {
-  const n = Number(String(v).replace(",", "."));
-  return Number.isFinite(n) && n >= 0 && n <= 99999 ? Math.round(n * 100) / 100 : null;
+  const s = String(v ?? "").trim().replace(",", ".");
+  if (!/^\d{1,5}(\.\d{1,2})?$/.test(s)) return null;
+  const n = Number(s);
+  return n <= 99999 ? Math.round(n * 100) / 100 : null;
+};
+/* Fecha real (rechaza 2015-02-31, 2015-13-45, 0000-00-00). */
+const fechaOk = (s) => {
+  if (!RX.fecha.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number),
+    t = new Date(Date.UTC(y, m - 1, d));
+  return y >= 1900 && t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
 };
 /* ==================================================================
    2. VALIDACIÓN Y SANEAMIENTO DE DATOS
@@ -56,12 +70,12 @@ function validarAlumno(f) {
   const d = {
       nom: limpiar(f.nom, 60),
       ape: limpiar(f.ape, 60),
-      dni: limpiar(f.dni, 8),
-      ac: limpiar(f.ac, 9),
+      dni: limpiar(f.dni, 40), // sin truncar: el regex decide (antes "123456789012" pasaba como "12345678")
+      ac: limpiar(f.ac, 40),
       am: limpiar(f.am, 120).toLowerCase(),
       an: limpiar(f.an, 80),
       seg: limpiar(f.seg, 60),
-      nac: limpiar(f.nac, 10),
+      nac: limpiar(f.nac, 40),
       sex: f.sex,
       mod: f.mod,
       con: f.con,
@@ -73,7 +87,7 @@ function validarAlumno(f) {
   if (d.dni && !RX.dni.test(d.dni)) e.push("El DNI debe tener 8 dígitos");
   if (d.ac && !RX.cel.test(d.ac)) e.push("El celular admite hasta 9 dígitos");
   if (d.am && !RX.mail.test(d.am)) e.push("Correo inválido");
-  if (!RX.fecha.test(d.nac)) e.push("Fecha de nacimiento inválida");
+  if (!fechaOk(d.nac)) e.push("Fecha de nacimiento inválida");
   for (const k in LISTAS) if (!LISTAS[k].includes(d[k])) e.push("Valor no permitido en " + k);
   for (const k of ["cm", "cmen", "pag"]) {
     d[k] = monto(f[k]);
@@ -251,38 +265,6 @@ function seed() {
   ];
   return s;
 }
-function load() {
-  try {
-    S = JSON.parse(sessionStorage.getItem(K));
-  } catch (e) {}
-  if (!S) {
-    try {
-      S = JSON.parse(sessionStorage.getItem("cdmt_erp_v1"));
-    } catch (e) {}
-    if (S) mig();
-    else S = seed();
-  }
-}
-function mig() {
-  const m = {};
-  S.alu.forEach((a) => {
-    const n = a.id.match(/ALU-(\d{4})-(\d+)/),
-      o = a.id;
-    if (n) a.id = n[1].slice(2) + n[2];
-    m[o] = a.id;
-    if (a.mod === "Entrenamiento") a.mod = "Formativo";
-  });
-  S.caja.forEach((x) => {
-    if (m[x.d]) x.d = m[x.d];
-  });
-  S.kits.forEach((k) => {
-    if (m[k.aid]) k.aid = m[k.aid];
-  });
-  S.asis.forEach((x) => {
-    if (x.t === "A" && m[x.ref]) x.ref = m[x.ref];
-  });
-  S.personal.forEach((p) => delete p.pass);
-}
 const nid = () => {
   const p = String(Y).slice(2);
   return (
@@ -293,6 +275,7 @@ const nid = () => {
   );
 };
 const age = (d) => {
+  if (!RX.fecha.test(String(d || ""))) return "—"; // antes age("") devolvía 2026
   const [y, m, x] = d.split("-").map(Number),
     t = new Date();
   return (
@@ -319,18 +302,29 @@ let TK = null,
   SN = {},
   busy = 0,
   sv = Promise.resolve();
+let REFRESHING = null;
 async function sb(path, o = {}, retry = 1) {
-  const r = await fetch(SB + path, {
-    ...o,
-    headers: {
-      apikey: KEY,
-      Authorization: "Bearer " + (TK || KEY),
-      "Content-Type": "application/json",
-      ...(o.headers || {}),
-    },
-  });
+  const ctl = new AbortController(),
+    to = setTimeout(() => ctl.abort(), o.timeout || 20000); // sin esto una petición colgada bloquea toda la cola
+  let r;
+  try {
+    r = await fetch(SB + path, {
+      ...o,
+      signal: ctl.signal,
+      headers: {
+        apikey: KEY,
+        Authorization: "Bearer " + (TK || KEY),
+        "Content-Type": "application/json",
+        ...(o.headers || {}),
+      },
+    });
+  } finally {
+    clearTimeout(to);
+  }
   if (r.status === 401 && RT && retry) {
-    await auth({ refresh_token: RT }, "refresh_token");
+    // Un único refresh aunque 401 lleguen en paralelo (el refresh token rota: reusarlo invalida la sesión)
+    REFRESHING = REFRESHING || auth({ refresh_token: RT }, "refresh_token").finally(() => (REFRESHING = null));
+    await REFRESHING;
     return sb(path, o, 0);
   }
   return r;
@@ -559,6 +553,10 @@ async function pull() {
     await ver();
     return;
   }
+  // 1) descargar TODO primero (si algo falla aquí, S y SN siguen intactos)
+  const raw = {};
+  for (const t of TB) raw[t.n] = t.n === "ajustes" ? aj : await all(t.n);
+  // 2) reemplazar el estado de golpe, sin ningún await en medio
   S = {
     sedes: [],
     deportes: [],
@@ -570,7 +568,7 @@ async function pull() {
     caja: [],
     c: {},
   };
-  for (const t of TB) t.load(t.n === "ajustes" ? aj : await all(t.n));
+  for (const t of TB) t.load(raw[t.n]);
   SN = {};
   TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
   await ver();
@@ -621,26 +619,36 @@ async function flush() {
     SN[t.n] = m;
   }
 }
+let SAVE_OK = true; // resultado del último guardado (lo consultan recibos y borrado de pre-registros)
 function save() {
   busy++;
-  sv = sv.then(async () => {
-    try {
-      await flush();
-      await ver();
-    } catch (e) {
-      console.error(e);
-      if (e === "dup") {
-        toast(
-          "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro.",
-        );
-        try {
-          await pull();
-        } catch (_) {}
-        R();
-      } else toast("No se pudo guardar: revisa la conexión o tus permisos");
-    }
-    busy--;
-  });
+  sv = sv
+    .then(async () => {
+      try {
+        await flush();
+        SAVE_OK = true;
+        await ver();
+      } catch (e) {
+        SAVE_OK = false;
+        console.error(e);
+        if (e === "dup") {
+          toast(
+            "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro.",
+          );
+          try {
+            await pull();
+          } catch (_) {}
+          try {
+            R();
+          } catch (x) {
+            console.error(x);
+          }
+        } else toast("No se pudo guardar: revisa la conexión o tus permisos");
+      } finally {
+        busy--; // siempre, pase lo que pase
+      }
+    })
+    .catch((e) => console.error("cola de guardado", e)); // la cadena nunca queda rechazada
 }
 async function backup() {
   try {
@@ -679,6 +687,7 @@ async function subirArch(f, carpeta, tipo) {
     r = await sb("/storage/v1/object/documentos/" + path, {
       method: "POST",
       headers: { "Content-Type": f.type },
+      timeout: 90000,
       body: f,
     });
   if (!r.ok) throw "subida";
@@ -1240,6 +1249,10 @@ function loopCam(id) {
     else setTimeout(() => loopCam(id), 100);
   };
   const now = performance.now();
+  if (!window.jsQR) {
+    const z = $("#cs");
+    if (z) z.textContent = "Lector QR no disponible: recarga la página o revisa tu conexión";
+  }
   if (now - CAMLAST < 110 || v.readyState < 2 || !v.videoWidth || !window.jsQR || v.paused) {
     if (v.paused) v.play().catch(() => {});
     return again();
@@ -1289,7 +1302,7 @@ function qrLeido(t) {
   if (m[1] === LASTQ && n - LASTT < 4000) return;
   LASTQ = m[1];
   LASTT = n;
-  const e = $("#cs"),
+  const e = $("#cs") || { textContent: "", classList: { add() {} } }, // el modal pudo cerrarse
     a = S.alu.find((x) => x.qt === m[1]);
   if (!a) {
     e.textContent = "QR no reconocido";
@@ -1947,6 +1960,9 @@ async function doLogin2() {
   R();
 }
 const out = () => {
+  if (TK) sb("/auth/v1/logout?scope=local", { method: "POST" }).catch(() => {}); // revoca la sesión en el servidor
+  if (typeof R_REAL === "function") R = R_REAL; // payRun() pudo dejar R() anulada
+  PAYB = 0;
   U = null;
   TK = RT = null;
   KS = 0;
@@ -1964,6 +1980,10 @@ function R() {
     postR();
     return;
   }
+  if (V === "mat" && ED && !S.alu.some((x) => x.id === ED)) {
+    ED = null; // el alumno ya no existe (otro admin lo borró o un pull lo reemplazó)
+    FRESH = null;
+  }
   const m = M.find((x) => x[0] === V);
   if (m && !m[3].includes(U.rol)) V = "home";
   NAVF = V !== LASTV;
@@ -1973,7 +1993,7 @@ function R() {
     contarPre();
   }
   if (V === "mat") {
-    FOTO = ED ? S.alu.find((x) => x.id === ED).foto : "";
+    FOTO = ED ? (S.alu.find((x) => x.id === ED) || {}).foto || "" : "";
     upHor();
   }
   postR();
@@ -2136,10 +2156,12 @@ function addSede() {
   };
   if (d.costo === null) return toast("Costo inválido");
   if (ES) {
-    Object.assign(
-      S.sedes.find((s) => s.id === ES),
-      d,
-    );
+    const tgt = S.sedes.find((s) => s.id === ES);
+    if (!tgt) {
+      ES = null;
+      return toast("La sede ya no existe (otro usuario la eliminó). Recarga e inténtalo de nuevo.");
+    }
+    Object.assign(tgt, d);
     ES = null;
     toast("Sede actualizada");
   } else {
@@ -2448,10 +2470,13 @@ async function saveAlu() {
   if (PREID) {
     const pid = PREID;
     PREID = PRE = null;
-    sb("/rest/v1/preregistros?id=eq." + encodeURIComponent(pid), { method: "DELETE" }).then(() => {
-      if (PR) PR = PR.filter((x) => x.id !== pid);
-      PRN = PR ? PR.length : PRN;
-    });
+    sv.then(() => {
+      if (!SAVE_OK) return; // el alumno no llegó a la BD: el pre-registro (datos + archivos) se conserva
+      return sb("/rest/v1/preregistros?id=eq." + encodeURIComponent(pid), { method: "DELETE" }).then(() => {
+        if (PR) PR = PR.filter((x) => x.id !== pid);
+        PRN = PR ? PR.length : PRN;
+      });
+    }).catch(() => {});
   }
   if (!old || FRESH === id) {
     FRESH = id;
@@ -3097,16 +3122,27 @@ function payRun(b, fn, metric, tk) {
       if (pend) R0();
     };
   const done = (ctl) =>
-    ctl.finish().then(() => {
-      end();
-      flush();
-      try {
-        recibo(tk());
-      } catch (e) {
-        console.error(e);
-      }
-      PAYB = 0;
-    });
+    sv
+      .then(() => {
+        if (!SAVE_OK) throw new Error("no guardado"); // no hay "¡PAGADO!" ni recibo sin confirmación de la BD
+        return ctl.finish();
+      })
+      .then(() => {
+        end();
+        flush();
+        try {
+          recibo(tk());
+        } catch (e) {
+          console.error(e);
+        }
+        PAYB = 0;
+      })
+      .catch(() => {
+        ctl.cancel();
+        end();
+        flush();
+        PAYB = 0;
+      });
   if (r && typeof r.then === "function") {
     PAYB = 1;
     const ctl = payBtn(b);
@@ -3382,13 +3418,14 @@ function kNumTyped(e) {
 function delegate(type, attr, registry) {
   document.addEventListener(type, (e) => {
     const el = e.target.closest("[" + attr + "]");
-    const fn = el && registry[el.getAttribute(attr)];
+    const k = el && el.getAttribute(attr),
+      fn = el && Object.hasOwn(registry, k) ? registry[k] : null;
     if (fn) fn(el, el.dataset.i, e);
   });
 }
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-f]");
-  if (b && FN[b.dataset.f]) FN[b.dataset.f](b.dataset.i, b.dataset.j, b.dataset.k, b);
+  if (b && Object.hasOwn(FN, b.dataset.f)) FN[b.dataset.f](b.dataset.i, b.dataset.j, b.dataset.k, b);
 });
 delegate("input", "data-in", ON_INPUT);
 delegate("change", "data-ch", ON_CHANGE);
@@ -3423,5 +3460,6 @@ function initBackgroundVideo() {
 /* ==================================================================
    19. ARRANQUE
    ================================================================== */
+const R_REAL = R;
 initBackgroundVideo();
 boot();

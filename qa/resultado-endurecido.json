@@ -1,0 +1,196 @@
+{
+  "script": "/home/claude/erp/erp-next/.qa-hardened/public/script.js",
+  "fecha": "2026-11-10T00:55:19.720Z",
+  "resultados": [
+    {
+      "id": "P1-a",
+      "nivel": "CRÍTICO",
+      "titulo": "pull() interrumpido por la red deja S a medias y el siguiente save() borra la BD",
+      "pass": true,
+      "detalle": "BD antes {\"alu\":3,\"asis\":0,\"caja\":0} → después {\"alu\":3,\"asis\":0,\"caja\":1}"
+    },
+    {
+      "id": "P1-b",
+      "nivel": "CRÍTICO",
+      "titulo": "save() durante un pull() lento (sin fallo de red) también borra datos",
+      "pass": true,
+      "detalle": "alumnos en BD: 3 → 3"
+    },
+    {
+      "id": "P2-a",
+      "nivel": "ALTO",
+      "titulo": "Ninguna petición a Supabase tiene timeout (AbortSignal); una petición colgada bloquea toda la cola de guardado",
+      "pass": true,
+      "detalle": "0/12 peticiones sin signal; tras 700 ms colgado: busy=1, POST enviados=1 (el 2.º guardado nunca sale; el poller queda deshabilitado)"
+    },
+    {
+      "id": "P2-b",
+      "nivel": "ALTO",
+      "titulo": "Se emite recibo y '¡PAGADO!' aunque la BD rechace el guardado (UI optimista sin confirmación)",
+      "pass": true,
+      "detalle": "recibos emitidos=0; filas nuevas en BD=0; toast=\"No se pudo guardar: revisa la conexión o tus permisos\""
+    },
+    {
+      "id": "P2-f",
+      "nivel": "MEDIO",
+      "titulo": "Varias peticiones con JWT vencido disparan varios refresh a la vez con el MISMO refresh token (rota: las demás fallan)",
+      "pass": true,
+      "detalle": "llamadas a refresh=1 (esperado 1); peticiones exitosas=3/3"
+    },
+    {
+      "id": "P2-c",
+      "nivel": "ALTO",
+      "titulo": "Un error dentro del catch de save() (p. ej. R() lanza tras un 409) envenena la cola: todos los guardados posteriores se ignoran en silencio",
+      "pass": true,
+      "inconcluso": false,
+      "detalle": "control R() en home sin error=true; R() con ED inexistente → no lanza; tras el 409: busy=0; guardado posterior persistió=true; promesas sin capturar=0"
+    },
+    {
+      "id": "P2-d",
+      "nivel": "MEDIO",
+      "titulo": "Propiedad: con 25 % de fallos aleatorios en escrituras, el diff de flush() converge a un estado idéntico (sin pérdida ni duplicados)",
+      "pass": true,
+      "detalle": "BD y estado local idénticos tras 150 operaciones con fallos"
+    },
+    {
+      "id": "P2-e",
+      "nivel": "BAJO",
+      "titulo": "Control positivo: ids hostiles (comillas, comas, paréntesis, barra) no rompen el DELETE ?id=in.(...)",
+      "pass": true,
+      "detalle": "ids restantes en caja: [\"ok1\"]"
+    },
+    {
+      "id": "P3-a",
+      "nivel": "ALTO",
+      "titulo": "validarAlumno: valores inválidos que DEBERÍAN rechazarse (truncado silencioso antes de validar, fechas imposibles, notación hex/exponencial)",
+      "pass": true,
+      "detalle": "todos rechazados"
+    },
+    {
+      "id": "P3-b",
+      "nivel": "ALTO",
+      "titulo": "today() usa UTC: en Perú (UTC-5) todo registro después de las 19:00 queda con la fecha del día siguiente",
+      "pass": true,
+      "detalle": "a las 20:30 hora de Lima today() devuelve \"2026-11-09\" (esperado 2026-11-09). Afecta caja, asistencias y cierres por día/mes"
+    },
+    {
+      "id": "P3-c",
+      "nivel": "MEDIO",
+      "titulo": "age('') devuelve el año actual como 'edad' (fecha vacía de pre-registro/legado no se detecta)",
+      "pass": true,
+      "detalle": "age(\"\") = —"
+    },
+    {
+      "id": "P3-d",
+      "nivel": "BAJO",
+      "titulo": "money() convierte NaN/undefined/texto en 'S/ 0.00' (oculta datos corruptos en vez de señalarlos)",
+      "pass": false,
+      "detalle": "money(NaN), money(undefined), money(\"abc\") → [\"S/ 0.00\",\"S/ 0.00\",\"S/ 0.00\"]"
+    },
+    {
+      "id": "P3-e",
+      "nivel": "MEDIO",
+      "titulo": "Fuzz de validarAlumno (5000 combinaciones de tipos hostiles): nunca lanza y nunca acepta datos fuera de invariantes",
+      "pass": true,
+      "detalle": "{\"thrown\":0,\"ej\":null,\"violaciones\":0}"
+    },
+    {
+      "id": "P3-f",
+      "nivel": "MEDIO",
+      "titulo": "Fuzz de esc(): ningún carácter peligroso sobrevive en salidas HTML (anti-XSS)",
+      "pass": true,
+      "detalle": "{\"mal\":0}"
+    },
+    {
+      "id": "P4-a",
+      "nivel": "ALTO",
+      "titulo": "Registrar un alumno desde un pre-registro borra el pre-registro aunque el guardado del alumno falle",
+      "pass": true,
+      "detalle": "alumno guardado en BD=false; pre-registro (datos del padre + archivos) ELIMINADO de la BD=false"
+    },
+    {
+      "id": "P4-b",
+      "nivel": "MEDIO",
+      "titulo": "Bajar 'monto pagado' de un alumno no deja ningún asiento en caja (descuadre contable)",
+      "pass": false,
+      "detalle": "monto_pagado 100 → 0; movimientos de caja 0 → 0 (ni egreso ni nota de anulación)"
+    },
+    {
+      "id": "P4-c",
+      "nivel": "MEDIO",
+      "titulo": "addSede() en modo edición lanza TypeError si la sede ya no existe (otro admin la borró y el poll recargó)",
+      "pass": true,
+      "detalle": "sin excepción"
+    },
+    {
+      "id": "P4-d",
+      "nivel": "MEDIO",
+      "titulo": "qrLeido() sin el modal abierto lanza TypeError (null.textContent); en loopCam() queda tragado por un catch vacío",
+      "pass": true,
+      "detalle": "sin excepción"
+    },
+    {
+      "id": "P4-e",
+      "nivel": "ALTO",
+      "titulo": "payRun() reemplaza la función global R() y, si la petición se cuelga, R()/out() quedan anulados: la sesión 'expira' pero los datos siguen en pantalla",
+      "pass": true,
+      "detalle": "tras out(): U=null, PAYB=0, pantalla sigue mostrando datos=false"
+    },
+    {
+      "id": "P5-a",
+      "nivel": "MEDIO",
+      "titulo": "ErpLoader: scripts de CDN con Subresource Integrity (integrity + crossOrigin)",
+      "pass": true,
+      "detalle": "SRI presente o librerías autoalojadas"
+    },
+    {
+      "id": "P5-b",
+      "nivel": "MEDIO",
+      "titulo": "ErpLoader: timeout al cargar scripts (CDN colgada)",
+      "pass": true,
+      "detalle": "hay timeout"
+    },
+    {
+      "id": "P5-c",
+      "nivel": "MEDIO",
+      "titulo": "ErpLoader/script.js: si falla jsQR el escáner avisa al usuario",
+      "pass": true,
+      "detalle": "avisa"
+    },
+    {
+      "id": "P5-d",
+      "nivel": "MEDIO",
+      "titulo": "CSP: script-src sin 'unsafe-inline'",
+      "pass": false,
+      "detalle": "'unsafe-inline' en script-src anula gran parte de la protección anti-XSS (el refresh token vive en sessionStorage)"
+    },
+    {
+      "id": "P5-e",
+      "nivel": "MEDIO",
+      "titulo": "out(): revoca la sesión en el servidor (/auth/v1/logout)",
+      "pass": true,
+      "detalle": "revoca"
+    },
+    {
+      "id": "P5-f",
+      "nivel": "BAJO",
+      "titulo": "FN/ON_* son objetos sin prototipo (data-f='constructor' no resuelve a funciones heredadas)",
+      "pass": true,
+      "detalle": "FN protegido"
+    },
+    {
+      "id": "P5-g",
+      "nivel": "BAJO",
+      "titulo": "Sin código muerto de persistencia local (load()/mig() nunca se invocan)",
+      "pass": true,
+      "detalle": "sin código muerto"
+    },
+    {
+      "id": "P5-h",
+      "nivel": "ALTO",
+      "titulo": "Alta anónima de pre-registros: anti-bot validado en servidor (el honeypot pp_w es solo cliente)",
+      "pass": false,
+      "detalle": "el formulario público y la subida a Storage son llamables directamente con la anon key: sin CAPTCHA/rate-limit ni CHECK/políticas que impongan tamaño y tipo en servidor"
+    }
+  ]
+}
