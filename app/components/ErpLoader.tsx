@@ -22,6 +22,10 @@ const APP = "/script.js";
 declare global {
   interface Window {
     __erpLoader?: Promise<void>;
+    __ERP_CONFIG__?: {
+      supabaseUrl: string;
+      supabaseKey: string;
+    };
   }
 }
 
@@ -47,8 +51,23 @@ function loadScript(src: string, ms = 12000): Promise<void> {
 }
 
 export default function ErpLoader() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   useEffect(() => {
     if (window.__erpLoader) return;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Faltan las variables de entorno de Supabase.");
+      const app = document.getElementById("app");
+      if (app) app.textContent = "Error de configuración. Contacta al administrador.";
+      return;
+    }
+
+    window.__ERP_CONFIG__ = {
+      supabaseUrl,
+      supabaseKey,
+    };
     window.__erpLoader = (async () => {
       for (const src of LIBS) {
         // Si la CDN falla, el sistema sigue funcionando (sin QR) en vez de quedarse en blanco.
@@ -60,7 +79,7 @@ export default function ErpLoader() {
       const app = document.getElementById("app");
       if (app) app.textContent = "No se pudo cargar el sistema. Recarga la página.";
     });
-  }, []);
+      }, [supabaseUrl, supabaseKey]);
 
   return null;
 }
