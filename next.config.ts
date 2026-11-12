@@ -10,7 +10,7 @@ const SUPABASE = "https://wuoqjcqniacsassxhrvs.supabase.co";
 const csp = [
   "default-src 'self'",
   // Next.js inserta scripts en línea para hidratar; sin un proxy con nonces hace falta 'unsafe-inline'.
-  "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",

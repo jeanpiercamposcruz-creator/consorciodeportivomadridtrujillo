@@ -16,10 +16,7 @@ import { useEffect } from "react";
  *    variables globales y duplicaría los listeners y temporizadores.
  *  - No se elimina el <script> al desmontar: script.js ya se ejecutó y sigue vivo.
  */
-const LIBS = [
-  "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js",
-];
+const LIBS = ["/vendor/qrcode.min.js", "/vendor/jsQR.min.js"];
 const APP = "/script.js";
 
 declare global {
