@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
-const SUPABASE = "https://wuoqjcqniacsassxhrvs.supabase.co";
+const SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+if (!SUPABASE) {
+  throw new Error("Falta NEXT_PUBLIC_SUPABASE_URL. Configuración detenida.");
+}
 
 /**
  * Cabeceras de seguridad (equivalen al archivo `_headers` y a la CSP del ERP original).

@@ -291,9 +291,14 @@ function ck(e) {
 /* ==================================================================
    4. CAPA DE DATOS (Supabase: autenticación, sincronización y respaldo)
    ================================================================== */
-const SB = "https://wuoqjcqniacsassxhrvs.supabase.co",
-  KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1b3FqY3FuaWFjc2Fzc3hocnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzODc2MjgsImV4cCI6MjEwODk2MzYyOH0.q8JRxory1AKAVy4oLKkAKfHXvHzW18NMMNqm95H_uIM";
+const CFG = window.__ERP_CONFIG__;
+
+if (!CFG?.supabaseUrl || !CFG?.supabaseKey) {
+  throw new Error("Configuración de Supabase no disponible. ERP detenido.");
+}
+const SB = CFG.supabaseUrl.replace(/\/+$/, ""),
+  KEY = CFG.supabaseKey;
+
 let TK = null,
   RT = null,
   UID = null,
@@ -302,11 +307,15 @@ let TK = null,
   SN = {},
   busy = 0,
   sv = Promise.resolve();
+
 let REFRESHING = null;
+
 async function sb(path, o = {}, retry = 1) {
   const ctl = new AbortController(),
-    to = setTimeout(() => ctl.abort(), o.timeout || 20000); // sin esto una petición colgada bloquea toda la cola
+    to = setTimeout(() => ctl.abort(), o.timeout || 20000);
+
   let r;
+
   try {
     r = await fetch(SB + path, {
       ...o,
@@ -321,12 +330,18 @@ async function sb(path, o = {}, retry = 1) {
   } finally {
     clearTimeout(to);
   }
+
   if (r.status === 401 && RT && retry) {
-    // Un único refresh aunque 401 lleguen en paralelo (el refresh token rota: reusarlo invalida la sesión)
-    REFRESHING = REFRESHING || auth({ refresh_token: RT }, "refresh_token").finally(() => (REFRESHING = null));
+    REFRESHING =
+      REFRESHING ||
+      auth({ refresh_token: RT }, "refresh_token").finally(
+        () => (REFRESHING = null)
+      );
+
     await REFRESHING;
     return sb(path, o, 0);
   }
+
   return r;
 }
 async function auth(body, q) {
@@ -335,22 +350,26 @@ async function auth(body, q) {
     headers: { apikey: KEY, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   if (!r.ok) {
     let e = {};
     try {
       e = await r.json();
     } catch (_) {}
+
     throw {
       st: r.status,
       c: e.error_code || e.code || "",
       m: e.msg || e.message || e.error_description || "",
     };
   }
+
   const j = await r.json();
   TK = j.access_token;
   RT = j.refresh_token;
   UID = j.user && j.user.id;
   EM = (j.user && j.user.email) || "";
+
   try {
     sessionStorage.setItem("cdmt_rt", RT);
   } catch (e) {}
@@ -650,25 +669,35 @@ function save() {
     })
     .catch((e) => console.error("cola de guardado", e)); // la cadena nunca queda rechazada
 }
+
 async function backup() {
   try {
     await pull();
-  } catch (e) {}
-  const o = {
-      sistema: "ERP Consorcio Deportivo Madrid Trujillo",
-      generado: new Date().toISOString(),
-      tablas: Object.fromEntries(TB.map((t) => [t.n, t.rows()])),
-    },
-    a = document.createElement("a");
-  a.href = URL.createObjectURL(
-    new Blob([JSON.stringify(o, null, 1)], { type: "application/json" }),
-  );
-  a.download = `respaldo-cdmt-${today()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  toast("Respaldo descargado");
+
+    const o = {
+        sistema: "ERP Consorcio Deportivo Madrid Trujillo",
+        generado: new Date().toISOString(),
+        tablas: Object.fromEntries(TB.map((t) => [t.n, t.rows()])),
+      },
+      a = document.createElement("a");
+
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify(o, null, 1)], { type: "application/json" }),
+    );
+    a.download = `respaldo-cdmt-${today()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+    toast("Respaldo descargado");
+    return true;
+  } catch (e) {
+    console.error("Error al generar respaldo:", e);
+    toast("No se pudo generar el respaldo. No se descargó ningún archivo.");
+    return false;
+  }
 }
+
 const tok = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => (b % 36).toString(36)).join("");
 const base = () => location.href.split("#")[0],
@@ -1615,9 +1644,13 @@ async function restaurar(inp) {
     )
   )
     return;
-  busy++;
+    busy++;
   try {
-    await backup();
+    if (!(await backup())) {
+      busy--;
+      R();
+      return;
+    }
     T.alumnos.forEach((r) => {
       if (r.foto && !IMG_OK.test(r.foto)) r.foto = null;
     });
