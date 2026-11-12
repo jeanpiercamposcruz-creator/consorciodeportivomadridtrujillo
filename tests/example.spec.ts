@@ -1,18 +1,37 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
-test('has title', async ({ page }) => {
-  await page.goto('https://playwright.dev/');
+test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
+  let page: Page;
 
-  // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/Playwright/);
-});
+  // Se ejecuta UNA SOLA VEZ antes de todas las pruebas
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage();
+    await page.goto('https://consorciodeportivomadridtrujillo.vercel.app/');
+    
+    // Usuario con punto correcto
+    await page.getByLabel('Usuario').fill('admin@cdmt.com');
+    await page.locator('#lp').fill('fuerzagreen');
+    await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
-test('get started link', async ({ page }) => {
-  await page.goto('https://playwright.dev/');
+    // Esperar a que cargue el panel principal tras la autenticación
+    await expect(page.getByText('Alumnos activos')).toBeVisible({ timeout: 20000 });
+  });
 
-  // Click the get started link.
-  await page.getByRole('link', { name: 'Get started' }).click();
+  // Cerrar la página al finalizar el bloque de pruebas
+  test.afterAll(async () => {
+    await page.close();
+  });
 
-  // Expects page to have a heading with the name of Installation.
-  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
+  test('Probar módulo de Alumnos activos', async () => {
+    await expect(page.getByText('Alumnos activos')).toBeVisible();
+  });
+
+  test('Navegar al módulo de Sedes y Alquileres', async () => {
+    await page.getByText('Sedes y Alquileres').click();
+    // Aquí puedes añadir validaciones específicas de esta sección si lo deseas
+  });
+
+  test('Navegar al módulo de Personal y Planillas', async () => {
+    await page.getByText('Personal y Planillas').click();
+  });
 });
