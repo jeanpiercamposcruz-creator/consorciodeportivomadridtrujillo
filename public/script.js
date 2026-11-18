@@ -688,7 +688,7 @@ async function backup() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast("Respaldo descargado");
     return true;
   } catch (e) {
