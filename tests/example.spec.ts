@@ -1,37 +1,48 @@
+
 import { test, expect, Page } from '@playwright/test';
 
 test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   let page: Page;
 
-  // Se ejecuta UNA SOLA VEZ antes de todas las pruebas
   test.beforeAll(async ({ browser }) => {
+    const url = process.env.ERP_URL;
+    const usuario = process.env.ERP_USER;
+    const password = process.env.ERP_PASSWORD;
+
+    if (!url || !usuario || !password) {
+      throw new Error('Faltan ERP_URL, ERP_USER o ERP_PASSWORD.');
+    }
+
     page = await browser.newPage();
-    await page.goto('https://consorciodeportivomadridtrujillo.vercel.app/');
-    
-    // Usuario con punto correcto
-    await page.getByLabel('Usuario').fill('admin@cdmt.com');
-    await page.locator('#lp').fill('fuerzagreen');
-    await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+    await page.goto(url);
 
-    // Esperar a que cargue el panel principal tras la autenticación
-    await expect(page.getByText('Alumnos activos')).toBeVisible({ timeout: 20000 });
+    await page.getByLabel('Usuario').fill(usuario);
+    await page.locator('#lp').fill(password);
+    await page.getByRole('button', { name: /Iniciar/i }).click();
+
+    await expect(page.getByText('Alumnos activos'))
+      .toBeVisible({ timeout: 20000 });
   });
 
-  // Cerrar la página al finalizar el bloque de pruebas
   test.afterAll(async () => {
-    await page.close();
+    await page?.close();
   });
 
-  test('Probar módulo de Alumnos activos', async () => {
+  test('Probar modulo de Alumnos activos', async () => {
     await expect(page.getByText('Alumnos activos')).toBeVisible();
   });
 
-  test('Navegar al módulo de Sedes y Alquileres', async () => {
+  test('Navegar al modulo de Sedes y Alquileres', async () => {
     await page.getByText('Sedes y Alquileres').click();
-    // Aquí puedes añadir validaciones específicas de esta sección si lo deseas
+
+    await expect(page.getByText('Sedes y Alquileres'))
+      .toBeVisible();
   });
 
-  test('Navegar al módulo de Personal y Planillas', async () => {
+  test('Navegar al modulo de Personal y Planillas', async () => {
     await page.getByText('Personal y Planillas').click();
+
+    await expect(page.getByText('Personal y Planillas'))
+      .toBeVisible();
   });
 });
