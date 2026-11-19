@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "ERP Consorcio Deportivo Madrid Trujillo",
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=Anton&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+  {children}
+  <SpeedInsights />
+</body>
     </html>
   );
 }
