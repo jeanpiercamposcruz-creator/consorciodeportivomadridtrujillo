@@ -14,6 +14,7 @@
    1. TOKENS
    ========================================================================== */
 :root {
+  /* Tokens base (light) */
   --bg: #f3f5f1;
   --sf: #fff;
   --tx: #17231c;
@@ -26,6 +27,13 @@
   --gn: #14633f;
   --ye: #b7791f;
   --pill: #14633f;
+  /* Semánticos (light) */
+  --bg-app: #f3f5f1;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f7f9f5;
+  --text-primary: #17231c;
+  --text-secondary: #62705f;
+  --border-subtle: #dde3d9;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -46,6 +54,13 @@
     --gn: #4fc58a;
     --ye: #e3b04b;
     --pill: #1c7a4e;
+    /* Semánticos (dark) */
+    --bg-app: #0f1712;
+    --bg-surface: #18221b;
+    --bg-elevated: #1e2e24;
+    --text-primary: #e8efe9;
+    --text-secondary: #9aab9d;
+    --border-subtle: #2a382d;
   }
 }
 
@@ -63,6 +78,13 @@
   --gn: #4fc58a;
   --ye: #e3b04b;
   --pill: #1c7a4e;
+  /* Semánticos (dark) */
+  --bg-app: #0f1712;
+  --bg-surface: #18221b;
+  --bg-elevated: #1e2e24;
+  --text-primary: #e8efe9;
+  --text-secondary: #9aab9d;
+  --border-subtle: #2a382d;
 }
 
 /* ==========================================================================
@@ -78,12 +100,13 @@ html {
 
 body {
   margin: 0;
-  background: #0b3d2a;
-  color: var(--tx);
+  background: var(--bg-app);
+  color: var(--text-primary);
   font:
     15px/1.45 Barlow,
     system-ui,
     sans-serif;
+  overflow-x: hidden;
 }
 
 h2,
@@ -102,14 +125,14 @@ h3 {
 }
 
 .mu {
-  color: var(--mu);
+  color: var(--text-secondary);
 }
 
 label {
   display: flex;
   flex-direction: column;
   font-size: 0.82rem;
-  color: var(--mu);
+  color: var(--text-secondary);
   gap: 3px;
 }
 
@@ -118,10 +141,10 @@ select,
 textarea {
   font: inherit;
   padding: 7px 8px;
-  border: 1px solid var(--bd);
+  border: 1px solid var(--border-subtle);
   border-radius: 5px;
-  background: var(--bg);
-  color: var(--tx);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   min-width: 0;
 }
 
@@ -140,6 +163,9 @@ button {
   background: var(--ac);
   color: #fff;
   cursor: pointer;
+  min-height: 40px;
+  min-width: 40px;
+  touch-action: manipulation;
 }
 
 button.g {
@@ -156,6 +182,8 @@ button.r {
 button.s {
   padding: 4px 8px;
   font-size: 0.8rem;
+  min-height: 32px;
+  min-width: 32px;
 }
 
 table {
@@ -166,19 +194,35 @@ table {
 
 th,
 td {
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--bd);
+  padding: 6px 7px;
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid color-mix(in srgb, var(--border-subtle) 45%, transparent);
   text-align: left;
   white-space: nowrap;
 }
 
 th {
-  color: var(--mu);
+  color: var(--text-secondary);
   font-weight: 600;
+  border-bottom: 2px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+}
+
+td:last-child, th:last-child {
+  border-right: 0;
+}
+
+tr.inc td {
+  background: var(--rdb);
+}
+
+tr.inc td:first-child {
+  border-left: 4px solid var(--rd);
 }
 
 .tw {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stat,
@@ -237,19 +281,20 @@ header {
   gap: 10px;
   align-items: center;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #17231c;
-  border-bottom: 4px solid #14633f;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-bottom: 4px solid var(--ac);
   flex-wrap: wrap;
 }
 
 header .brand {
   font-size: 1.2rem;
   font-weight: 700;
+  color: var(--text-primary);
 }
 
 header .mu {
-  color: #62705f;
+  color: var(--text-secondary);
 }
 
 .hl {
@@ -263,19 +308,58 @@ header .mu {
 
 .ib {
   padding: 7px 9px;
-  color: #17231c;
+  color: var(--text-primary);
+}
+
+/* --- Botones de acción con icono (sin texto) --- */
+.act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  min-width: 34px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  touch-action: manipulation;
+}
+.act svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.act.g {
+  border: 1px solid currentColor;
+}
+.act:hover {
+  background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+}
+.act.r, button.r.act {
+  background: var(--rd);
+  color: #fff;
+  border-color: transparent;
+}
+.act.r svg, button.r.act svg {
+  color: #fff;
 }
 
 /* --- Estructura principal --- */
 main {
-  max-width: 1150px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .shell {
   display: flex;
   align-items: flex-start;
+  gap: 14px;
 }
 
 .shell > main {
@@ -296,9 +380,9 @@ main {
   top: 0;
   align-self: stretch;
   min-height: calc(100vh - 66px);
-  padding: 12px 10px;
+  padding: 10px 8px;
   background: color-mix(in srgb, var(--sf) 94%, transparent);
-  border-right: 1px solid var(--bd);
+  border-right: 1px solid var(--border-subtle);
   backdrop-filter: blur(6px);
 }
 
@@ -316,8 +400,8 @@ main {
 /* --- Rejillas --- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
 }
 
 .t3 {
@@ -326,8 +410,8 @@ main {
 
 .g2 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
 }
 
 .g2 .card {
@@ -343,15 +427,15 @@ main {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 10px;
+  margin-top: 8px;
   align-items: center;
 }
 
 /* --- Formularios simétricos: misma altura, controles alineados al pie aunque la etiqueta ocupe 2 líneas --- */
 .fg {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
   align-items: stretch;
 }
 
@@ -362,13 +446,13 @@ main {
 
 .fg input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
 .fg select {
-  height: 40px;
+  height: 38px;
   padding: 0 10px;
   border-radius: 6px;
 }
 
 .fg input[type="file"] {
-  height: 40px;
+  height: 38px;
   padding: 6px 8px;
   border-radius: 6px;
 }
@@ -376,7 +460,7 @@ main {
 .fg label > b {
   display: flex;
   align-items: center;
-  height: 40px;
+  height: 38px;
   padding: 0 !important;
 }
 
@@ -422,11 +506,11 @@ main {
 
 /* --- Tarjeta --- */
 .card {
-  background: color-mix(in srgb, var(--sf) 94%, transparent);
-  border: 1px solid var(--bd);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  padding: 14px;
-  margin-bottom: 14px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
 }
 
 .login .card {
@@ -440,11 +524,45 @@ main {
   color: #17231c;
 }
 
+/* --- Foto del personal: placeholder (silueta) y previsualización --- */
+.per-foto {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: block;
+}
+.per-ph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 96px;
+  height: 96px;
+  border: 2px dashed var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.per-ph:hover {
+  border-color: var(--ac);
+  color: var(--ac);
+}
+.per-ph svg {
+  width: 34px;
+  height: 34px;
+  color: var(--text-secondary);
+}
+
 .lg {
   width: 100%;
   max-width: 300px;
   display: block;
-  margin: 0 auto 14px;
+  margin: 0 auto 10px;
 }
 
 /* --- Tile (accesos del menú y KPIs) --- */
@@ -453,15 +571,15 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 118px;
-  padding: 18px;
-  background: color-mix(in srgb, var(--sf) 94%, transparent);
-  border: 1px solid var(--bd);
+  gap: 8px;
+  min-height: 100px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   cursor: pointer;
   text-align: center;
-  color: var(--tx);
+  color: var(--text-primary);
   font: inherit;
 }
 
@@ -1362,12 +1480,14 @@ tr.inc td:first-child {
 /* ==========================================================================
    7. RESPONSIVE E IMPRESIÓN
    ========================================================================== */
-@media (max-width: 700px) {
-  .t3 {
-    grid-template-columns: 1fr;
-  }
+/* Tablet y escritorio intermedio */
+@media (max-width: 1100px) {
+  main { padding: 8px 10px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .fg { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
 
+/* Tablet (retrato) */
 @media (max-width: 900px) {
   .side {
     position: fixed;
@@ -1379,14 +1499,44 @@ tr.inc td:first-child {
     min-height: 0;
     box-shadow: 4px 0 14px #0006;
   }
+  .shell { gap: 10px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .kitw { grid-template-columns: 1fr; }
+  .kitp { position: static; }
+  .tile { min-height: 92px; padding: 12px; }
+}
 
-  .kitw {
-    grid-template-columns: 1fr;
-  }
+/* Celular vertical (portrait) */
+@media (max-width: 600px) and (orientation: portrait) {
+  main { padding: 8px; }
+  .t3, .grid { grid-template-columns: 1fr; }
+  .g2 { grid-template-columns: 1fr; }
+  .fg { grid-template-columns: 1fr; }
+  .fg > h4 { grid-column: 1/-1; }
+  .bill { grid-template-columns: 1fr; }
+  .pform { grid-template-columns: 1fr; }
+  header { padding: 8px 12px; gap: 8px; }
+  .fab { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding: 11px 16px; font-size: 0.85rem; }
+  th, td { padding: 5px 6px; font-size: 0.82rem; }
+  button.s { padding: 3px 7px; font-size: 0.75rem; }
+  .act { min-height: 30px; min-width: 30px; padding: 3px 6px; }
+  .act svg { width: 14px; height: 14px; }
+}
 
-  .kitp {
-    position: static;
-  }
+/* Celular horizontal (landscape) */
+@media (max-width: 600px) and (orientation: landscape) {
+  main { padding: 6px 10px; }
+  .t3 { grid-template-columns: repeat(3, 1fr); }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .fg { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  header { padding: 8px 12px; }
+  .fab { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Evitar desbordamiento horizontal en raíz y contenedores principales */
+#app, main, .shell, header, .side {
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 @media print {
@@ -1493,6 +1643,20 @@ label.chk {
 label.chk input {
   margin-top: 3px;
   flex: none;
+}
+label.chk.wide {
+  grid-column: 1/-1;
+  justify-content: flex-start;
+}
+.chk-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: flex-start;
+  margin-top: 2px;
+}
+.chk-grid label.chk {
+  flex: 0 0 auto;
 }
 .bh {
   margin: 18px 0 8px;
