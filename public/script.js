@@ -133,7 +133,15 @@ let S,
   FOTO = null,
   DF = {},
   AS = {},
-  GM = today().slice(0, 7);
+  GM = today().slice(0, 7),
+  EC = null,
+  EK = null,
+  SEDT = "s",
+  PERT = "d",
+  SQ = "",
+  PQ = "",
+  PFOTO = "",
+  HFS = "";
 function seed() {
   const s = {
     c: { ALU: 3, "PER-ADM": 1, "PER-REC": 1, "PER-ENT": 1, HOR: 2 },
@@ -211,6 +219,7 @@ function seed() {
     asis: [],
     kits: [],
     caja: [],
+    cuotas: [],
   };
   const mk = (n, a, ap, dni, nac, h, seg, an, ac, pag) => ({
     id: `${String(Y).slice(2)}000${n}`,
@@ -412,8 +421,14 @@ const HOR = G("horarios", "hor", {
   cat: "categoria",
   ini: "hora_inicio",
   fin: "hora_fin",
+  dia: "dia_semana",
+  est: "estado",
 });
 const TB = [
+  {
+    ...G("centros_costo", "cc", { id: "id", codigo: "codigo", nombre: "nombre", activo: "activo" }),
+    opt: true,
+  },
   G("sedes", "sedes", {
     id: "id",
     nombre: "nombre",
@@ -421,8 +436,23 @@ const TB = [
     con: "contacto",
     tipo: "tipo_alquiler",
     costo: "costo_mensual",
+    cod: "codigo_corto",
+    cc: "centro_costo_id",
+    est: "estado",
   }),
   G("deportes", "deportes", { id: "id", nombre: "nombre" }),
+  {
+    ...G("contratos_alquiler", "contratos", {
+      id: "id",
+      sede: "sede_id",
+      ini: "fecha_inicio",
+      fin: "fecha_fin",
+      monto: "monto_mensual",
+      doc: "documento_url",
+      vig: "vigente",
+    }),
+    opt: true,
+  },
   G("personal", "personal", {
     id: "id",
     nom: "nombres",
@@ -432,7 +462,36 @@ const TB = [
     rol: "rol",
     precio: "precio_hora",
     activo: "activo",
+    foto: "foto",
+    correo: "correo",
+    tc: "tipo_contrato",
+    fi: "fecha_inicio",
+    ff: "fecha_fin",
+    sf: "sueldo_fijo",
+    jor: "jornada",
+    mv: "permite_varias_sedes",
   }),
+  {
+    ...G("personal_sedes", "psedes", {
+      id: "id",
+      pid: "personal_id",
+      sede: "sede_id",
+      hr: "horario_resumen",
+      hs: "horas_semanales",
+    }),
+    opt: true,
+  },
+  {
+    ...G("personal_certificaciones", "pcert", {
+      id: "id",
+      pid: "personal_id",
+      cert: "certificacion",
+      ent: "entidad",
+      ven: "fecha_vencimiento",
+      est: "estado",
+    }),
+    opt: true,
+  },
   {
     ...HOR,
     load: (d) => {
@@ -479,7 +538,21 @@ const TB = [
     dnf: "doc_dni_frente",
     dsg: "doc_seguro",
     dfm: "doc_ficha",
+    cons: "consentimiento_ley_29733",
+    mp: "metodo_pago",
+    hoy: "monto_pagar_hoy",
   }),
+  {
+    ...G("cronograma_cuotas", "cuotas", {
+      id: "id",
+      aid: "alumno_id",
+      n: "numero_cuota",
+      f: "fecha_vencimiento",
+      m: "monto",
+      e: "estado",
+    }),
+    opt: true,
+  },
   {
     n: "asistencias",
     rows: () =>
@@ -567,6 +640,8 @@ async function pull() {
       old = (await (await sb("/rest/v1/erp_state?id=eq.1&select=data")).json())[0].data;
     } catch (e) {}
     S = old && old.sedes ? old : seed();
+    S.cuotas = S.cuotas || [];
+    ["cc", "contratos", "psedes", "pcert"].forEach((k) => (S[k] = S[k] || []));
     SN = {};
     await flush();
     await ver();
@@ -574,7 +649,8 @@ async function pull() {
   }
   // 1) descargar TODO primero (si algo falla aquí, S y SN siguen intactos)
   const raw = {};
-  for (const t of TB) raw[t.n] = t.n === "ajustes" ? aj : await all(t.n);
+  for (const t of TB)
+    raw[t.n] = t.n === "ajustes" ? aj : t.opt ? await all(t.n).catch(() => []) : await all(t.n);
   // 2) reemplazar el estado de golpe, sin ningún await en medio
   S = {
     sedes: [],
@@ -585,6 +661,11 @@ async function pull() {
     asis: [],
     kits: [],
     caja: [],
+    cuotas: [],
+    cc: [],
+    contratos: [],
+    psedes: [],
+    pcert: [],
     c: {},
   };
   for (const t of TB) t.load(raw[t.n]);
@@ -793,6 +874,8 @@ function adjHtml(m = "") {
 function adjRefrescar() {
   const r = $("#ad_r");
   if (r) r.innerHTML = adjBoton();
+  const fb = $("#foto_box");
+  if (fb) fb.innerHTML = fotoBox();
   if ($("#adj_m") && DOM.mod.classList.contains("o")) modal(adjHtml());
 }
 function abrirBlob(b) {
@@ -1635,7 +1718,11 @@ async function restaurar(inp) {
   if (
     !T ||
     typeof T !== "object" ||
-    TB.some((t) => !Array.isArray(T[t.n]) || T[t.n].some((r) => !r || typeof r.id !== "string"))
+    TB.some(
+      (t) =>
+        !(t.opt && T[t.n] === undefined) &&
+        (!Array.isArray(T[t.n]) || T[t.n].some((r) => !r || typeof r.id !== "string")),
+    )
   )
     return toast("El archivo no parece un respaldo de este sistema");
   if (
@@ -1654,7 +1741,10 @@ async function restaurar(inp) {
     T.alumnos.forEach((r) => {
       if (r.foto && !IMG_OK.test(r.foto)) r.foto = null;
     });
-    for (const t of TB) t.load(T[t.n]);
+    (T.personal || []).forEach((r) => {
+      if (r.foto && !IMG_OK.test(r.foto)) r.foto = null;
+    });
+    for (const t of TB) t.load(T[t.n] || []);
     await flush();
     await ver();
     toast("Respaldo restaurado correctamente");
@@ -1721,7 +1811,7 @@ const hrs = (h) => {
   return Math.max(0, t(h.fin) - t(h.ini));
 };
 const hl = (h) =>
-  `${esc(sn(h.sede))} · ${esc(dn(h.dep))} ${esc(h.cat)} · ${esc(h.ini)}-${esc(h.fin)}`;
+  `${esc(sn(h.sede))} · ${esc(dn(h.dep))} ${esc(h.cat)} · ${DIAS[h.dia] ? DIAS[h.dia] + " " : ""}${esc(h.ini)}-${esc(h.fin)}`;
 const falta = (a) => {
   const f = [];
   if (!/^\d{8}$/.test(a.dni || "")) f.push("DNI");
@@ -1763,8 +1853,8 @@ const qr = (t) => {
 };
 const XL = {
   sedes: () => [
-    ["Código", "Sede", "Dirección", "Contacto", "Tipo de alquiler", "Alquiler mensual (S/)"],
-    S.sedes.map((s) => [s.id, s.nombre, s.dir, s.con, s.tipo, +s.costo]),
+    ["Código", "Sede", "Centro de costo", "Dirección", "Contacto", "Tipo de alquiler", "Alquiler mensual (S/)", "Estado"],
+    S.sedes.map((s) => [s.id, s.nombre, ccTxt(s.cc), s.dir, s.con, s.tipo, +costoSede(s), sedEst(s)]),
   ],
   personal: () => [
     [
@@ -1772,8 +1862,14 @@ const XL = {
       "DNI",
       "Nombres",
       "Teléfono",
+      "Correo",
       "Especialidad",
       "Rol",
+      "Tipo de contrato",
+      "Inicio",
+      "Fin",
+      "Jornada",
+      "Sueldo fijo (S/)",
       "Precio por hora (S/)",
       "Horas semana",
       "Pago semana (S/)",
@@ -1784,8 +1880,14 @@ const XL = {
       p.dni,
       p.nom,
       p.tel,
+      p.correo,
       p.esp,
       p.rol,
+      p.tc,
+      p.fi,
+      p.ff,
+      p.jor,
+      +p.sf || 0,
       +p.precio,
       +hsem(p).toFixed(1),
       +(hsem(p) * p.precio).toFixed(2),
@@ -1793,15 +1895,17 @@ const XL = {
     ]),
   ],
   hor: () => [
-    ["Código", "Sede", "Deporte", "Categoría", "Inicio", "Fin", "Profesores"],
+    ["Código", "Día", "Sede", "Deporte", "Categoría", "Inicio", "Fin", "Profesores", "Estado"],
     S.hor.map((h) => [
       h.id,
+      DIAL[h.dia] || "",
       sn(h.sede),
       dn(h.dep),
       "CAT-" + h.cat,
       h.ini,
       h.fin,
       h.profs.map((x) => (S.personal.find((p) => p.id === x) || {}).nom).join(", "),
+      h.est || "Activo",
     ]),
   ],
   dir: () => [
@@ -1919,7 +2023,8 @@ const M = [
 const go = (x) => {
   V = x;
   if (innerWidth <= 900) SIDE = false;
-  ED = ES = EP = null;
+  ED = ES = EP = EC = EK = null;
+  PFOTO = "";
   FOTO = null;
   DWK = null;
   PRE = PREID = FRESH = null;
@@ -2028,6 +2133,7 @@ function R() {
   if (V === "mat") {
     FOTO = ED ? (S.alu.find((x) => x.id === ED) || {}).foto || "" : "";
     upHor();
+    cronRender();
   }
   postR();
 }
@@ -2158,9 +2264,80 @@ const tbl = (h, r) =>
   `<div class=tw><table><tr>${h.map((x) => `<th>${x}</th>`).join("")}</tr>${r.join("") || `<tr><td colspan=${esc(h.length)} class=mu>Sin registros todavía.</td></tr>`}</table></div>`;
 const VW = {};
 VW.pre = () => vwPre();
-VW.sedes = () => {
-  const e = S.sedes.find((s) => s.id === ES) || {};
-  return `<div class=card><h3>${ES ? "Modificar " + esc(ES) : "Nueva sede"}</h3><div class=fg>${fl("Nombre", `<input id=s_n value="${esc(e.nombre || "")}">`)}${fl("Código corto (3 letras)", `<input id=s_c maxlength=3 value="${esc(ES ? ES.slice(4) : "")}" ${ES ? "disabled" : ""}>`)}${fl("Dirección", `<input id=s_d value="${esc(e.dir || "")}">`)}${fl("Contacto", `<input id=s_t value="${esc(e.con || "")}">`)}${fl(
+/* ==================================================================
+   PARTE 2: helpers compartidos (días, pestañas, enlaces, contadores)
+   ================================================================== */
+const DIAS = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DIAL = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const nxl = (L, p, n) =>
+  p +
+  String(
+    Math.max(
+      0,
+      ...L.filter((x) => String(x.id).startsWith(p)).map((x) => +String(x.id).slice(p.length) || 0),
+    ) + 1,
+  ).padStart(n, "0");
+const urlOk = (u) => /^https?:\/\/[^\s"'<>`]{1,500}$/i.test(u || "");
+const tabs = (cur, L, f) =>
+  `<div class=tabs role=tablist>${L.map(([k, t]) => `<button type=button role=tab aria-selected=${k === cur} class="tab${k === cur ? " on" : ""}" data-f=${f} data-i=${k}>${t}</button>`).join("")}</div>`;
+const sedEst = (s) => s.est || "Activa";
+const ctrVig = (sid) => S.contratos.find((c) => c.sede === sid && c.vig);
+const costoSede = (s) => {
+  const c = ctrVig(s.id);
+  return c ? +c.monto : +s.costo || 0;
+};
+const ccTxt = (id) => (S.cc.find((x) => x.id === id) || {}).codigo || "-";
+
+/* ==================================================================
+   SEDES Y ALQUILERES (pestañas: Sedes · Contratos de Alquiler · Centros de Costo)
+   ================================================================== */
+VW.sedes = () =>
+  `<div class=card>${tabs(
+    SEDT,
+    [
+      ["s", "Sedes"],
+      ["c", "Contratos de Alquiler"],
+      ["k", "Centros de Costo"],
+    ],
+    "sedTab",
+  )}</div>` + (SEDT === "c" ? vwCtr() : SEDT === "k" ? vwCc() : vwSed());
+const sedTbl = () => {
+  const q = SQ.toLowerCase(),
+    L = S.sedes.filter((s) => !q || `${s.id} ${s.nombre} ${s.dir}`.toLowerCase().includes(q));
+  return tbl(
+    ["Código", "Sede", "Centro de costo", "Dirección", "Contacto", "Alquiler / mes", "Estado", ""],
+    L.map((s) => {
+      const on = sedEst(s) === "Activa",
+        id = esc(s.id);
+      return `<tr><td>${id}</td><td>${esc(s.nombre)}</td><td>${esc(ccTxt(s.cc))}</td><td>${esc(s.dir)}</td><td>${esc(s.con)}</td><td>${money(costoSede(s))}</td><td><span class="b ${on ? "ok" : "no"}">${on ? "Activa" : "Inactiva"}</span></td><td><button class="s g" data-f=sedEd data-i="${id}">Modificar</button> <button class="s g" data-f=sedCtr data-i="${id}">Contratos</button> <button class="s ${on ? "r" : "g"}" data-f=sedTog data-i="${id}">${on ? "Desactivar" : "Activar"}</button> <button class="s r" data-f=delSede data-i="${id}">Eliminar</button></td></tr>`;
+    }),
+  );
+};
+function vwSed() {
+  const e = S.sedes.find((s) => s.id === ES) || {},
+    cv = ES ? ctrVig(ES) : null,
+    tot = S.sedes.filter((s) => sedEst(s) === "Activa").reduce((t, s) => t + costoSede(s), 0);
+  return `<div class=card><h3>${ES ? "Modificar " + esc(ES) : "Datos de la sede"}</h3><div class=fg>${fl("Nombre de la sede *", `<input id=s_n value="${esc(e.nombre || "")}">`)}${fl("Código corto (3 letras) *", `<input id=s_c maxlength=3 value="${esc(ES ? ES.slice(4) : "")}" ${ES ? "disabled" : ""}>`)}${fl("Dirección", `<input id=s_d value="${esc(e.dir || "")}">`)}${fl("Contacto", `<input id=s_t value="${esc(e.con || "")}">`)}${fl(
+    "Centro de costo",
+    "<select id=s_cc>" +
+      o(
+        S.cc.filter((c) => c.activo || c.id === e.cc).map((c) => [c.id, c.codigo + " - " + c.nombre]),
+        e.cc,
+        "Seleccionar...",
+      ) +
+      "</select>",
+  )}${fl(
+    "Estado",
+    "<select id=s_e>" +
+      o(
+        [
+          ["Activa", "Activa"],
+          ["Inactiva", "Inactiva"],
+        ],
+        sedEst(e),
+      ) +
+      "</select>",
+  )}${fl(
     "Tipo de alquiler",
     "<select id=s_k>" +
       o(
@@ -2168,24 +2345,24 @@ VW.sedes = () => {
         e.tipo,
       ) +
       "</select>",
-  )}${fl("Costo mensual de alquiler (S/)", `<input id=s_m type=number min=0 value="${esc(e.costo ?? "")}">`)}</div><div class=row><button data-f=addSede>${ES ? "Guardar cambios" : "Guardar sede"}</button>${ES ? "<button class=g data-f=cancelSede>Cancelar</button>" : ""}</div></div><div class=card>${tbl(
-    ["Código", "Sede", "Dirección", "Contacto", "Tipo", "Alquiler / mes", ""],
-    S.sedes.map(
-      (s) =>
-        `<tr><td>${esc(s.id)}</td><td>${esc(s.nombre)}</td><td>${esc(s.dir)}</td><td>${esc(s.con)}</td><td>${esc(s.tipo)}</td><td>${money(s.costo)}</td><td><button class="s g" data-f="sedEd" data-i="${esc(s.id)}">Modificar</button> <button class="s r" data-f="delSede" data-i="${esc(s.id)}">Eliminar</button></td></tr>`,
-    ),
-  )}<div class=row><button class=g data-f=cp data-i=sedes>Copiar para Excel</button></div><p><b>Costos fijos de alquiler: ${money(S.sedes.reduce((t, s) => t + +s.costo, 0))} al mes</b></p></div>`;
-};
+  )}${fl("Costo mensual de alquiler (S/)", `<input id=s_m type=number min=0 value="${esc(cv ? cv.monto : (e.costo ?? ""))}" ${cv ? "disabled" : ""}>`)}</div><p class=mu>${cv ? `Costo vigente: <b>${money(cv.monto)} / mes</b> · contrato del ${esc(cv.ini)} al ${esc(cv.fin)}${urlOk(cv.doc) ? ` · <a href="${esc(cv.doc)}" target=_blank rel="noopener noreferrer">Ver contrato</a>` : ""}` : "Sin contrato vigente: se usa el costo mensual indicado. Puedes registrar el contrato en la pestaña Contratos de Alquiler."}</p><div class=row><button data-f=addSede>${ES ? "Guardar cambios" : "Guardar sede"}</button>${ES ? "<button class=g data-f=cancelSede>Cancelar</button>" : ""}</div></div><div class=card><div class=row><h3 class="u-m-0 u-flex-1">Sedes registradas</h3><input id=s_q data-in=sedQ placeholder="Buscar por código, nombre o dirección..." value="${esc(SQ)}"></div><div id=sed_t>${sedTbl()}</div><div class=row><button class=g data-f=cp data-i=sedes>Copiar para Excel</button></div><p><b>Total de alquileres activos: ${money(tot)} al mes</b></p></div>`;
+}
 function addSede() {
   const n = limpiar(v("s_n"), 60),
-    c = v("s_c").toUpperCase();
+    c = v("s_c").toUpperCase(),
+    cc = v("s_cc"),
+    est = v("s_e");
   if (!n) return toast("Ingresa el nombre");
+  if (!["Activa", "Inactiva"].includes(est)) return toast("Estado inválido");
+  if (S.cc.length && !S.cc.some((x) => x.id === cc)) return toast("Elige un centro de costo");
   const d = {
     nombre: n,
     dir: limpiar(v("s_d"), 120),
     con: limpiar(v("s_t"), 80),
     tipo: ["Mensual", "Por hora", "Anual"].includes(v("s_k")) ? v("s_k") : "Mensual",
     costo: monto(v("s_m") || 0),
+    cc,
+    est,
   };
   if (d.costo === null) return toast("Costo inválido");
   if (ES) {
@@ -2194,28 +2371,168 @@ function addSede() {
       ES = null;
       return toast("La sede ya no existe (otro usuario la eliminó). Recarga e inténtalo de nuevo.");
     }
+    const cv = ctrVig(ES);
+    if (cv) d.costo = +cv.monto;
     Object.assign(tgt, d);
+    tgt.cod = tgt.cod || ES.slice(4);
     ES = null;
     toast("Sede actualizada");
   } else {
     if (!/^[A-Z]{3}$/.test(c)) return toast("El código debe tener 3 letras (A-Z)");
     if (S.sedes.some((s) => s.id === "SED-" + c)) return toast("Ese código ya existe");
-    S.sedes.push({ id: "SED-" + c, ...d });
+    S.sedes.push({ id: "SED-" + c, cod: c, ...d });
     toast("Sede guardada");
   }
   save();
   R();
 }
+const sedTog = (id) => {
+  const s = S.sedes.find((x) => x.id === id);
+  if (!s) return;
+  s.est = sedEst(s) === "Activa" ? "Inactiva" : "Activa";
+  save();
+  toast(s.est === "Activa" ? "Sede activada" : "Sede desactivada");
+  R();
+};
 function delSede(id) {
   if (
     S.hor.some((h) => h.sede === id) ||
     S.alu.some((a) => a.sede === id) ||
-    S.caja.some((x) => x.sede === id)
+    S.caja.some((x) => x.sede === id) ||
+    S.kits.some((x) => x.sede === id) ||
+    S.contratos.some((x) => x.sede === id) ||
+    S.psedes.some((x) => x.sede === id)
   )
-    return toast("No se puede eliminar: tiene horarios, alumnos o movimientos asociados");
+    return toast("No se puede eliminar: tiene horarios, alumnos, contratos o movimientos. Puedes desactivarla.");
   S.sedes = S.sedes.filter((s) => s.id !== id);
   save();
   toast("Sede eliminada");
+  R();
+}
+
+/* ---------- Contratos de alquiler ---------- */
+function vwCtr() {
+  const e = S.contratos.find((c) => c.id === EC) || {},
+    sid = e.sede || ES || (S.sedes[0] || {}).id,
+    hoy = today(),
+    L = [...S.contratos].sort(
+      (a, b) => a.sede.localeCompare(b.sede) || String(b.ini).localeCompare(String(a.ini)),
+    );
+  return `<div class=card><h3>${EC ? "Modificar " + esc(EC) : "Nuevo contrato de alquiler"}</h3><div class=fg>${fl("Sede *", "<select id=c_s>" + o(S.sedes.map((s) => [s.id, s.nombre]), sid) + "</select>")}${fl("Inicio *", `<input id=c_i type=date value="${esc(e.ini || "")}">`)}${fl("Fin *", `<input id=c_f type=date value="${esc(e.fin || "")}">`)}${fl("Monto mensual (S/) *", `<input id=c_m type=number min=0 value="${esc(e.monto ?? "")}">`)}${fl("Enlace del contrato (opcional)", `<input id=c_u placeholder="https://..." value="${esc(e.doc || "")}">`)}<label class=chk><input type=checkbox id=c_v ${EC ? (e.vig ? "checked" : "") : "checked"}><span>Contrato vigente (define el costo de alquiler de la sede)</span></label></div><div class=row><button data-f=addCtr>${EC ? "Guardar cambios" : "Guardar contrato"}</button>${EC ? "<button class=g data-f=cancelCtr>Cancelar</button>" : ""}</div></div><div class=card>${tbl(
+    ["Código", "Sede", "Vigencia", "Monto / mes", "Documento", "Estado", ""],
+    L.map((c) => {
+      const venc = c.fin < hoy,
+        id = esc(c.id);
+      return `<tr><td>${id}</td><td>${esc(sn(c.sede))}</td><td>${esc(c.ini)} al ${esc(c.fin)}</td><td>${money(c.monto)}</td><td>${urlOk(c.doc) ? `<a href="${esc(c.doc)}" target=_blank rel="noopener noreferrer">Ver contrato</a>` : "-"}</td><td><span class="b ${c.vig && !venc ? "ok" : "no"}">${c.vig ? (venc ? "Vencido" : "Vigente") : "Finalizado"}</span></td><td><button class="s g" data-f=ctrEd data-i="${id}">Modificar</button> <button class="s r" data-f=delCtr data-i="${id}">Eliminar</button></td></tr>`;
+    }),
+  )}</div>`;
+}
+function addCtr() {
+  const sid = v("c_s"),
+    ini = v("c_i"),
+    fin = v("c_f"),
+    m = monto(v("c_m")),
+    u = v("c_u"),
+    vig = $("#c_v").checked;
+  if (!S.sedes.some((s) => s.id === sid)) return toast("Elige una sede");
+  if (!fechaOk(ini) || !fechaOk(fin)) return toast("Las fechas de inicio y fin son obligatorias");
+  if (fin <= ini) return toast("La fecha de fin debe ser posterior al inicio");
+  if (m === null || m <= 0) return toast("Monto mensual inválido");
+  if (u && !urlOk(u)) return toast("El enlace debe empezar con http:// o https://");
+  const d = { sede: sid, ini, fin, monto: m, doc: u, vig };
+  let idc = EC;
+  if (EC) {
+    const t = S.contratos.find((c) => c.id === EC);
+    if (!t) {
+      EC = null;
+      return toast("El contrato ya no existe. Recarga e inténtalo de nuevo.");
+    }
+    Object.assign(t, d);
+  } else {
+    idc = nxl(S.contratos, "CTR-", 4);
+    S.contratos.push({ id: idc, ...d });
+  }
+  if (vig) {
+    S.contratos.forEach((c) => {
+      if (c.sede === sid && c.id !== idc) c.vig = false;
+    });
+    const s = S.sedes.find((x) => x.id === sid);
+    if (s) s.costo = m;
+  }
+  EC = null;
+  save();
+  toast("Contrato guardado");
+  R();
+}
+function delCtr(id) {
+  S.contratos = S.contratos.filter((c) => c.id !== id);
+  save();
+  toast("Contrato eliminado");
+  R();
+}
+
+/* ---------- Centros de costo ---------- */
+function vwCc() {
+  const e = S.cc.find((c) => c.id === EK) || {};
+  return `<div class=card><h3>${EK ? "Modificar " + esc(EK) : "Nuevo centro de costo"}</h3><div class=fg>${fl("Código *", `<input id=k_c maxlength=12 value="${esc(e.codigo || nxl(S.cc, "CC-", 3))}" ${EK ? "disabled" : ""}>`)}${fl("Nombre *", `<input id=k_n value="${esc(e.nombre || "")}">`)}${fl(
+    "Estado",
+    "<select id=k_a>" +
+      o(
+        [
+          ["1", "Activo"],
+          ["0", "Inactivo"],
+        ],
+        EK ? (e.activo ? "1" : "0") : "1",
+      ) +
+      "</select>",
+  )}</div><div class=row><button data-f=addCc>${EK ? "Guardar cambios" : "Guardar centro de costo"}</button>${EK ? "<button class=g data-f=cancelCc>Cancelar</button>" : ""}${!S.cc.length && S.sedes.length ? "<button class=g data-f=ccAuto>Crear uno por cada sede existente</button>" : ""}</div></div><div class=card>${tbl(
+    ["Código", "Nombre", "Sedes asociadas", "Estado", ""],
+    S.cc.map((c) => {
+      const id = esc(c.id);
+      return `<tr><td>${id}</td><td>${esc(c.nombre)}</td><td>${esc(S.sedes.filter((s) => s.cc === c.id).map((s) => s.nombre).join(", ") || "-")}</td><td><span class="b ${c.activo ? "ok" : "no"}">${c.activo ? "Activo" : "Inactivo"}</span></td><td><button class="s g" data-f=ccEd data-i="${id}">Modificar</button> <button class="s r" data-f=delCc data-i="${id}">Eliminar</button></td></tr>`;
+    }),
+  )}</div>`;
+}
+function addCc() {
+  const c = v("k_c").toUpperCase(),
+    n = limpiar(v("k_n"), 60),
+    a = v("k_a") === "1";
+  if (!n) return toast("Ingresa el nombre");
+  if (EK) {
+    const t = S.cc.find((x) => x.id === EK);
+    if (!t) {
+      EK = null;
+      return toast("El centro de costo ya no existe. Recarga e inténtalo de nuevo.");
+    }
+    Object.assign(t, { nombre: n, activo: a });
+  } else {
+    if (!/^[A-Z0-9-]{2,12}$/.test(c)) return toast("Código: 2 a 12 letras, números o guiones");
+    if (S.cc.some((x) => x.id === c || x.codigo === c)) return toast("Ese código ya existe");
+    S.cc.push({ id: c, codigo: c, nombre: n, activo: a });
+  }
+  EK = null;
+  save();
+  toast("Centro de costo guardado");
+  R();
+}
+function delCc(id) {
+  if (S.sedes.some((s) => s.cc === id))
+    return toast("No se puede eliminar: hay sedes asociadas. Desactívalo o cambia la sede.");
+  S.cc = S.cc.filter((c) => c.id !== id);
+  save();
+  toast("Centro de costo eliminado");
+  R();
+}
+function ccAuto() {
+  S.sedes
+    .filter((s) => !s.cc)
+    .forEach((s) => {
+      const c = nxl(S.cc, "CC-", 3);
+      S.cc.push({ id: c, codigo: c, nombre: "Sede " + s.nombre, activo: true });
+      s.cc = c;
+    });
+  save();
+  toast("Centros de costo creados y asignados");
   R();
 }
 const hsem = (p) => {
@@ -2226,11 +2543,92 @@ const hsem = (p) => {
     .filter((x) => x.t === "P" && x.ref === p.id && x.ok && x.f >= w)
     .reduce((t, x) => t + hrs(S.hor.find((h) => h.id === x.h) || { ini: "0:00", fin: "0:00" }), 0);
 };
-VW.personal = () => {
+/* ==================================================================
+   PERSONAL Y PLANILLAS (pestañas: Datos Generales · Contratos · Pagos y Liquidaciones)
+   ================================================================== */
+const PTIPOS = ["Planilla", "Locación de servicios", "Por horas"],
+  PJOR = ["Tiempo completo", "Tiempo parcial", "Por horas"];
+const perSedes = (id) => S.psedes.filter((x) => x.pid === id),
+  perCert = (id) => S.pcert.filter((x) => x.pid === id),
+  certEst = (c) => (c.ven && c.ven < today() ? "Vencida" : "Vigente"),
+  nomP = (id) => (S.personal.find((p) => p.id === id) || {}).nom || id;
+const perFotoHtml = () =>
+  IMG_OK.test(PFOTO || "")
+    ? `<img src="${esc(PFOTO)}" alt="Foto del personal" width=96 height=96>`
+    : "<span class=mu>Sin foto</span>";
+function perFotoSel(el) {
+  const f = el.files && el.files[0];
+  if (!f || !/^image\/(jpeg|png)$/.test(f.type)) return toast("Elige una imagen JPG o PNG");
+  const rd = new FileReader();
+  rd.onerror = () => toast("No se pudo leer la imagen");
+  rd.onload = () => {
+    const img = new Image();
+    img.onerror = () => toast("No se pudo leer la imagen");
+    img.onload = () => {
+      const z = Math.min(1, 320 / Math.max(img.width, img.height)),
+        c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.width * z));
+      c.height = Math.max(1, Math.round(img.height * z));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const d = c.toDataURL("image/jpeg", 0.8);
+      if (!IMG_OK.test(d)) return toast("La imagen es demasiado grande");
+      PFOTO = d;
+      const b = $("#p_fp");
+      if (b) b.innerHTML = perFotoHtml();
+    };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+}
+/* Resumen de horario y horas semanales de una persona en una sede, calculado desde Horarios */
+function autoSede(pid, sid) {
+  const g = {};
+  S.hor
+    .filter((h) => h.sede === sid && h.est !== "Inactivo" && h.profs.includes(pid) && +h.dia >= 1)
+    .forEach((h) => (g[h.ini + "-" + h.fin] = (g[h.ini + "-" + h.fin] || new Set()).add(+h.dia)));
+  const e = Object.entries(g);
+  return {
+    resumen: e
+      .map(([k, ds]) => [...ds].sort((a, b) => a - b).map((d) => DIAS[d]).join(" · ") + " " + k)
+      .join(" / "),
+    horas: e.reduce((t, [k, ds]) => t + ds.size * hrs({ ini: k.slice(0, 5), fin: k.slice(6) }), 0),
+  };
+}
+const perSedTxt = (p) =>
+  perSedes(p.id)
+    .map((x) => sn(x.sede))
+    .join(", ") ||
+  [...new Set(S.hor.filter((h) => h.profs.includes(p.id)).map((h) => sn(h.sede)))].join(", ") ||
+  "-";
+VW.personal = () =>
+  `<div class=card>${tabs(
+    PERT,
+    [
+      ["d", "Datos Generales"],
+      ["c", "Contratos"],
+      ["p", "Pagos y Liquidaciones"],
+    ],
+    "perTab",
+  )}</div>` + (PERT === "c" ? perCtr() : PERT === "p" ? perPay() : perDatos());
+const perTbl = () => {
+  const q = PQ.toLowerCase(),
+    L = S.personal.filter(
+      (p) => !q || `${p.id} ${p.dni} ${p.nom} ${p.rol} ${p.esp}`.toLowerCase().includes(q),
+    );
+  return tbl(
+    ["Código", "DNI", "Nombres", "Rol", "Especialidad", "Sedes", "Contrato", "Tarifa (S/)", "Estado", ""],
+    L.map((p) => {
+      const id = esc(p.id);
+      return `<tr><td>${id}</td><td>${esc(p.dni)}</td><td>${esc(p.nom)}</td><td>${esc(p.rol)}</td><td>${esc(p.esp)}</td><td>${esc(perSedTxt(p))}</td><td>${esc(p.tc || "-")}</td><td>${+p.precio ? (+p.precio).toFixed(2) : "--"}</td><td><span class="b ${p.activo ? "ok" : "no"}">${p.activo ? "Activo" : "Inactivo"}</span></td><td><button class="s g" data-f=perEd data-i="${id}">Modificar</button> <button class="s ${p.activo ? "r" : "g"}" data-f=togP data-i="${id}">${p.activo ? "Desactivar" : "Activar"}</button></td></tr>`;
+    }),
+  );
+};
+function perDatos() {
   const e = S.personal.find((p) => p.id === EP) || {},
-    dg = "data-in=digits inputmode=numeric";
-  return `<div class=card><h3>${EP ? "Modificar " + esc(EP) : "Nuevo personal"}</h3><div class=fg>${fl("Nombres", `<input id=p_n value="${esc(e.nom || "")}">`)}${fl("DNI", `<input id=p_d maxlength=8 ${dg} value="${esc(e.dni || "")}">`)}${fl("Teléfono", `<input id=p_t maxlength=9 ${dg} value="${esc(e.tel || "")}">`)}${fl("Especialidad", `<input id=p_e value="${esc(e.esp || "")}">`)}${fl(
-    "Rol",
+    dg = "data-in=digits inputmode=numeric",
+    act = S.personal.filter((p) => p.activo).length;
+  const form = `<div class=card><h3>${EP ? "Modificar " + esc(EP) : "Información del personal"}</h3><div class=pform><div class=pfoto><div id=p_fp>${perFotoHtml()}</div><label class=fbtn>Subir foto<input id=p_f type=file accept="image/jpeg,image/png" data-ch=perFoto hidden></label></div><div class=fg>${fl("DNI *", `<input id=p_d maxlength=8 ${dg} value="${esc(e.dni || "")}">`)}${fl("Nombres y apellidos *", `<input id=p_n value="${esc(e.nom || "")}">`)}${fl("Teléfono", `<input id=p_t maxlength=9 ${dg} value="${esc(e.tel || "")}">`)}${fl("Correo", `<input id=p_m type=email value="${esc(e.correo || "")}">`)}${fl(
+    "Rol / Cargo *",
     "<select id=p_r>" +
       o(
         [
@@ -2241,78 +2639,234 @@ VW.personal = () => {
         e.rol,
       ) +
       "</select>",
-  )}${fl("Precio por hora (S/)", `<input id=p_p type=number min=0 value="${esc(e.precio ?? "")}">`)}</div><div class=row><button data-f=addPer>${EP ? "Guardar cambios" : "Guardar"}</button>${EP ? "<button class=g data-f=cancelPer>Cancelar</button>" : ""}</div></div><div class=card>${tbl(
-    [
-      "Código",
-      "DNI",
-      "Nombres",
-      "Teléfono",
-      "Rol",
-      "Especialidad",
-      "S/ hora",
-      "Horas semana",
-      "Pago semana",
-      "Estado",
-      "",
-    ],
-    S.personal.map((p) => {
-      const h = hsem(p);
-      return `<tr><td>${esc(p.id)}</td><td>${esc(p.dni)}</td><td>${esc(p.nom)}</td><td>${esc(p.tel || "")}</td><td>${esc(p.rol)}</td><td>${esc(p.esp)}</td><td>${money(p.precio)}</td><td>${h.toFixed(1)}</td><td>${money(h * p.precio)}</td><td><span class="b ${p.activo ? "ok" : "no"}">${p.activo ? "Activo" : "Inactivo"}</span></td><td><button class="s g" data-f="perEd" data-i="${esc(p.id)}">Modificar</button> <button class="s g" data-f="togP" data-i="${esc(p.id)}">${p.activo ? "Desactivar" : "Activar"}</button></td></tr>`;
-    }),
-  )}<div class=row><button class=g data-f=cp data-i=personal>Copiar para Excel</button></div></div>`;
-};
+  )}${fl("Especialidad", `<input id=p_e value="${esc(e.esp || "")}">`)}${fl("Tipo de contrato *", "<select id=p_tc>" + o(PTIPOS.map((x) => [x, x]), e.tc, "Seleccionar...") + "</select>")}${fl("Fecha de inicio *", `<input id=p_fi type=date value="${esc(e.fi || "")}">`)}${fl("Fecha de fin", `<input id=p_ff type=date value="${esc(e.ff || "")}">`)}${fl("Sueldo fijo (S/)", `<input id=p_sf type=number min=0 value="${esc(e.sf ?? 0)}">`)}${fl("Tarifa por hora (S/) *", `<input id=p_p type=number min=0 value="${esc(e.precio ?? "")}">`)}${fl("Jornada / Régimen", "<select id=p_j>" + o(PJOR.map((x) => [x, x]), e.jor, "Seleccionar...") + "</select>")}${fl(
+    "Estado *",
+    "<select id=p_a>" +
+      o(
+        [
+          ["1", "Activo"],
+          ["0", "Inactivo"],
+        ],
+        e.id ? (e.activo ? "1" : "0") : "1",
+      ) +
+      "</select>",
+  )}<label class=chk><input type=checkbox id=p_mv ${e.mv ? "checked" : ""}><span>Permite dictar en varias sedes</span></label></div></div><div class=row><button data-f=addPer>${EP ? "Guardar cambios" : "Guardar"}</button>${EP ? "<button class=g data-f=cancelPer>Cancelar</button>" : ""}</div></div>`;
+  let paneles = '<div class=card><p class=mu>Guarda al personal para asignarle sedes y certificaciones.</p></div>';
+  if (EP) {
+    const SL = perSedes(EP),
+      CL = perCert(EP),
+      th = SL.reduce((t, x) => t + (+x.hs || 0), 0);
+    paneles = `<div class=pgrid><div class=card><h3>Sedes asignadas</h3>${tbl(
+      ["Sede", "Horario", "Horas sem.", ""],
+      SL.map(
+        (x) =>
+          `<tr><td>${esc(sn(x.sede))}</td><td>${esc(x.hr)}</td><td>${esc(x.hs)}</td><td><button class="s r" data-f=perSedDel data-i="${esc(x.id)}">Quitar</button></td></tr>`,
+      ),
+    )}<div class=row><select id=ps_s>${o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre]))}</select><input id=ps_h placeholder="Horario (vacío = se toma de Horarios)"><input id=ps_r type=number min=0 placeholder="Horas sem."><button data-f=perSedAdd>Asignar sede</button></div><p class=mu>Total de horas semanales: <b>${th}</b></p></div><div class=card><h3>Certificaciones y acreditaciones</h3>${tbl(
+      ["Certificación", "Entidad", "Vencimiento", "Estado", ""],
+      CL.map(
+        (x) =>
+          `<tr><td>${esc(x.cert)}</td><td>${esc(x.ent)}</td><td>${esc(x.ven || "-")}</td><td><span class="b ${certEst(x) === "Vigente" ? "ok" : "no"}">${certEst(x)}</span></td><td><button class="s r" data-f=perCerDel data-i="${esc(x.id)}">Quitar</button></td></tr>`,
+      ),
+    )}<div class=row><input id=pc_c placeholder="Certificación"><input id=pc_e placeholder="Entidad"><input id=pc_v type=date><button data-f=perCerAdd>Agregar</button></div></div></div>`;
+  }
+  return `${form}${paneles}<div class=card><div class=row><h3 class="u-m-0 u-flex-1">Personal registrado</h3><input id=p_q data-in=perQ placeholder="Buscar por DNI, nombre, cargo o especialidad..." value="${esc(PQ)}"></div><div id=per_t>${perTbl()}</div><div class=row><button class=g data-f=cp data-i=personal>Copiar para Excel</button></div><p><b>Total de personal: ${S.personal.length} · Activos: ${act} · Inactivos: ${S.personal.length - act}</b></p></div>`;
+}
 function addPer() {
   const n = limpiar(v("p_n"), 60),
     d = v("p_d"),
-    r = v("p_r");
+    r = v("p_r"),
+    mail = v("p_m"),
+    tc = v("p_tc"),
+    fi = v("p_fi"),
+    ff = v("p_ff"),
+    jor = v("p_j"),
+    est = v("p_a"),
+    pr = monto(v("p_p") || 0),
+    sf = monto(v("p_sf") || 0);
   if (!RX.nombre.test(n) || !RX.dni.test(d))
     return toast("Nombre válido (solo letras) y DNI de 8 dígitos son obligatorios");
   if (v("p_t") && !RX.cel.test(v("p_t"))) return toast("Teléfono: hasta 9 dígitos");
-  if (!["ENT", "ADM", "REC"].includes(r) || monto(v("p_p") || 0) === null)
-    return toast("Rol o precio inválido");
-  if (S.personal.some((p) => p.dni === d && p.id !== EP))
-    return toast("Ese DNI ya está registrado");
+  if (mail && !RX.mail.test(mail)) return toast("Correo inválido");
+  if (!["ENT", "ADM", "REC"].includes(r)) return toast("Rol inválido");
+  if (pr === null || sf === null) return toast("Tarifa o sueldo fijo inválido");
+  if ((tc && !PTIPOS.includes(tc)) || (jor && !PJOR.includes(jor))) return toast("Contrato o jornada inválidos");
+  if (!EP && (!tc || !fi)) return toast("Tipo de contrato y fecha de inicio son obligatorios");
+  if ((fi && !fechaOk(fi)) || (ff && !fechaOk(ff))) return toast("Fecha inválida");
+  if (fi && ff && ff < fi) return toast("La fecha de fin no puede ser anterior al inicio");
+  if (!["1", "0"].includes(est)) return toast("Estado inválido");
+  if (S.personal.some((p) => p.dni === d && p.id !== EP)) return toast("Ese DNI ya está registrado");
   const x = {
     nom: n,
     dni: d,
     tel: v("p_t"),
     esp: limpiar(v("p_e"), 60),
     rol: r,
-    precio: monto(v("p_p") || 0),
+    precio: pr,
+    correo: mail,
+    tc,
+    fi,
+    ff,
+    sf,
+    jor,
+    mv: $("#p_mv").checked,
+    foto: IMG_OK.test(PFOTO || "") ? PFOTO : "",
+    activo: +est,
   };
   if (EP) {
-    Object.assign(
-      S.personal.find((p) => p.id === EP),
-      x,
-    );
+    const t = S.personal.find((p) => p.id === EP);
+    if (!t) {
+      EP = null;
+      return toast("El personal ya no existe. Recarga e inténtalo de nuevo.");
+    }
+    Object.assign(t, x);
     EP = null;
+    PFOTO = "";
     toast("Personal actualizado");
   } else {
-    S.personal.push({ id: `PER-${r}-${nx("PER-" + r, 4)}`, ...x, activo: 1 });
-    toast("Personal guardado");
+    const id = `PER-${r}-${nx("PER-" + r, 4)}`;
+    S.personal.push({ id, ...x });
+    EP = id;
+    toast("Personal guardado: ya puedes asignarle sedes y certificaciones");
   }
   save();
   R();
 }
+function perSedAdd() {
+  const sid = v("ps_s");
+  if (!S.sedes.some((s) => s.id === sid)) return toast("Elige una sede");
+  if (perSedes(EP).some((x) => x.sede === sid)) return toast("Esa sede ya está asignada");
+  const p = S.personal.find((x) => x.id === EP);
+  if (!p) return;
+  if (!p.mv && perSedes(EP).length) return toast("Esta persona no permite dictar en varias sedes");
+  const a = autoSede(EP, sid),
+    hr = limpiar(v("ps_h"), 80) || a.resumen,
+    hs = v("ps_r") === "" ? a.horas : monto(v("ps_r"));
+  if (hs === null) return toast("Horas semanales inválidas");
+  S.psedes.push({ id: uid(), pid: EP, sede: sid, hr, hs });
+  save();
+  toast("Sede asignada");
+  R();
+}
+function perSedDel(id) {
+  S.psedes = S.psedes.filter((x) => x.id !== id);
+  save();
+  R();
+}
+function perCerAdd() {
+  const c = limpiar(v("pc_c"), 80),
+    ven = v("pc_v");
+  if (!c) return toast("Ingresa la certificación");
+  if (ven && !fechaOk(ven)) return toast("Fecha de vencimiento inválida");
+  const x = { id: uid(), pid: EP, cert: c, ent: limpiar(v("pc_e"), 60), ven };
+  x.est = certEst(x);
+  S.pcert.push(x);
+  save();
+  toast("Certificación agregada");
+  R();
+}
+function perCerDel(id) {
+  S.pcert = S.pcert.filter((x) => x.id !== id);
+  save();
+  R();
+}
+function perCtr() {
+  const hoy = new Date(today() + "T00:00:00"),
+    dd = (f) => Math.ceil((new Date(f + "T00:00:00") - hoy) / 864e5);
+  return `<div class=card><h3>Contratos del personal</h3>${tbl(
+    ["Código", "Nombres", "Tipo", "Inicio", "Fin", "Situación", "Sueldo fijo", "Tarifa/h", "Jornada", ""],
+    S.personal.map((p) => {
+      const k = p.ff ? dd(p.ff) : null,
+        st = k === null ? ["ok", "Indefinido"] : k < 0 ? ["no", "Vencido"] : k <= 30 ? ["no", `Vence en ${k} d`] : ["ok", "Vigente"];
+      return `<tr><td>${esc(p.id)}</td><td>${esc(p.nom)}</td><td>${esc(p.tc || "-")}</td><td>${esc(p.fi || "-")}</td><td>${esc(p.ff || "-")}</td><td><span class="b ${st[0]}">${st[1]}</span></td><td>${money(p.sf)}</td><td>${money(p.precio)}</td><td>${esc(p.jor || "-")}</td><td><button class="s g" data-f=perEd data-i="${esc(p.id)}">Modificar</button></td></tr>`;
+    }),
+  )}</div>`;
+}
+function perPay() {
+  let tp = 0,
+    tf = 0;
+  const rows = S.personal.map((p) => {
+    const h = hsem(p),
+      pg = h * p.precio;
+    tp += pg;
+    tf += +p.sf || 0;
+    return `<tr><td>${esc(p.id)}</td><td>${esc(p.nom)}</td><td>${esc(p.rol)}</td><td>${money(p.precio)}</td><td>${h.toFixed(1)}</td><td>${money(pg)}</td><td>${money(p.sf)}</td></tr>`;
+  });
+  return `<div class=card><h3>Pagos y liquidaciones de la semana</h3>${tbl(
+    ["Código", "Nombres", "Rol", "S/ hora", "Horas semana", "Pago semana (horas)", "Sueldo fijo (mensual)"],
+    rows,
+  )}<p><b>Total pago por horas de la semana: ${money(tp)} · Sueldos fijos mensuales: ${money(tf)}</b></p><p class=mu>El Dashboard Gerencial sigue calculando la planilla como horas asistidas × tarifa; el sueldo fijo se muestra aquí como referencia.</p></div>`;
+}
 const togP = (id) => {
   const p = S.personal.find((x) => x.id === id);
+  if (!p) return;
   if (p === U) return toast("No puedes desactivarte");
   p.activo = p.activo ? 0 : 1;
   save();
   R();
 };
-VW.horarios = () =>
-  `<div class=card><h3>Categorías ${Y}</h3><div class=row>${cats()
+/* ==================================================================
+   HORARIOS Y CATEGORÍAS (calendario semanal, un horario por día y categoría)
+   ================================================================== */
+const tmin = (x) => +x.slice(0, 2) * 60 + +x.slice(3, 5),
+  solapa = (a, b) => tmin(a.ini) < tmin(b.fin) && tmin(b.ini) < tmin(a.fin),
+  mismaSes = (a, b) => a.sede === b.sede && a.dep === b.dep && a.ini === b.ini && a.fin === b.fin;
+/* Devuelve un mensaje si el horario n choca con otro activo; "" si no hay cruce */
+function choque(n, ps, skipId) {
+  for (const h of S.hor) {
+    if (h.id === skipId || h.est === "Inactivo" || +h.dia !== +n.dia || !solapa(n, h)) continue;
+    if (h.sede === n.sede && +h.cat === +n.cat)
+      return `CAT-${n.cat} ya tiene horario ese día en ${sn(n.sede)} (${h.id}, ${h.ini}-${h.fin})`;
+    if (mismaSes(n, h)) continue;
+    const p = ps.find((x) => h.profs.includes(x));
+    if (p) return `${nomP(p)} ya dicta ${h.id} (${sn(h.sede)}, ${DIAL[h.dia]} ${h.ini}-${h.fin})`;
+  }
+  return "";
+}
+function horCal() {
+  const L = S.hor.filter((h) => !HFS || h.sede === HFS);
+  return `<div class=tw><div class=cal>${[1, 2, 3, 4, 5, 6, 7]
+    .map(
+      (d) =>
+        `<div class=cald><b>${DIAL[d]}</b>${
+          L.filter((h) => +h.dia === d)
+            .sort((a, b) => tmin(a.ini) - tmin(b.ini))
+            .map(
+              (h) =>
+                `<div class="calb${h.est === "Inactivo" ? " off" : ""}"><b>${esc(h.ini)}-${esc(h.fin)}</b><span>${esc(sn(h.sede))} · ${esc(dn(h.dep))} CAT-${esc(h.cat)}</span><small>${esc(h.profs.map(nomP).join(", ") || "Sin profesor")}</small></div>`,
+            )
+            .join("") || "<span class=mu>-</span>"
+        }</div>`,
+    )
+    .join("")}</div></div>`;
+}
+VW.horarios = () => {
+  const sd = S.hor.filter((h) => !(+h.dia >= 1 && +h.dia <= 7));
+  return `<div class=card><h3>Categorías ${Y}</h3><div class=row>${cats()
     .map((c) => `<span class="b ok">CAT-${c}</span>`)
     .join(
       "",
-    )}</div></div><div class=card><h3>Nuevo deporte</h3><div class=row>${'<input id=d_n placeholder="Nombre">'}<input id=d_c maxlength=3 placeholder="Código (3 letras)"><button data-f=addDep>Agregar deporte</button></div><p class=mu>${S.deportes.map((d) => d.id + " " + d.nombre).join(" · ")}</p></div><div class=card><h3>Nuevo horario</h3><div class=fg>${fl("Sede", "<select id=h_s>" + o(S.sedes.map((s) => [s.id, s.nombre])) + "</select>")}${fl("Deporte", "<select id=h_d>" + o(S.deportes.map((s) => [s.id, s.nombre])) + "</select>")}${fl("Categoría", "<select id=h_c>" + o(cats().map((c) => [c, "CAT-" + c])) + "</select>")}${fl("Inicio", "<input id=h_i type=time value=16:00>")}${fl("Fin", "<input id=h_f type=time value=18:00>")}${fl("Profesores (Ctrl para varios)", "<select id=h_p multiple>" + o(S.personal.filter((p) => p.rol === "ENT" && p.activo).map((p) => [p.id, p.nom])) + "</select>")}</div><div class=row><button data-f=addHor>Guardar horario</button></div></div><div class=card>${tbl(
-    ["Código", "Sede", "Deporte", "Categoría", "Horario", "Profesores", ""],
-    S.hor.map(
-      (h) =>
-        `<tr><td>${esc(h.id)}</td><td>${esc(sn(h.sede))}</td><td>${esc(dn(h.dep))}</td><td>CAT-${esc(h.cat)}</td><td>${esc(h.ini)}-${esc(h.fin)}</td><td>${esc(h.profs.map((p) => (S.personal.find((x) => x.id === p) || {}).nom).join(", "))}</td><td><button class="s r" data-f="delHor" data-i="${esc(h.id)}">Quitar</button></td></tr>`,
-    ),
+    )}</div></div><div class=card><h3>Nuevo deporte</h3><div class=row>${'<input id=d_n placeholder="Nombre">'}<input id=d_c maxlength=3 placeholder="Código (3 letras)"><button data-f=addDep>Agregar deporte</button></div><p class=mu>${S.deportes.map((d) => d.id + " " + d.nombre).join(" · ")}</p></div><div class=card><h3>Nuevo horario</h3><div class=fg>${fl("Sede", "<select id=h_s>" + o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre])) + "</select>")}${fl("Deporte", "<select id=h_d>" + o(S.deportes.map((s) => [s.id, s.nombre])) + "</select>")}${fl("Categorías (Ctrl para varias)", "<select id=h_c multiple size=5>" + o(cats().map((c) => [c, `CAT-${c} (${Y - c} años)`])) + "</select>")}${fl("Inicio", "<input id=h_i type=time value=16:00>")}${fl("Fin", "<input id=h_f type=time value=18:00>")}${fl("Profesores (Ctrl para varios)", "<select id=h_p multiple size=5>" + o(S.personal.filter((p) => p.rol === "ENT" && p.activo).map((p) => [p.id, p.nom])) + "</select>")}</div><label>Días de la semana</label><div class=dias>${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label class=chk><input type=checkbox class=h_dia value=${d}><span>${DIAS[d]}</span></label>`).join("")}</div><p class=mu>Se crea un horario por cada día y categoría elegidos. Se bloquean los cruces de profesores y de categorías.</p><div class=row><button data-f=addHor>Guardar horario</button></div></div><div class=card><div class=row><h3 class="u-m-0 u-flex-1">Calendario semanal</h3><select data-ch=horSede aria-label="Filtrar por sede">${o(S.sedes.map((s) => [s.id, s.nombre]), HFS, "Todas las sedes")}</select></div>${horCal()}</div>${
+    sd.length
+      ? `<div class=card><h3>Horarios sin día asignado</h3><p class=mu>Estos horarios son anteriores al calendario. Elige el día para incluirlos.</p>${tbl(
+          ["Código", "Sede", "Deporte", "Categoría", "Horario", "Día"],
+          sd.map(
+            (h) =>
+              `<tr><td>${esc(h.id)}</td><td>${esc(sn(h.sede))}</td><td>${esc(dn(h.dep))}</td><td>CAT-${esc(h.cat)}</td><td>${esc(h.ini)}-${esc(h.fin)}</td><td><select data-ch=horDia data-id="${esc(h.id)}">${o(DIAL.slice(1).map((x, i) => [i + 1, x]), "", "Elegir...")}</select></td></tr>`,
+          ),
+        )}</div>`
+      : ""
+  }<div class=card>${tbl(
+    ["Código", "Día", "Sede", "Deporte", "Categoría", "Horario", "Profesores", "Estado", ""],
+    [...S.hor]
+      .sort((a, b) => (+a.dia || 9) - (+b.dia || 9) || tmin(a.ini) - tmin(b.ini))
+      .map((h) => {
+        const on = h.est !== "Inactivo",
+          id = esc(h.id);
+        return `<tr><td>${id}</td><td>${esc(DIAS[h.dia] || "-")}</td><td>${esc(sn(h.sede))}</td><td>${esc(dn(h.dep))}</td><td>CAT-${esc(h.cat)}</td><td>${esc(h.ini)}-${esc(h.fin)}</td><td>${esc(h.profs.map(nomP).join(", "))}</td><td><span class="b ${on ? "ok" : "no"}">${on ? "Activo" : "Inactivo"}</span></td><td><button class="s g" data-f=horEst data-i="${id}">${on ? "Desactivar" : "Activar"}</button> <button class="s r" data-f=delHor data-i="${id}">Quitar</button></td></tr>`;
+      }),
   )}<div class=row><button class=g data-f=cp data-i=hor>Copiar para Excel</button></div></div>`;
+};
 function addDep() {
   const c = v("d_c").toUpperCase(),
     n = limpiar(v("d_n"), 40);
@@ -2323,28 +2877,133 @@ function addDep() {
   R();
 }
 function addHor() {
-  const ps = [...$("#h_p").selectedOptions].map((x) => x.value);
-  if (v("h_i") >= v("h_f")) return toast("La hora de fin debe ser posterior");
+  const ps = [...$("#h_p").selectedOptions].map((x) => x.value),
+    cs = [...$("#h_c").selectedOptions].map((x) => +x.value),
+    ds = [...document.querySelectorAll(".h_dia:checked")].map((x) => +x.value),
+    n = { sede: v("h_s"), dep: v("h_d"), ini: v("h_i"), fin: v("h_f") };
+  if (!S.sedes.some((s) => s.id === n.sede && sedEst(s) === "Activa")) return toast("Elige una sede activa");
+  if (!S.deportes.some((d) => d.id === n.dep)) return toast("Elige un deporte");
+  if (!cs.length || !cs.every(catOk)) return toast("Elige al menos una categoría");
+  if (!ds.length) return toast("Elige al menos un día");
+  if (!n.ini || !n.fin || n.ini >= n.fin) return toast("La hora de fin debe ser posterior");
   if (!ps.length) return toast("Asigna al menos un profesor");
-  S.hor.push({
-    id: "HOR-" + nx("HOR", 4),
-    sede: v("h_s"),
-    dep: v("h_d"),
-    cat: +v("h_c"),
-    ini: v("h_i"),
-    fin: v("h_f"),
-    profs: ps,
-  });
+  for (const p of ps) {
+    const pe = S.personal.find((x) => x.id === p);
+    if (!pe) return toast("Profesor inválido");
+    if (!pe.mv && S.hor.some((h) => h.est !== "Inactivo" && h.profs.includes(p) && h.sede !== n.sede))
+      return toast(`${pe.nom} no tiene permitido dictar en varias sedes`);
+  }
+  const nuevos = [];
+  for (const d of ds)
+    for (const c of cs) {
+      const h = { ...n, cat: c, dia: d },
+        m = choque(h, ps);
+      if (m) return toast(`${DIAL[d]}: ${m}`);
+      nuevos.push(h);
+    }
+  nuevos.forEach((h) => S.hor.push({ id: "HOR-" + nx("HOR", 4), ...h, est: "Activo", profs: [...ps] }));
   save();
-  toast("Horario guardado");
+  toast(nuevos.length === 1 ? "Horario guardado" : `${nuevos.length} horarios guardados`);
+  R();
+}
+const horEst = (id) => {
+  const h = S.hor.find((x) => x.id === id);
+  if (!h) return;
+  if (h.est !== "Inactivo") {
+    h.est = "Inactivo";
+  } else {
+    const m = +h.dia ? choque(h, h.profs, h.id) : "";
+    if (m) return toast(m);
+    h.est = "Activo";
+  }
+  save();
+  R();
+};
+function horDia(el) {
+  const h = S.hor.find((x) => x.id === el.dataset.id),
+    d = +el.value;
+  if (!h || !(d >= 1 && d <= 7)) return;
+  const m = choque({ ...h, dia: d }, h.profs, h.id);
+  if (m) {
+    toast(`${DIAL[d]}: ${m}`);
+    return R();
+  }
+  h.dia = d;
+  save();
   R();
 }
 const delHor = (id) => {
-  if (S.alu.some((a) => a.hor === id))
-    return toast("Hay alumnos en este horario; reasígnalos primero");
+  if (S.alu.some((a) => a.hor === id)) return toast("Hay alumnos en este horario; reasígnalos primero");
   S.hor = S.hor.filter((h) => h.id !== id);
   save();
   R();
+};
+
+/* Acciones nuevas de la parte 2 (se mezclan en FN, ON_INPUT y ON_CHANGE) */
+const NEW_FN = {
+  sedTab: (i) => {
+    SEDT = i;
+    ES = EC = EK = null;
+    R();
+  },
+  sedCtr: (i) => {
+    SEDT = "c";
+    EC = EK = null;
+    ES = i;
+    R();
+  },
+  sedTog: (i) => sedTog(i),
+  addCtr: () => addCtr(),
+  ctrEd: (i) => {
+    EC = i;
+    SEDT = "c";
+    R();
+  },
+  cancelCtr: () => {
+    EC = null;
+    R();
+  },
+  delCtr: (i) => delCtr(i),
+  addCc: () => addCc(),
+  ccEd: (i) => {
+    EK = i;
+    R();
+  },
+  cancelCc: () => {
+    EK = null;
+    R();
+  },
+  delCc: (i) => delCc(i),
+  ccAuto: () => ccAuto(),
+  perTab: (i) => {
+    PERT = i;
+    EP = null;
+    PFOTO = "";
+    R();
+  },
+  perSedAdd: () => perSedAdd(),
+  perSedDel: (i) => perSedDel(i),
+  perCerAdd: () => perCerAdd(),
+  perCerDel: (i) => perCerDel(i),
+  horEst: (i) => horEst(i),
+};
+const NEW_IN = {
+  sedQ: (el) => {
+    SQ = el.value;
+    $("#sed_t").innerHTML = sedTbl();
+  },
+  perQ: (el) => {
+    PQ = el.value;
+    $("#per_t").innerHTML = perTbl();
+  },
+};
+const NEW_CH = {
+  perFoto: (el) => perFotoSel(el),
+  horSede: (el) => {
+    HFS = el.value;
+    R();
+  },
+  horDia: (el) => horDia(el),
 };
 VW.mat = () => {
   const a = ED
@@ -2417,7 +3076,7 @@ VW.mat = () => {
         a.est,
       ) +
       "</select>",
-  )}${fl("Costo matrícula (S/)", `<input id=m_cm type=number min=0 value="${esc(a.cm)}">`)}${fl("Costo mensualidad (S/)", `<input id=m_cmen type=number min=0 value="${esc(a.cmen)}">`)}${fl("Meses contratados", `<input id=m_mes type=number min=0 value="${esc(a.mes)}">`)}${fl("Monto pagado (S/)", `<input id=m_pag type=number min=0 value="${esc(a.pag)}">`)}</div><div class=row id=ad_r>${adjBoton()}</div><div class=row><button data-f=matPay>Guardar</button><button class=g data-f=go data-i=mat>Cancelar</button>${ED ? `<button class=g data-f="carnet" data-i="${esc(ED)}">Generar carnet</button>` : ""}<button class=g data-f=qrPadres>QR para padres</button></div></div>`;
+  )}</div><div class="fb"><div class="fbx"><label>Foto del alumno</label><button type=button class="foto-box" id=foto_box data-f=adjFoto aria-label="Elegir foto del alumno">${fotoBox()}</button><label class=chk><input type=checkbox id=m_cons ${a.cons ? "checked" : ""}><span>Consentimiento de protección de datos personales (Ley N° 29733)</span></label></div></div><h4 class="bh">Facturación y cronograma de cuotas</h4><div class="bill"><div class=fg>${fl("Costo matrícula (S/)", `<input id=m_cm data-in=cron type=number min=0 value="${esc(a.cm)}">`)}${fl("Costo mensualidad (S/)", `<input id=m_cmen data-in=cron type=number min=0 value="${esc(a.cmen)}">`)}${fl("Plan / Meses contratados", `<input id=m_mes data-in=cron type=number min=0 value="${esc(a.mes)}">`)}${fl("Monto pagado (S/)", `<input id=m_pag data-in=cron type=number min=0 value="${esc(a.pag)}">`)}${fl("Monto a pagar hoy (S/)", `<input id=m_hoy type=number min=0 data-in=cron value="${esc(a.hoy ?? 0)}">`)}${fl("Método de pago", "<select id=m_mp>" + o([["Efectivo", "Efectivo"], ["Transferencia", "Transferencia"], ["Yape/Plin", "Yape/Plin"]], a.mp || "Efectivo") + "</select>")}</div><div class=cron><b>Cronograma de cuotas generado automáticamente</b><div id=cron_t></div></div></div><div class=row id=ad_r>${adjBoton()}</div><div class=row><button data-f=matPay>Registrar Alumno y Matrícula</button><button class=g data-f=limpiarMat>Limpiar formulario</button><button class=g data-f=carnetMat>Generar carnet</button></div><div class=row><button data-f=matPay>Guardar</button><button class=g data-f=go data-i=mat>Cancelar</button><button class=g data-f=qrPadres>QR para padres</button></div></div>`;
 };
 
 function upHor() {
@@ -2432,10 +3091,10 @@ function upHor() {
   c.classList.toggle("u-neg", !!(y && !catOk(y)));
   const cur = ED ? (S.alu.find((x) => x.id === ED) || {}).hor : "";
   const hs = S.hor.filter(
-    (h) => h.sede === v("m_sed") && h.dep === v("m_dep") && (!y || h.cat === y),
+    (h) => h.est !== "Inactivo" && h.sede === v("m_sed") && h.dep === v("m_dep") && (!y || h.cat === y),
   );
   $("#m_hor").innerHTML = o(
-    hs.map((h) => [h.id, `${esc(h.cat)} · ${esc(h.ini)}-${esc(h.fin)}`]),
+    hs.map((h) => [h.id, `${DIAS[h.dia] ? DIAS[h.dia] + " " : ""}${esc(h.cat)} · ${esc(h.ini)}-${esc(h.fin)}`]),
     v("m_hor") || cur,
     "Sin horario aún",
   );
@@ -2472,6 +3131,9 @@ async function saveAlu() {
     hor: hh ? hh.id : "",
     foto: IMG_OK.test(DW.foto || "") ? DW.foto : "",
     mes: Math.min(36, Math.max(0, parseInt(v("m_mes")) || 0)),
+    cons: !!($("#m_cons") && $("#m_cons").checked),
+    mp: ["Efectivo", "Transferencia", "Yape/Plin"].includes(v("m_mp")) ? v("m_mp") : "Efectivo",
+    hoy: monto(v("m_hoy") || 0) ?? 0,
   });
   if (d.dni && S.alu.some((x) => x.dni === d.dni && x.id !== ED))
     return toast("Ese DNI ya está registrado");
@@ -2487,6 +3149,10 @@ async function saveAlu() {
   Object.assign(d, dc);
   if (old) Object.assign(old, d);
   else S.alu.push({ id, fecha: today(), ...d });
+  regenCuotas(
+    id,
+    S.alu.find((x) => x.id === id),
+  );
   if (delta > 0)
     S.caja.push({
       f: today(),
@@ -2518,6 +3184,66 @@ async function saveAlu() {
     toast("Matrícula guardada. Ya puedes generar el carnet.");
   } else go("dir");
 }
+const addMes = (f, n) => {
+  const [y, m, d] = f.split("-").map(Number),
+    x = new Date(Date.UTC(y, m - 1 + n, 1)),
+    ult = new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + 1, 0)).getUTCDate();
+  x.setUTCDate(Math.min(d, ult));
+  return x.toISOString().slice(0, 10);
+};
+/* Cuotas = meses contratados × mensualidad. El monto pagado cubre primero la matrícula y luego las cuotas en orden. */
+function cronograma(a) {
+  const n = Math.min(36, Math.max(0, parseInt(a.mes) || 0)),
+    m = +a.cmen || 0,
+    base = a.fecha || today(),
+    r = [];
+  let resto = Math.max(0, (+a.pag || 0) - (+a.cm || 0));
+  for (let i = 1; i <= n; i++) {
+    const ok = resto >= m;
+    if (ok) resto -= m;
+    r.push({ n: i, f: addMes(base, i), m, e: ok ? "Pagada" : "Pendiente" });
+  }
+  return r;
+}
+function regenCuotas(id, a) {
+  S.cuotas = S.cuotas.filter((c) => c.aid !== id);
+  cronograma(a).forEach((c) => S.cuotas.push({ id: `CUO-${id}-${c.n}`, aid: id, ...c }));
+}
+function cronRender() {
+  const t = $("#cron_t");
+  if (!t) return;
+  const old = ED ? S.alu.find((x) => x.id === ED) : null,
+    a = {
+      fecha: (old && old.fecha) || today(),
+      cm: v("m_cm"),
+      cmen: v("m_cmen"),
+      mes: v("m_mes"),
+      pag: v("m_pag"),
+    },
+    c = cronograma(a),
+    tot = (+a.cm || 0) + c.reduce((s, x) => s + x.m, 0),
+    hoy = today();
+  t.innerHTML =
+    tbl(
+      ["Cuota #", "Fecha venc.", "Monto S/", "Estado"],
+      c.map((x) => {
+        const venc = x.e === "Pendiente" && x.f < hoy;
+        return `<tr><td>${x.n}</td><td>${esc(x.f)}</td><td>${money(x.m)}</td><td><span class="b ${x.e === "Pagada" ? "ok" : "no"}">${venc ? "Vencida" : x.e}</span></td></tr>`;
+      }),
+    ) + `<p><b>Monto total proyectado: ${money(tot)}</b> <span class=mu>(matrícula + cuotas)</span></p>`;
+}
+/* "Monto a pagar hoy" y "Monto pagado" se mantienen coherentes; el flujo de caja sigue usando Monto pagado. */
+function cronSync(el) {
+  const old = ED ? (S.alu.find((x) => x.id === ED) || {}).pag || 0 : 0,
+    r2 = (n) => Math.round(n * 100) / 100;
+  if (el.id === "m_hoy" && $("#m_pag")) $("#m_pag").value = r2(old + (+el.value || 0));
+  else if (el.id === "m_pag" && $("#m_hoy")) $("#m_hoy").value = Math.max(0, r2((+el.value || 0) - old));
+  cronRender();
+}
+const fotoBox = () =>
+  DW && DW.foto && IMG_OK.test(DW.foto)
+    ? `<img src="${esc(DW.foto)}" alt="Foto del alumno"><span class="foto-cambiar">Cambiar foto</span>`
+    : `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Elegir foto...</span>`;
 function carnet(id) {
   const a = S.alu.find((x) => x.id === id);
   modal(
@@ -2745,45 +3471,119 @@ function addCaja(s) {
   save();
   R();
 }
+let GR = "anio";
+const MFULL = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const WARN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>';
+function gerRow(s, ym) {
+  const mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(ym)),
+    ing = mc.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
+    eg = mc.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
+    kc = S.kits.filter((k) => k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
+    pl = S.asis
+      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym))
+      .reduce((t, x) => {
+        const h = S.hor.find((h) => h.id === x.h);
+        const p = S.personal.find((p) => p.id === x.ref);
+        return h && p && h.sede === s.id ? t + hrs(h) * p.precio : t;
+      }, 0);
+  return { s, ing, eg, kc, pl, al: +s.costo, u: ing - eg - kc - pl - s.costo };
+}
+const gerIni = () =>
+  ([...S.caja.map((x) => x.f), ...S.alu.map((a) => a.fecha)].filter(Boolean).sort()[0] || today()).slice(0, 7);
+const gerU = (s, ym, ini) => (ym < ini ? 0 : gerRow(s, ym).u);
+const gerNet = (ym, ini) => S.sedes.reduce((t, s) => t + gerU(s, ym, ini), 0);
+const lastMonths = (ym, n) => {
+  let [y, m] = ym.split("-").map(Number);
+  const r = [];
+  for (let i = 0; i < n; i++) {
+    r.unshift(`${y}-${String(m).padStart(2, "0")}`);
+    if (--m < 1) {
+      m = 12;
+      y--;
+    }
+  }
+  return r;
+};
+const mesesRango = () =>
+  GR === "anio"
+    ? Array.from({ length: 12 }, (_, i) => `${GM.slice(0, 4)}-${String(i + 1).padStart(2, "0")}`)
+    : lastMonths(today().slice(0, 7), 12);
+const mLbl = (ym) => MS[+ym.slice(5, 7) - 1];
+function spark(vs) {
+  const W = 84,
+    H = 24,
+    mn = Math.min(...vs),
+    mx = Math.max(...vs),
+    rg = mx - mn || 1,
+    pts = vs
+      .map((x, i) => `${((i / (vs.length - 1)) * W).toFixed(1)},${(H - 2 - ((x - mn) / rg) * (H - 4)).toFixed(1)}`)
+      .join(" ");
+  return `<svg class=spk width=${W} height=${H} viewBox="0 0 ${W} ${H}" role=img aria-label="Tendencia de rendimiento, últimos 6 meses"><title>Tendencia de rendimiento por sede (6 meses)</title><polyline points="${pts}" fill=none stroke="${vs[vs.length - 1] < 0 ? "var(--rd)" : "var(--ac)"}" stroke-width=2 stroke-linejoin=round stroke-linecap=round /></svg>`;
+}
+function svgBars(ms, vals, hoyYm) {
+  const W = 600,
+    H = 220,
+    P = 30,
+    mn = Math.min(0, ...vals),
+    mx = Math.max(0, ...vals),
+    rg = mx - mn || 1,
+    y = (x) => P + ((mx - x) / rg) * (H - 2 * P - 14),
+    z = y(0),
+    bw = (W - 2 * P) / ms.length;
+  return `<svg viewBox="0 0 ${W} ${H}" class=gch role=img aria-label="Utilidad neta por mes"><line x1=${P} x2=${W - P} y1=${z} y2=${z} stroke=currentColor opacity=.3 />${ms
+    .map((m, i) => {
+      const x = vals[i],
+        h = Math.max(2, Math.abs(y(x) - z)),
+        fut = m > hoyYm,
+        px = P + i * bw;
+      return `<g class=gb data-f=gerMes data-i=${m}><title>${MFULL[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}: ${money(x)}${fut ? " (proyectado)" : ""}</title><rect x=${px} y=0 width=${bw} height=${H} fill=transparent /><rect class=bv x=${(px + bw * 0.16).toFixed(1)} y=${(x >= 0 ? z - h : z).toFixed(1)} width=${(bw * 0.68).toFixed(1)} height=${h.toFixed(1)} rx=3 fill="${x < 0 ? "var(--rd)" : "var(--ac)"}" opacity=${m === GM ? 1 : fut ? 0.3 : 0.62} /><text x=${(px + bw / 2).toFixed(1)} y=${H - 6} text-anchor=middle font-size=11 fill=currentColor opacity=${m === GM ? 1 : 0.7}>${mLbl(m)}</text></g>`;
+    })
+    .join("")}</svg>`;
+}
+function svgLine(ms, vals) {
+  const W = 600,
+    H = 220,
+    P = 30,
+    mx = Math.max(4, ...vals),
+    x = (i) => P + (i * (W - 2 * P)) / Math.max(1, ms.length - 1),
+    y = (n) => H - P - (n / mx) * (H - 2 * P - 6),
+    d = vals.map((n, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(n).toFixed(1)}`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" class=gch role=img aria-label="Matrículas registradas por mes"><line x1=${P} x2=${W - P} y1=${y(0)} y2=${y(0)} stroke=currentColor opacity=.3 /><text x=4 y=${y(mx) + 4} font-size=11 fill=currentColor opacity=.7>${mx}</text><text x=4 y=${y(0) + 4} font-size=11 fill=currentColor opacity=.7>0</text><path d="${d}" fill=none stroke="var(--ac)" stroke-width=2.5 stroke-linejoin=round />${ms
+    .map(
+      (m, i) =>
+        `<g class=gb data-f=gerMes data-i=${m}><title>${MFULL[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}: ${vals[i]} matrículas</title><rect x=${(x(i) - 14).toFixed(1)} y=0 width=28 height=${H} fill=transparent /><circle cx=${x(i).toFixed(1)} cy=${y(vals[i]).toFixed(1)} r=${m === GM ? 6 : 3.5} fill="var(--ac)" /><text x=${x(i).toFixed(1)} y=${H - 6} text-anchor=middle font-size=11 fill=currentColor opacity=${m === GM ? 1 : 0.7}>${mLbl(m)}</text></g>`,
+    )
+    .join("")}</svg>`;
+}
 VW.ger = () => {
-  const rows = S.sedes.map((s) => {
-      const mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(GM)),
-        ing = mc.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
-        eg = mc.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
-        kc = S.kits
-          .filter((k) => k.sede === s.id && k.f.startsWith(GM))
-          .reduce((t, k) => t + k.c, 0),
-        pl = S.asis
-          .filter((x) => x.t === "P" && x.ok && x.f.startsWith(GM))
-          .reduce((t, x) => {
-            const h = S.hor.find((h) => h.id === x.h);
-            const p = S.personal.find((p) => p.id === x.ref);
-            return h && p && h.sede === s.id ? t + hrs(h) * p.precio : t;
-          }, 0);
-      return { s, ing, eg, kc, pl, al: +s.costo, u: ing - eg - kc - pl - s.costo };
-    }),
-    mx = Math.max(1, ...rows.map((r) => Math.abs(r.u)));
-  return `<div class=card><div class="row u-m-0">${fl("Mes", "<input type=month value=" + GM + " data-ch=setGM>")}</div></div><div class=card>${tbl(
-    [
-      "Sede",
-      "Ingresos",
-      "Alquiler",
-      "Planilla",
-      "Costo kits",
-      "Otros egresos",
-      "Utilidad neta",
-      "",
-    ],
+  const mm = GM.slice(5, 7),
+    yy = GM.slice(0, 4),
+    hoyYm = today().slice(0, 7),
+    parcial = GM === hoyYm,
+    ini = gerIni(),
+    yrs = [
+      ...new Set([+hoyYm.slice(0, 4), +yy, ...S.alu.map((a) => +(a.fecha || "").slice(0, 4)).filter(Boolean)]),
+    ].sort(),
+    rows = S.sedes.map((s) => ({ ...gerRow(s, GM), tr: lastMonths(GM, 6).map((m) => gerU(s, m, ini)) })),
+    mx = Math.max(1, ...rows.map((r) => Math.abs(r.u))),
+    tot = rows.reduce((t, r) => t + r.u, 0),
+    ms = mesesRango(),
+    nets = ms.map((m) => gerNet(m, ini)),
+    mats = ms.map((m) => S.alu.filter((a) => (a.fecha || "").startsWith(m)).length),
+    aviso = `Datos de ${MFULL[+mm - 1].toLowerCase()} parciales: fin de mes en progreso`;
+  return `<div class=card><div class="row u-m-0">${fl("Mes a analizar", `<select data-ch=setGMm>${o(MFULL.map((n, i) => [String(i + 1).padStart(2, "0"), n]), mm)}</select>`)}${fl("Año", `<select data-ch=setGMy>${o(yrs.map((n) => [String(n), String(n)]), yy)}</select>`)}<p class=mu>Utilidad neta = Ingresos − Alquileres − Planilla − Costo de kits − Otros egresos</p></div></div><div class=card><h3>Balance de utilidad por sede</h3>${tbl(
+    ["Sede", "Ingresos", "Alquiler", "Planilla", "Costo kits", "Otros egresos", "Utilidad neta", "Rendimiento"],
     rows.map(
       (r, ri) =>
-        `<tr><td>${esc(r.s.nombre)}</td><td>${money(r.ing)}</td><td>${money(r.al)}</td><td>${money(r.pl)}</td><td>${money(r.kc)}</td><td>${money(r.eg)}</td><td><b class="${r.u < 0 ? "u-neg" : "u-pos"}">${money(r.u)}</b></td><td class="u-w-160"><div class="bar ${r.u < 0 ? "n" : ""}${NAVF ? " ga" : ""}" data-dw="${(Math.abs(r.u) / mx) * 100}" data-dx=${ri}></div></td></tr>`,
+        `<tr><td>${esc(r.s.nombre)}</td><td>${money(r.ing)}</td><td>${money(r.al)}</td><td>${money(r.pl)}</td><td>${money(r.kc)}</td><td>${money(r.eg)}</td><td><b class="${r.u < 0 ? "u-neg" : "u-pos"}">${money(r.u)}</b>${parcial ? `<span class=warn title="${aviso}" aria-label="${aviso}">${WARN}</span>` : ""}</td><td><div class=rend><div class="bar ${r.u < 0 ? "n" : ""}${NAVF ? " ga" : ""}" data-dw="${(Math.abs(r.u) / mx) * 100}" data-dx=${ri}></div>${spark(r.tr)}</div></td></tr>`,
     ),
-  )}<p><b>Utilidad total del mes: ${money(rows.reduce((t, r) => t + r.u, 0))}</b></p><p class=mu>Utilidad = ingresos − alquiler − planilla (horas asistidas × precio por hora) − costo de confección − otros egresos manuales.</p></div>`;
+  )}<p><b>Utilidad neta total del mes: ${money(tot)}</b></p>${parcial ? `<p class=mu>${aviso}.</p>` : ""}</div><div class=gcharts><div class=card><div class="row ghd"><h3>Utilidad neta por mes <span class=mu>(clic en barra para ver mes)</span></h3><button class="g s" data-f=gerRango>Filtrar</button></div><p class=mu>Filtro de fecha: ${GR === "anio" ? "Año " + yy : "Últimos 12 meses"}</p>${svgBars(ms, nets, hoyYm)}</div><div class=card><h3>Matrículas registradas por mes</h3><p class=mu>Filtro de fecha: ${GR === "anio" ? "Año " + yy : "Últimos 12 meses"}</p>${svgLine(ms, mats)}</div></div>`;
 };
 /* ==================================================================
    16. ACCIONES DELEGADAS (data-f) Y REGISTROS DE EVENTOS
    ================================================================== */
 const FN = {
+  ...NEW_FN,
   nav: (i) => go(i),
   kSel: (i) => {
     KSEL = i;
@@ -2820,6 +3620,8 @@ const FN = {
   },
   perEd: (i) => {
     EP = i;
+    PERT = "d";
+    PFOTO = (S.personal.find((p) => p.id === i) || {}).foto || "";
     R();
   },
   delSede: (i) => delSede(i),
@@ -2883,12 +3685,14 @@ Object.assign(FN, {
 
 /* Acciones de teclado (data-in): antes oninput="..." */
 const ON_INPUT = {
+  ...NEW_IN,
   digits: (el) => {
     el.value = el.value.replace(/\D/g, "");
   },
   shirtDraw: () => shirtDraw(),
   kNumTyped: (el) => kNumTyped(el),
   ck: (el) => ck(el),
+  cron: (el) => cronSync(el),
   preQ: (el) => {
     PF.q = el.value;
     preF();
@@ -2905,6 +3709,7 @@ const ON_INPUT = {
 
 /* Cambios de valor (data-ch): antes onchange="..." */
 const ON_CHANGE = {
+  ...NEW_CH,
   upHor: () => upHor(),
   restaurar: (el) => restaurar(el),
   setFee: (el) => {
@@ -2917,6 +3722,14 @@ const ON_CHANGE = {
   },
   setGM: (el) => {
     GM = el.value;
+    R();
+  },
+  setGMm: (el) => {
+    GM = GM.slice(0, 5) + el.value;
+    R();
+  },
+  setGMy: (el) => {
+    GM = el.value + GM.slice(4);
     R();
   },
   csV: (el) => {
@@ -2959,6 +3772,17 @@ function applyDynamicStyles(root) {
 }
 Object.assign(FN, {
   adjAbrir: () => modal(adjHtml()),
+  adjFoto: () => adjCamb("foto"),
+  limpiarMat: () => go("mat"),
+  carnetMat: () => (ED ? carnet(ED) : toast("Guarda la matrícula primero para generar el carnet")),
+  gerMes: (i) => {
+    GM = i;
+    R();
+  },
+  gerRango: () => {
+    GR = GR === "anio" ? "12m" : "anio";
+    R();
+  },
   adjVer: (k) => adjVer(k),
   adjCamb: (k) => adjCamb(k),
   adjDel: (k) => adjDel(k),
