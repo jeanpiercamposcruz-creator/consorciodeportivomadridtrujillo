@@ -3419,8 +3419,17 @@ function saveKit() {
 }
 function delKit(id) {
   if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
-  S.kits = S.kits.filter((k) => k.id !== id);
-  S.caja = S.caja.filter((c) => c.k !== "kit|" + id);
+  const targetId = String(id ?? "").trim();
+  const targetCajaKey = "kit|" + targetId;
+
+  const beforeLen = S.kits.length;
+  S.kits = S.kits.filter((k) => String(k.id ?? "").trim() !== targetId);
+  S.caja = S.caja.filter((c) => String(c.k ?? "").trim() !== targetCajaKey);
+
+  if (S.kits.length === beforeLen) {
+    console.warn("No se encontró el kit con id:", id, "en S.kits");
+  }
+
   save();
   toast("Venta eliminada");
   R();
