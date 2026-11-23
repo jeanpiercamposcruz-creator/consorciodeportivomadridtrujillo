@@ -2009,11 +2009,12 @@ const IC = {
 };
 /* Iconos de acción (estilo Lucide/Heroicons, SVG vectorial — nunca emojis) */
 const IA = {
-  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>',
-  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  edit: '<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>',
+  doc: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
   block: '<circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
-  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14c0 1.1-0.9 2-2 2H7c-1.1 0-2-0.9-2-2V6M8 6V3m6 3v14m-6-3h10"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
 };
 const ico = (k, z = 34) =>
   `<svg width="${z}" height="${z}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
@@ -2320,7 +2321,7 @@ const sedTbl = () => {
     L.map((s) => {
       const on = sedEst(s) === "Activa",
         id = esc(s.id);
-      return `<tr><td>${id}</td><td>${esc(s.nombre)}</td><td>${esc(ccTxt(s.cc))}</td><td>${esc(s.dir)}</td><td>${esc(s.con)}</td><td>${money(costoSede(s))}</td><td><span class="b ${on ? "ok" : "no"}">${on ? "Activa" : "Inactiva"}</span></td><td><button class="s g act" data-f=sedEd data-i="${id}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s g act" data-f=sedCtr data-i="${id}" title="Contratos" aria-label="Contratos">${iac("doc")}</button> <button class="s act ${on ? "r" : "g"}" data-f=sedTog data-i="${id}" title="${on ? "Desactivar" : "Activar"}" aria-label="${on ? "Desactivar" : "Activar"}">${on ? iac("block") : iac("check")}</button> <button class="s r act" data-f=delSede data-i="${id}" title="Eliminar" aria-label="Eliminar">${iac("trash")}</button></td></tr>`;
+      return `<tr><td>${id}</td><td>${esc(s.nombre)}</td><td>${esc(ccTxt(s.cc))}</td><td>${esc(s.dir)}</td><td>${esc(s.con)}</td><td>${money(costoSede(s))}</td><td><span class="b ${on ? "ok" : "no"}">${on ? "Activa" : "Inactiva"}</span></td><td><button class="s g act" data-f=sedEd data-i="${id}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s g act" data-f=sedCtr data-i="${id}" title="Contratos" aria-label="Contratos">${iac("doc")}</button> <button class="s act ${on ? "ban" : "g"}" data-f=sedTog data-i="${id}" title="${on ? "Desactivar" : "Activar"}" aria-label="${on ? "Desactivar" : "Activar"}">${on ? iac("block") : iac("check")}</button> <button class="s r act" data-f=delSede data-i="${id}" title="Eliminar" aria-label="Eliminar">${iac("trash")}</button></td></tr>`;
     }),
   );
 };
@@ -2566,7 +2567,7 @@ const perSedes = (id) => S.psedes.filter((x) => x.pid === id),
 const perFotoHtml = () =>
   IMG_OK.test(PFOTO || "")
     ? `<img src="${esc(PFOTO)}" alt="Foto del personal" class="per-foto">`
-    : `<div class="per-ph" role="img" aria-label="Foto del personal (sin foto)"><div class="per-silueta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span class=mu>Sin foto</span></div>`;
+    : `<div class="per-ph" role="img" aria-label="Foto del personal (sin foto)"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="24" r="12.5"/><path d="M6 60c0-15 11.6-24 26-24s26 9 26 24z"/></svg></div>`;
 function perFotoSel(el) {
   const f = el.files && el.files[0];
   if (!f || !/^image\/(jpeg|png)$/.test(f.type)) return toast("Elige una imagen JPG o PNG");
@@ -2586,10 +2587,13 @@ function perFotoSel(el) {
       PFOTO = d;
       const b = $("#p_fp");
       if (b) b.innerHTML = perFotoHtml();
+      const t = $("#p_ft");
+      if (t) t.textContent = "Cambiar foto";
     };
     img.src = rd.result;
   };
   rd.readAsDataURL(f);
+  el.value = ""; // permite volver a elegir el mismo archivo
 }
 /* Resumen de horario y horas semanales de una persona en una sede, calculado desde Horarios */
 function autoSede(pid, sid) {
@@ -2630,7 +2634,7 @@ const perTbl = () => {
     ["Código", "DNI", "Nombres", "Rol", "Especialidad", "Sedes", "Contrato", "Tarifa (S/)", "Estado", ""],
     L.map((p) => {
       const id = esc(p.id);
-      return `<tr><td>${id}</td><td>${esc(p.dni)}</td><td>${esc(p.nom)}</td><td>${esc(p.rol)}</td><td>${esc(p.esp)}</td><td>${esc(perSedTxt(p))}</td><td>${esc(p.tc || "-")}</td><td>${+p.precio ? (+p.precio).toFixed(2) : "--"}</td><td><span class="b ${p.activo ? "ok" : "no"}">${p.activo ? "Activo" : "Inactivo"}</span></td><td><button class="s g act" data-f=perEd data-i="${id}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s act ${p.activo ? "r" : "g"}" data-f=togP data-i="${id}" title="${p.activo ? "Desactivar" : "Activar"}" aria-label="${p.activo ? "Desactivar" : "Activar"}">${p.activo ? iac("block") : iac("check")}</button></td></tr>`;
+      return `<tr><td>${id}</td><td>${esc(p.dni)}</td><td>${esc(p.nom)}</td><td>${esc(p.rol)}</td><td>${esc(p.esp)}</td><td>${esc(perSedTxt(p))}</td><td>${esc(p.tc || "-")}</td><td>${+p.precio ? (+p.precio).toFixed(2) : "--"}</td><td><span class="b ${p.activo ? "ok" : "no"}">${p.activo ? "Activo" : "Inactivo"}</span></td><td><button class="s g act" data-f=perEd data-i="${id}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s act ${p.activo ? "ban" : "g"}" data-f=togP data-i="${id}" title="${p.activo ? "Desactivar" : "Activar"}" aria-label="${p.activo ? "Desactivar" : "Activar"}">${p.activo ? iac("block") : iac("check")}</button></td></tr>`;
     }),
   );
 };
@@ -2638,7 +2642,7 @@ function perDatos() {
   const e = S.personal.find((p) => p.id === EP) || {},
     dg = "data-in=digits inputmode=numeric",
     act = S.personal.filter((p) => p.activo).length;
-  const form = `<div class=card><h3>${EP ? "Modificar " + esc(EP) : "Información del personal"}</h3><div class=pform><div class=pfoto><div id=p_fp>${perFotoHtml()}</div><label class=fbtn>Subir foto<input id=p_f type=file accept="image/jpeg,image/png" data-ch=perFoto hidden></label></div><div class=fg>${fl("DNI *", `<input id=p_d maxlength=8 ${dg} value="${esc(e.dni || "")}">`)}${fl("Nombres y apellidos *", `<input id=p_n value="${esc(e.nom || "")}">`)}${fl("Teléfono", `<input id=p_t maxlength=9 ${dg} value="${esc(e.tel || "")}">`)}${fl("Correo", `<input id=p_m type=email value="${esc(e.correo || "")}">`)}${fl(
+  const form = `<div class=card><h3>${EP ? "Modificar " + esc(EP) : "Información del personal"}</h3><div class=pform><div class=pfoto><div id=p_fp>${perFotoHtml()}</div><label class=fbtn>${iac("upload")}<span id=p_ft>${IMG_OK.test(PFOTO || "") ? "Cambiar foto" : "Subir foto"}</span><input id=p_f type=file accept="image/jpeg,image/png" data-ch=perFoto hidden></label></div><div class=fg>${fl("DNI *", `<input id=p_d maxlength=8 ${dg} value="${esc(e.dni || "")}">`)}${fl("Nombres y apellidos *", `<input id=p_n value="${esc(e.nom || "")}">`)}${fl("Teléfono", `<input id=p_t maxlength=9 ${dg} value="${esc(e.tel || "")}">`)}${fl("Correo", `<input id=p_m type=email value="${esc(e.correo || "")}">`)}${fl(
     "Rol / Cargo *",
     "<select id=p_r>" +
       o(
@@ -2661,7 +2665,7 @@ function perDatos() {
         e.id ? (e.activo ? "1" : "0") : "1",
       ) +
       "</select>",
-  )}<label class="chk wide"><input type=checkbox id=p_mv ${e.mv ? "checked" : ""}><span>Permite dictar en varias sedes</span></label></div></div><div class=row><button data-f=addPer>${EP ? "Guardar cambios" : "Guardar"}</button>${EP ? "<button class=g data-f=cancelPer>Cancelar</button>" : ""}</div></div>`;
+  )}<div class=fchk><span class=fchk-l>Varias sedes</span><label class="chk fchk-box"><input type=checkbox id=p_mv ${e.mv ? "checked" : ""}><span>Permite dictar en varias sedes</span></label></div></div></div><div class=row><button data-f=addPer>${EP ? "Guardar cambios" : "Guardar"}</button>${EP ? "<button class=g data-f=cancelPer>Cancelar</button>" : ""}</div></div>`;
   let paneles = '<div class=card><p class=mu>Guarda al personal para asignarle sedes y certificaciones.</p></div>';
   if (EP) {
     const SL = perSedes(EP),
@@ -2671,13 +2675,13 @@ function perDatos() {
       ["Sede", "Horario", "Horas sem.", ""],
       SL.map(
         (x) =>
-          `<tr><td>${esc(sn(x.sede))}</td><td>${esc(x.hr)}</td><td>${esc(x.hs)}</td><td><button class="s r" data-f=perSedDel data-i="${esc(x.id)}">Quitar</button></td></tr>`,
+          `<tr><td>${esc(sn(x.sede))}</td><td>${esc(x.hr)}</td><td>${esc(x.hs)}</td><td><button class="s r act" data-f=perSedDel data-i="${esc(x.id)}" title="Quitar" aria-label="Quitar">${iac("trash")}</button></td></tr>`,
       ),
     )}<div class=row><select id=ps_s>${o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre]))}</select><input id=ps_h placeholder="Horario (vacío = se toma de Horarios)"><input id=ps_r type=number min=0 placeholder="Horas sem."><button data-f=perSedAdd>Asignar sede</button></div><p class=mu>Total de horas semanales: <b>${th}</b></p></div><div class=card><h3>Certificaciones y acreditaciones</h3>${tbl(
       ["Certificación", "Entidad", "Vencimiento", "Estado", ""],
       CL.map(
         (x) =>
-          `<tr><td>${esc(x.cert)}</td><td>${esc(x.ent)}</td><td>${esc(x.ven || "-")}</td><td><span class="b ${certEst(x) === "Vigente" ? "ok" : "no"}">${certEst(x)}</span></td><td><button class="s r" data-f=perCerDel data-i="${esc(x.id)}">Quitar</button></td></tr>`,
+          `<tr><td>${esc(x.cert)}</td><td>${esc(x.ent)}</td><td>${esc(x.ven || "-")}</td><td><span class="b ${certEst(x) === "Vigente" ? "ok" : "no"}">${certEst(x)}</span></td><td><button class="s r act" data-f=perCerDel data-i="${esc(x.id)}" title="Quitar" aria-label="Quitar">${iac("trash")}</button></td></tr>`,
       ),
     )}<div class=row><input id=pc_c placeholder="Certificación"><input id=pc_e placeholder="Entidad"><input id=pc_v type=date><button data-f=perCerAdd>Agregar</button></div></div></div>`;
   }
@@ -2857,7 +2861,8 @@ VW.horarios = () => {
     .map((c) => `<span class="b ok">CAT-${c}</span>`)
     .join(
       "",
-    )}</div></div><div class=card><h3>Nuevo deporte</h3><div class=row>${'<input id=d_n placeholder="Nombre">'}<input id=d_c maxlength=3 placeholder="Código (3 letras)"><button data-f=addDep>Agregar deporte</button></div><p class=mu>${S.deportes.map((d) => d.id + " " + d.nombre).join(" · ")}</p></div><div class=card><h3>Nuevo horario</h3><div class=fg>${fl("Sede", "<select id=h_s>" + o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre])) + "</select>")}${fl("Deporte", "<select id=h_d>" + o(S.deportes.map((s) => [s.id, s.nombre])) + "</select>")}${fl("Categorías", `<div class="chk-grid" id=h_c>${cats().map((c) => `<label class=chk><input type=checkbox value=${c}><span>CAT-${c} (${Y - c} años)</span></label>`).join("")}</div>`)}${fl("Inicio", "<input id=h_i type=time value=16:00>")}${fl("Fin", "<input id=h_f type=time value=18:00>")}${fl("Profesores", `<div class="chk-grid" id=h_p">${S.personal.filter((p) => p.rol === "ENT" && p.activo).map((p) => `<label class=chk><input type=checkbox value="${esc(p.id)}"><span>${esc(p.nom)}</span></label>`).join("")}</div>`)}</div><label>Días de la semana</label><div class=dias>${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label class=chk><input type=checkbox class=h_dia value=${d}><span>${DIAS[d]}</span></label>`).join("")}</div><p class=mu>Se crea un horario por cada día y categoría elegidos. Se bloquean los cruces de profesores y de categorías.</p><div class=row><button data-f=addHor>Guardar horario</button></div></div><div class=card><div class=row><h3 class="u-m-0 u-flex-1">Calendario semanal</h3><select data-ch=horSede aria-label="Filtrar por sede">${o(S.sedes.map((s) => [s.id, s.nombre]), HFS, "Todas las sedes")}</select></div>${horCal()}</div>${
+    )}</div></div><div class=card><h3>Nuevo deporte</h3><div class=row>${'<input id=d_n placeholder="Nombre">'}<input id=d_c maxlength=3 placeholder="Código (3 letras)"><button data-f=addDep>Agregar deporte</button></div><p class=mu>${S.deportes.map((d) => d.id + " " + d.nombre).join(" · ")}</p></div><div class=card><h3>Nuevo horario</h3><div class=fg>${fl("Sede", "<select id=h_s>" + o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre])) + "</select>")}${fl("Deporte", "<select id=h_d>" + o(S.deportes.map((s) => [s.id, s.nombre])) + "</select>")}${fl("Inicio", "<input id=h_i type=time value=16:00>")}${fl("Fin", "<input id=h_f type=time value=18:00>")}<div class="fgrp u-col-full" role="group" aria-labelledby=h_cl><span class=fgrp-l id=h_cl>Categorías</span><div class="chk-grid" id=h_c>${cats().map((c) => `<label class=chk><input type=checkbox value=${c}><span>CAT-${c} (${Y - c} años)</span></label>`).join("")}</div></div><div class="fgrp u-col-full" role="group" aria-labelledby=h_pl><span class=fgrp-l id=h_pl>Profesores</span><div class="chk-grid" id=h_p>${S.personal.filter((p) => p.rol === "ENT" && p.activo).map((p) => `<label class=chk><input type=checkbox value="${esc(p.id)}"><span>${esc(p.nom)}</span></label>`).join("") || "<span class=mu>No hay profesores activos. Regístralos en Personal y Planillas.</span>"}</div></div>
+</div><div class="fgrp u-m-8-0-0" role="group" aria-labelledby=h_dl><span class=fgrp-l id=h_dl>Días de la semana</span><div class=dias>${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label class=chk><input type=checkbox class=h_dia value=${d}><span>${DIAS[d]}</span></label>`).join("")}</div></div><p class=mu>Se crea un horario por cada día y categoría elegidos. Se bloquean los cruces de profesores y de categorías.</p><div class=row><button data-f=addHor>Guardar horario</button></div></div><div class=card><div class=row><h3 class="u-m-0 u-flex-1">Calendario semanal</h3><select data-ch=horSede aria-label="Filtrar por sede">${o(S.sedes.map((s) => [s.id, s.nombre]), HFS, "Todas las sedes")}</select></div>${horCal()}</div>${
     sd.length
       ? `<div class=card><h3>Horarios sin día asignado</h3><p class=mu>Estos horarios son anteriores al calendario. Elige el día para incluirlos.</p>${tbl(
           ["Código", "Sede", "Deporte", "Categoría", "Horario", "Día"],
@@ -2874,7 +2879,7 @@ VW.horarios = () => {
       .map((h) => {
         const on = h.est !== "Inactivo",
           id = esc(h.id);
-        return `<tr><td>${id}</td><td>${esc(DIAS[h.dia] || "-")}</td><td>${esc(sn(h.sede))}</td><td>${esc(dn(h.dep))}</td><td>CAT-${esc(h.cat)}</td><td>${esc(h.ini)}-${esc(h.fin)}</td><td>${esc(h.profs.map(nomP).join(", "))}</td><td><span class="b ${on ? "ok" : "no"}">${on ? "Activo" : "Inactivo"}</span></td><td><button class="s g act" data-f=horEst data-i="${id}" title="${on ? "Desactivar" : "Activar"}" aria-label="${on ? "Desactivar" : "Activar"}">${on ? iac("block") : iac("check")}</button> <button class="s r act" data-f=delHor data-i="${id}" title="Quitar" aria-label="Quitar">${iac("trash")}</button></td></tr>`;
+        return `<tr><td>${id}</td><td>${esc(DIAS[h.dia] || "-")}</td><td>${esc(sn(h.sede))}</td><td>${esc(dn(h.dep))}</td><td>CAT-${esc(h.cat)}</td><td>${esc(h.ini)}-${esc(h.fin)}</td><td>${esc(h.profs.map(nomP).join(", "))}</td><td><span class="b ${on ? "ok" : "no"}">${on ? "Activo" : "Inactivo"}</span></td><td><button class="s act ${on ? "ban" : "g"}" data-f=horEst data-i="${id}" title="${on ? "Desactivar" : "Activar"}" aria-label="${on ? "Desactivar" : "Activar"}">${on ? iac("block") : iac("check")}</button> <button class="s r act" data-f=delHor data-i="${id}" title="Quitar" aria-label="Quitar">${iac("trash")}</button></td></tr>`;
       }),
   )}<div class=row><button class=g data-f=cp data-i=hor>Copiar para Excel</button></div></div>`;
 };
@@ -3036,7 +3041,7 @@ VW.mat = () => {
   const r = (k, x, t = "text", e = "") =>
     `<input id=m_${k} type=${t} value="${esc(x)}" data-r=1 class="${x ? "" : "bad"}" data-in=ck ${e}>`;
   adjInit(a);
-  return `<div class=card><h3>${ED ? "Ficha " + esc(ED) : PRE ? "Matrícula desde pre-registro (" + esc(PRE.modalidad) + ")" : "Nueva matrícula"} <span class=mu>· fecha ${esc(a.fecha || today())}</span></h3><p class=mu>Puedes guardar con datos pendientes: los campos en rojo se completan después.</p><div class=fg><h4 class=bh>Datos del alumno</h4>${fl("Nombres", `<input id=m_nom value="${esc(a.nom || "")}">`)}${fl("Apellidos", `<input id=m_ape value="${esc(a.ape || "")}">`)}${fl("DNI", r("dni", a.dni || "", "text", "maxlength=8 inputmode=numeric data-d=1"))}${fl("Sexo", "<select id=m_sex>" + o([["M", "Masculino"], ["F", "Femenino"]], a.sex) + "</select>")}${fl("Fecha de nacimiento", `<input id=m_nac type=date value="${esc(a.nac || "")}" data-ch=upHor>`)}${fl("Categoría y edad", '<b id=m_cat class="u-py-8">-</b>')}${fl("Foto del alumno", `<button type=button class="foto-box" id=foto_box data-f=adjFoto aria-label="Elegir foto del alumno">${fotoBox()}</button>`)}<h4 class=bh>Apoderado y contacto</h4>${fl("Seguro médico", r("seg", a.seg || ""))}${fl("Apoderado", r("an", a.an || ""))}${fl("Celular", r("ac", a.ac || "", "text", "maxlength=9 inputmode=numeric data-d=1"))}${fl("Correo", r("am", a.am || "", "email"))}${fl("Condición", "<select id=m_con>" + o(["Ninguna", "Media Beca", "Becado"].map((x) => [x, x]), a.con) + "</select>")}${fl("Modalidad", "<select id=m_mod>" + o(["Formativo", "Competitivo"].map((x) => [x, x]), a.mod) + "</select>")}${fl("Estado", "<select id=m_est>" + o(["Activo", "Inactivo"].map((x) => [x, x]), a.est) + "</select>")}<label class="chk wide"><input type=checkbox id=m_cons ${a.cons ? "checked" : ""}><span>Consentimiento de protección de datos personales (Ley N° 29733)</span></label><h4 class=bh>Inscripción, sede y horario</h4>${fl("Deporte", "<select id=m_dep data-ch=upHor>" + o(S.deportes.map((d) => [d.id, d.nombre]), a.dep) + "</select>")}${fl("Sede", "<select id=m_sed data-ch=upHor>" + o(S.sedes.map((d) => [d.id, d.nombre]), a.sede) + "</select>")}${fl("Horario", "<select id=m_hor></select>")}<h4 class=bh>Facturación y cronograma de cuotas</h4>${fl("Costo matrícula (S/)", `<input id=m_cm data-in=cron type=number min=0 value="${esc(a.cm)}">`)}${fl("Costo mensualidad (S/)", `<input id=m_cmen data-in=cron type=number min=0 value="${esc(a.cmen)}">`)}${fl("Plan / Meses contratados", `<input id=m_mes data-in=cron type=number min=0 value="${esc(a.mes)}">`)}${fl("Monto pagado (S/)", `<input id=m_pag data-in=cron type=number min=0 value="${esc(a.pag)}">`)}${fl("Monto a pagar hoy (S/)", `<input id=m_hoy type=number min=0 data-in=cron value="${esc(a.hoy ?? 0)}">`)}${fl("Método de pago", "<select id=m_mp>" + o([["Efectivo", "Efectivo"], ["Transferencia", "Transferencia"], ["Yape/Plin", "Yape/Plin"]], a.mp || "Efectivo") + "</select>")}</div><div class="cron"><b>Cronograma de cuotas generado automáticamente</b><div id=cron_t></div></div><div class=row id=ad_r>${adjBoton()}</div><div class=row><button data-f=matPay>Guardar matrícula</button><button class=g data-f=limpiarMat>Limpiar formulario</button><button class=g data-f=carnetMat>Generar carnet</button><button class=g data-f=qrPadres>QR para padres</button><button class=g data-f=go data-i=mat>Cancelar</button></div></div>`;
+  return `<div class=card><h3>${ED ? "Ficha " + esc(ED) : PRE ? "Matrícula desde pre-registro (" + esc(PRE.modalidad) + ")" : "Nueva matrícula"} <span class=mu>· fecha ${esc(a.fecha || today())}</span></h3><p class=mu>Puedes guardar con datos pendientes: los campos en rojo se completan después.</p><div class=msec><h4 class=bh><span class=mnum>1</span>Datos del alumno</h4><div class=mtop><div class=mleft><div class="fg mfields">${fl("Nombres", `<input id=m_nom value="${esc(a.nom || "")}">`)}${fl("Apellidos", `<input id=m_ape value="${esc(a.ape || "")}">`)}${fl("DNI", r("dni", a.dni || "", "text", "maxlength=8 inputmode=numeric data-d=1"))}${fl("Sexo", "<select id=m_sex>" + o([["M", "Masculino"], ["F", "Femenino"]], a.sex) + "</select>")}${fl("Fecha de nacimiento", `<input id=m_nac type=date value="${esc(a.nac || "")}" data-ch=upHor>`)}${fl("Categoría y edad", '<b id=m_cat class="u-py-8">-</b>')}${fl("Seguro médico", r("seg", a.seg || ""))}</div><label class="chk"><input type=checkbox id=m_cons ${a.cons ? "checked" : ""}><span>Consentimiento de protección de datos personales (Ley N° 29733)</span></label></div><div class=mfoto><span class=mfoto-l>Foto del alumno</span><button type=button class="foto-box" id=foto_box data-f=adjFoto aria-label="Elegir foto del alumno">${fotoBox()}</button></div></div></div><div class=msec><h4 class=bh><span class=mnum>2</span>Apoderado y contacto</h4><div class=fg>${fl("Apoderado", r("an", a.an || ""))}${fl("Celular", r("ac", a.ac || "", "text", "maxlength=9 inputmode=numeric data-d=1"))}${fl("Correo", r("am", a.am || "", "email"))}</div></div><div class=mcols><div class=msec><h4 class=bh><span class=mnum>3</span>Inscripción, sede y horario</h4><div class=fg>${fl("Deporte", "<select id=m_dep data-ch=upHor>" + o(S.deportes.map((d) => [d.id, d.nombre]), a.dep) + "</select>")}${fl("Sede", "<select id=m_sed data-ch=upHor>" + o(S.sedes.map((d) => [d.id, d.nombre]), a.sede) + "</select>")}${fl("Horario", "<select id=m_hor></select>")}${fl("Condición", "<select id=m_con>" + o(["Ninguna", "Media Beca", "Becado"].map((x) => [x, x]), a.con) + "</select>")}${fl("Modalidad", "<select id=m_mod>" + o(["Formativo", "Competitivo"].map((x) => [x, x]), a.mod) + "</select>")}${fl("Estado", "<select id=m_est>" + o(["Activo", "Inactivo"].map((x) => [x, x]), a.est) + "</select>")}</div></div><div class=msec><h4 class=bh><span class=mnum>4</span>Facturación y cronograma de cuotas</h4><div class=bill><div class=fg>${fl("Costo matrícula (S/)", `<input id=m_cm data-in=cron type=number min=0 value="${esc(a.cm)}">`)}${fl("Costo mensualidad (S/)", `<input id=m_cmen data-in=cron type=number min=0 value="${esc(a.cmen)}">`)}${fl("Plan / Meses contratados", `<input id=m_mes data-in=cron type=number min=0 value="${esc(a.mes)}">`)}${fl("Monto pagado (S/)", `<input id=m_pag data-in=cron type=number min=0 value="${esc(a.pag)}">`)}${fl("Monto a pagar hoy (S/)", `<input id=m_hoy type=number min=0 data-in=cron value="${esc(a.hoy ?? 0)}">`)}${fl("Método de pago", "<select id=m_mp>" + o([["Efectivo", "Efectivo"], ["Transferencia", "Transferencia"], ["Yape/Plin", "Yape/Plin"]], a.mp || "Efectivo") + "</select>")}</div><div class="cron"><b>Cronograma de cuotas generado automáticamente</b><div id=cron_t></div></div></div></div></div><div class=row id=ad_r>${adjBoton()}</div><div class=row><button data-f=matPay>Guardar matrícula</button><button class=g data-f=limpiarMat>Limpiar formulario</button><button class=g data-f=carnetMat>Generar carnet</button><button class=g data-f=qrPadres>QR para padres</button><button class=g data-f=go data-i=mat>Cancelar</button></div></div>`;
 };
 
 function upHor() {
@@ -3413,6 +3418,7 @@ function saveKit() {
   R();
 }
 function delKit(id) {
+  if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
   S.kits = S.kits.filter((k) => k.id !== id);
   S.caja = S.caja.filter((c) => c.k !== "kit|" + id);
   save();
