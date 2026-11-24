@@ -236,4 +236,51 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.locator('button[data-f="perTab"][data-i="p"]').click();
     await expect(page.getByRole('heading', { name: 'Pagos y liquidaciones de la semana', exact: true })).toBeVisible();
   });
+
+  test('Rechazar contrato con fecha de fin anterior al inicio sin guardar cambios', async () => {
+    await page.getByText('Personal y Planillas', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+    await page.locator('button[data-f="perTab"][data-i="c"]').click();
+    await expect(page.getByRole('heading', { name: 'Contratos del personal', exact: true })).toBeVisible();
+
+    const filas = page.locator('table tr');
+    expect(await filas.count()).toBeGreaterThan(1);
+    await filas.nth(1).getByRole('button', { name: 'Modificar', exact: true }).click();
+
+    await expect(page.locator('#p_fi')).toBeVisible();
+    await expect(page.locator('#p_ff')).toBeVisible();
+    await page.locator('#p_fi').fill('2026-11-24');
+    await page.locator('#p_ff').fill('2026-11-23');
+    await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+
+    await expect(page.locator('#toast')).toContainText('La fecha de fin no puede ser anterior al inicio');
+    await expect(page.locator('#p_fi')).toHaveValue('2026-11-24');
+    await expect(page.locator('#p_ff')).toHaveValue('2026-11-23');
+    await expect(page.getByRole('heading', { name: /Modificar PER-/ })).toBeVisible();
+
+    // Cancelar descarta los valores inválidos; no se persiste ningún cambio.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+  });
+
+  test('Consultar pagos y verificar importes sin modificar registros', async () => {
+    await page.getByText('Personal y Planillas', { exact: true }).first().click();
+    await page.locator('button[data-f="perTab"][data-i="p"]').click();
+    await expect(page.getByRole('heading', { name: 'Pagos y liquidaciones de la semana', exact: true })).toBeVisible();
+
+    const tabla = page.locator('table').last();
+    await expect(tabla.getByText('Pago semana (horas)', { exact: true })).toBeVisible();
+    await expect(tabla.getByText('Sueldo fijo (mensual)', { exact: true })).toBeVisible();
+    const filas = tabla.locator('tr');
+    expect(await filas.count()).toBeGreaterThan(1);
+
+    const importes = await filas.nth(1).locator('td').evaluateAll((celdas) =>
+      celdas.slice(3).map((celda) => celda.textContent?.trim() || '')
+    );
+    expect(importes.length).toBeGreaterThanOrEqual(4);
+    expect(importes.every((valor) => /^(S\/\s*)?-?[\d,.]+$/.test(valor))).toBeTruthy();
+    await expect(page.getByText(/Total pago por horas de la semana:/)).toBeVisible();
+    await expect(page.getByText(/Sueldos fijos mensuales:/)).toBeVisible();
+  });
+
 });
