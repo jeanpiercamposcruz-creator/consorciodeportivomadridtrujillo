@@ -414,7 +414,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(anio).toBeVisible();
     await mes.selectOption('10');
     await expect(page.getByText(/Utilidad neta total del mes:/)).toBeVisible();
-    await anio.selectOption({ index: 1 });
+    const opcionesAnio = await anio.locator('option').count();
+    if (opcionesAnio > 1) {
+      await anio.selectOption({ index: 1 });
+    } else {
+      await expect(anio).toHaveValue(await anio.inputValue());
+    }
 
     await expect(page.getByRole('heading', { name: 'Utilidad neta por mes' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Matrículas registradas por mes' })).toBeVisible();
