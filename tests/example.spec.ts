@@ -40,7 +40,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Validar formulario de nueva matrícula sin guardar datos', async () => {
-    await page.locator('[data-f="nav"]').filter({ hasText: 'Alumnos activos' }).first().click();
+    // La sesión inicia directamente en Alumnos activos; no hace falta volver a navegar.
+    await expect(page.getByText('Alumnos activos')).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
 
     await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
