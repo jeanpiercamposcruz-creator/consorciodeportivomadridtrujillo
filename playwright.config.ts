@@ -17,11 +17,11 @@ if (url) {
 
   const esQA =
     destino.hostname ===
-    'consorciodeportivomadridtrujillo-ao.vercel.app';
+    'consorciodeportivomadridtrujillo-aolm-git-auditor-d3ba91-marget.vercel.app';
 
   if (!esLocal && (!esQA || destino.protocol !== 'https:')) {
     throw new Error(
-      'Bloqueado: las pruebas solo pueden ejecutarse en localhost o en QA mediante HTTPS.'
+      'Bloqueado: las pruebas solo pueden ejecutarse en localhost o en el despliegue Preview autorizado de QA mediante HTTPS.'
     );
   }
 }
