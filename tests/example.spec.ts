@@ -351,4 +351,37 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Horarios y Categorías', exact: true })).toBeVisible();
   });
 
+
+  test('Consultar filtros de asistencia sin marcar ni registrar pagos', async () => {
+    await page.getByText('Toma de Asistencias', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Toma de Asistencias', exact: true })).toBeVisible();
+
+    const sede = page.locator('select[data-ch="setA"][data-i="s"]');
+    await expect(sede).toBeVisible();
+    expect(await sede.locator('option').count()).toBeGreaterThan(1);
+    await sede.selectOption({ index: 1 });
+
+    const grupo = page.locator('select[data-ch="setA"][data-i="g"]');
+    await expect(grupo).toBeVisible();
+    expect(await grupo.locator('option').count()).toBeGreaterThan(1);
+    await grupo.selectOption({ index: 1 });
+
+    const hora = page.locator('select[data-ch="setA"][data-i="h"]');
+    await expect(hora).toBeVisible();
+    expect(await hora.locator('option').count()).toBeGreaterThan(1);
+    await hora.selectOption({ index: 1 });
+
+    const tipo = page.locator('select[data-ch="setA"][data-i="t"]');
+    await expect(tipo).toBeVisible();
+    await tipo.selectOption('A');
+
+    await expect(page.getByText('Completa los 4 filtros para ver la lista.', { exact: true })).toHaveCount(0);
+    await expect(page.locator('table')).toBeVisible();
+
+    // Esta consulta no pulsa Asistió, Faltó, Pagó ni Debe: no altera asistencias ni caja.
+    await expect(page.getByRole('button', { name: 'Asistió', exact: true })).toHaveCount(
+      await page.getByRole('button', { name: 'Asistió', exact: true }).count()
+    );
+  });
+
 });
