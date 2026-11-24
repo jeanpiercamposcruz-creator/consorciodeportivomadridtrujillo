@@ -704,4 +704,91 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // Solo se cambiaron filtros de consulta; no se creó ni modificó ningún movimiento.
   });
 
+
+  test('Verificar que los horarios activos estén vinculados a entrenadores activos', async () => {
+    await page.getByText('Personal y Planillas', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+
+    const personalRows = await page.locator('#per_t table tr').evaluateAll((rows) =>
+      rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+    );
+    const entrenadoresActivos = new Set(
+      personalRows
+        .filter((row) => row[3] === 'ENT' && row[8] === 'Activo')
+        .map((row) => row[2])
+    );
+
+    await page.getByText('Horarios y Categorías', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Horarios y Categorías', exact: true })).toBeVisible();
+    const horarioRows = await page.locator('table').last().locator('tr').evaluateAll((rows) =>
+      rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+    );
+    const horariosActivos = horarioRows.filter((row) => row[7] === 'Activo');
+    expect(horariosActivos.length).toBeGreaterThan(0);
+
+    for (const horario of horariosActivos) {
+      const profesores = (horario[6] || '').split(',').map((nombre) => nombre.trim()).filter(Boolean);
+      expect(profesores.length, 'El horario ' + horario[0] + ' debe tener entrenador asignado').toBeGreaterThan(0);
+      for (const profesor of profesores) {
+        expect(
+          entrenadoresActivos.has(profesor),
+          'El entrenador "' + profesor + '" del horario ' + horario[0] + ' debe existir y estar activo en Personal'
+        ).toBeTruthy();
+      }
+    }
+  });
+
+  test('Verificar que la lista de asistencia solo incluya alumnos activos del grupo y sede seleccionados', async () => {
+    await page.getByText('Directorio de Alumnos', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+
+    const directorio = await page.locator('table').last().locator('tr').evaluateAll((rows) =>
+      rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+    );
+    const alumnosActivos = new Map(
+      directorio
+        .filter((row) => row[7] === 'Activo')
+        .map((row) => [row[1].replace(/\\s+/g, ' ').trim(), { sede: row[3], deporte: row[4], categoria: row[5] }])
+    );
+
+    await page.getByText('Toma de Asistencias', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Toma de Asistencias', exact: true })).toBeVisible();
+
+    const sede = page.locator('select[data-ch="setA"][data-i="s"]');
+    await expect(sede).toBeVisible();
+    const sedesDisponibles = await sede.locator('option').count();
+    expect(sedesDisponibles).toBeGreaterThan(1);
+    await sede.selectOption({ index: 1 });
+    const sedeNombre = (await sede.locator('option:checked').textContent())?.trim() || '';
+
+    const grupo = page.locator('select[data-ch="setA"][data-i="g"]');
+    await expect(grupo).toBeVisible();
+    expect(await grupo.locator('option').count()).toBeGreaterThan(1);
+    await grupo.selectOption({ index: 1 });
+    const grupoValor = await grupo.inputValue();
+    const [deporteId, categoria] = grupoValor.split('|');
+
+    const deportes = await page.getByText('Directorio de Alumnos', { exact: true }).count();
+    expect(deportes).toBeGreaterThanOrEqual(0);
+    const nombreDeporte = (await grupo.locator('option:checked').textContent())?.trim() || '';
+
+    const hora = page.locator('select[data-ch="setA"][data-i="h"]');
+    await expect(hora).toBeVisible();
+    expect(await hora.locator('option').count()).toBeGreaterThan(1);
+    await hora.selectOption({ index: 1 });
+    await page.locator('select[data-ch="setA"][data-i="t"]').selectOption('A');
+
+    const filasAsistencia = await page.locator('table').last().locator('tr').evaluateAll((rows) =>
+      rows.slice(1).map((row) => row.querySelector('td')?.textContent?.replace(/\\s+/g, ' ').trim() || '')
+    );
+    for (const nombre of filasAsistencia) {
+      const alumno = alumnosActivos.get(nombre);
+      expect(alumno, 'El alumno "' + nombre + '" debe existir y estar activo en el Directorio').toBeDefined();
+      expect(alumno!.sede, 'La sede del alumno "' + nombre + '" debe coincidir con la seleccionada').toBe(sedeNombre);
+      expect(alumno!.deporte, 'El deporte del alumno "' + nombre + '" debe coincidir con el grupo ' + nombreDeporte + ' (' + deporteId + ')').toContain(nombreDeporte.split(' ')[0]);
+      expect(alumno!.categoria, 'La categoría del alumno "' + nombre + '" debe coincidir con el grupo seleccionado').toBe(categoria);
+    }
+    // La prueba solo consulta el directorio y la lista; no marca asistencia ni pagos.
+  });
+
 });
