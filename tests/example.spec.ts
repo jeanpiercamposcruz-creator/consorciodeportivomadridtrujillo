@@ -448,4 +448,19 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('button', { name: 'Actualizar', exact: true })).toBeVisible();
   });
 
+
+  test('Abrir directamente Matrículas y Alumnos y revisar formulario sin guardar', async () => {
+    await page.getByText('Matrículas y Alumnos', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Matrículas y Alumnos', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/ })).toBeVisible();
+
+    await expect(page.locator('#m_nom')).toBeVisible();
+    await expect(page.locator('#m_ape')).toBeVisible();
+    await expect(page.locator('#m_dni')).toBeVisible();
+    await expect(page.locator('#m_dep')).toBeVisible();
+    await expect(page.locator('#m_sed')).toBeVisible();
+
+    // Solo se inspecciona el formulario; no se pulsa Guardar matrícula.
+  });
+
 });
