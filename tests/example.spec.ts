@@ -41,7 +41,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
   test('Validar formulario de nueva matrícula sin guardar datos', async () => {
     // El inicio es el dashboard. Entramos al módulo Directorio de Alumnos desde su acceso directo.
-    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await page.locator('button[data-f="nav"][data-i="dir"]').click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
 
@@ -60,7 +60,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Rechazar nombres inválidos sin guardar matrícula', async () => {
-    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await page.locator('button[data-f="nav"][data-i="dir"]').click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
 
@@ -73,13 +73,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.locator('#m_nom')).toHaveValue('123');
 
     // Salimos sin guardar: la prueba no crea ni modifica alumnos.
-    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await page.locator('button[data-f="nav"][data-i="dir"]').click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
   test('Buscar alumnos sin modificar registros', async () => {
     // Volvemos al directorio desde el menú lateral; la búsqueda solo filtra la vista.
-    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await page.locator('button[data-f="nav"][data-i="dir"]').click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
 
     // La función tbl() coloca también el encabezado dentro de tbody; contamos todas las filas.
@@ -108,7 +108,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   test('Abrir ficha de alumno y cancelar sin guardar cambios', async () => {
     const encabezadoDirectorio = page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true });
     if (!(await encabezadoDirectorio.isVisible())) {
-      await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+      await page.locator('button[data-f="nav"][data-i="dir"]').click();
     }
     await expect(encabezadoDirectorio).toBeVisible();
 
