@@ -39,6 +39,25 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByText('Alumnos activos')).toBeVisible();
   });
 
+  test('Validar formulario de nueva matrícula sin guardar datos', async () => {
+    await page.locator('[data-f="nav"][data-i="dir"]').first().click();
+    await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+    await expect(page.locator('#m_nom')).toBeVisible();
+    await expect(page.locator('#m_ape')).toBeVisible();
+    await expect(page.locator('#m_dni')).toBeVisible();
+    await expect(page.locator('#m_sed')).toBeVisible();
+    await expect(page.locator('#m_dep')).toBeVisible();
+
+    // El formulario vacío debe mostrar validación y no crear ningún registro.
+    await page.getByRole('button', { name: 'Guardar matrícula' }).click();
+    await expect(page.locator('#toast')).toHaveText(
+      'Nombres o apellidos inválidos (solo letras)'
+    );
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+  });
+
   test('Navegar al modulo de Sedes y Alquileres', async () => {
     // El menú y el encabezado pueden compartir el mismo texto.
     // Selecciona la primera coincidencia para navegar y valida el encabezado por rol.
