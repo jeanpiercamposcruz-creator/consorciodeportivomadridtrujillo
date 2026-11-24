@@ -378,10 +378,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByText('Completa los 4 filtros para ver la lista.', { exact: true })).toHaveCount(0);
     await expect(page.locator('table')).toBeVisible();
 
-    // Esta consulta no pulsa Asistió, Faltó, Pagó ni Debe: no altera asistencias ni caja.
-    await expect(page.getByRole('button', { name: 'Asistió', exact: true })).toHaveCount(
-      await page.getByRole('button', { name: 'Asistió', exact: true }).count()
-    );
+    // Esta consulta solo cambia filtros; no pulsa Asistió, Faltó, Pagó ni Debe.
   });
 
 });
