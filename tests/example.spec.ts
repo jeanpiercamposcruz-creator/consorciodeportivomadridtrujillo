@@ -59,6 +59,24 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
   });
 
+  test('Rechazar nombres inválidos sin guardar matrícula', async () => {
+    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+
+    await page.locator('#m_nom').fill('123');
+    await page.locator('#m_ape').fill('Prueba QA');
+    await page.getByRole('button', { name: 'Guardar matrícula' }).click();
+
+    await expect(page.locator('#toast')).toContainText('Nombres o apellidos inválidos');
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+    await expect(page.locator('#m_nom')).toHaveValue('123');
+
+    // Salimos sin guardar: la prueba no crea ni modifica alumnos.
+    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+  });
+
   test('Buscar alumnos sin modificar registros', async () => {
     // Volvemos al directorio desde el menú lateral; la búsqueda solo filtra la vista.
     await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
