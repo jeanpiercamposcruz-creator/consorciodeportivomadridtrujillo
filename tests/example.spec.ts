@@ -427,14 +427,25 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
-  test('Rechazar pre-registro público vacío sin enviar solicitudes', async () => {
-    await page.goto(url + '#prereg');
-    await expect(page.getByRole('heading', { name: 'Pre-registro de alumno', exact: true })).toBeVisible();
+  test('Consultar pre-registros y filtrar sin aceptar ni eliminar solicitudes', async () => {
+    await page.getByRole('button', { name: /PRE-REGISTRO/ }).click();
+    const buscador = page.getByPlaceholder('Nombre, DNI o apoderado', { exact: true });
+    await expect(buscador).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Actualizar', exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Enviar pre-registro', exact: true }).click();
-    await expect(page.locator('#toast')).toBeVisible();
-    await expect(page.locator('#toast')).not.toBeEmpty();
-    await expect(page.getByRole('heading', { name: 'Pre-registro de alumno', exact: true })).toBeVisible();
+    const filas = page.locator('#pt table tr');
+    await buscador.fill('QA_PRE_REGISTRO_INEXISTENTE_938472');
+    await expect(filas).toHaveCount(2);
+    await expect(page.getByText('Sin registros todavía.', { exact: true })).toBeVisible();
+
+    await buscador.fill('');
+    const modalidad = page.locator('select[data-ch="preM"]');
+    await expect(modalidad).toBeVisible();
+    await modalidad.selectOption('Virtual');
+    await expect(filas).toBeVisible();
+
+    // No se pulsan Aceptar ni Eliminar; solo se consulta y filtra la lista.
+    await expect(page.getByRole('button', { name: 'Actualizar', exact: true })).toBeVisible();
   });
 
 });
