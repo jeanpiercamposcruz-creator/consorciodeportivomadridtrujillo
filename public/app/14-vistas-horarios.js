@@ -282,8 +282,14 @@ async function saveAlu() {
   if (d.dni && S.alu.some((x) => x.dni === d.dni && x.id !== ED))
     return toast("Ese DNI ya está registrado");
   const id = old ? old.id : nid(),
-    delta = d.pag - (old ? old.pag : 0),
+    delta = Math.round((d.pag - (old ? old.pag : 0)) * 100) / 100,
     dc = { qt: old && old.qt ? old.qt : tok() };
+  if (delta < 0) {
+    const reversas = calcularReversionesCaja(S.caja, id, -delta);
+    const disponible = reversas.reduce((s, x) => s + x.monto, 0);
+    if (Math.abs(disponible + delta) > 0.009)
+      return toast("No se puede reducir el pago: los ingresos originales disponibles en caja no cubren la reversión.");
+  }
   try {
     await adjCommit(id);
   } catch (e) {
@@ -297,15 +303,31 @@ async function saveAlu() {
     id,
     S.alu.find((x) => x.id === id),
   );
-  if (delta > 0)
+  if (delta > 0) {
     S.caja.push({
+      _id: uid(),
       f: today(),
       sede: d.sede,
       t: "I",
       c: "Matrícula / mensualidad",
       d: id,
       m: delta,
+      k: "matricula:" + id,
     });
+  } else if (delta < 0) {
+    calcularReversionesCaja(S.caja, id, -delta).forEach((x) => {
+      S.caja.push({
+        _id: uid(),
+        f: today(),
+        sede: d.sede,
+        t: "E",
+        c: "Reversión de pago de matrícula",
+        d: id,
+        m: x.monto,
+        k: "reversion:" + x.originalId,
+      });
+    });
+  }
   save();
   adjLimpiar(id);
   const pf = falta(d);
@@ -335,23 +357,57 @@ const addMes = (f, n) => {
   x.setUTCDate(Math.min(d, ult));
   return x.toISOString().slice(0, 10);
 };
-/* Cuotas = meses contratados × mensualidad. El monto pagado cubre primero la matrícula y luego las cuotas en orden. */
+/* Distribuye el pago primero a matrícula y luego a cuotas en orden cronológico. */
 function cronograma(a) {
   const n = Math.min(36, Math.max(0, parseInt(a.mes) || 0)),
-    m = +a.cmen || 0,
+    m = Math.max(0, Math.round((+a.cmen || 0) * 100) / 100),
+    matricula = Math.max(0, Math.round((+a.cm || 0) * 100) / 100),
     base = a.fecha || today(),
     r = [];
-  let resto = Math.max(0, (+a.pag || 0) - (+a.cm || 0));
+  let resto = Math.max(0, Math.round((+a.pag || 0) * 100) / 100),
+    pagadoMatricula = Math.min(matricula, resto);
+  resto = Math.round((resto - pagadoMatricula) * 100) / 100;
   for (let i = 1; i <= n; i++) {
-    const ok = resto >= m;
-    if (ok) resto -= m;
-    r.push({ n: i, f: addMes(base, i), m, e: ok ? "Pagada" : "Pendiente" });
+    const abonado = Math.min(m, resto),
+      saldo = Math.round((m - abonado) * 100) / 100,
+      e = saldo <= 0.009 ? "Pagada" : abonado > 0 ? "Parcial" : "Pendiente";
+    resto = Math.round((resto - abonado) * 100) / 100;
+    r.push({ n: i, f: addMes(base, i), m, a: abonado, s: saldo, e });
   }
-  return r;
+  return { cuotas: r, matricula: { m: matricula, a: pagadoMatricula, s: Math.round((matricula - pagadoMatricula) * 100) / 100 } };
 }
 function regenCuotas(id, a) {
-  S.cuotas = S.cuotas.filter((c) => c.aid !== id);
-  cronograma(a).forEach((c) => S.cuotas.push({ id: `CUO-${id}-${c.n}`, aid: id, ...c }));
+  const plan = cronograma(a).cuotas;
+  for (const c of plan) {
+    const existente = S.cuotas.find((x) => x.aid === id && +x.n === c.n);
+    if (existente) Object.assign(existente, c, { e: c.e });
+    else S.cuotas.push({ id: `CUO-${id}-${c.n}`, aid: id, ...c });
+  }
+  // No se eliminan cuotas históricas si se reduce el número de meses contratado.
+  S.cuotas.filter((x) => x.aid === id && !plan.some((c) => c.n === +x.n)).forEach((x) => {
+    x.e = "Anulada";
+  });
+}
+/* Calcula cuánto puede revertirse de cada ingreso, sin alterar ni borrar movimientos previos. */
+function calcularReversionesCaja(caja, alumnoId, importe) {
+  let pendiente = Math.round(Math.max(0, importe) * 100) / 100;
+  const ingresos = caja.filter((x) => x.d === alumnoId && x.t === "I" &&
+    (x.c === "Matrícula / mensualidad" || x.k === "matricula:" + alumnoId));
+  const resultado = [];
+  for (const ingreso of ingresos.slice().reverse()) {
+    const originalId = ingreso._id || (ingreso._id = uid());
+    const revertido = caja.filter((x) => x.t === "E" && x.k === "reversion:" + originalId)
+      .reduce((s, x) => s + (+x.m || 0), 0);
+    const disponible = Math.max(0, Math.round(((+ingreso.m || 0) - revertido) * 100) / 100);
+    const monto = Math.min(disponible, pendiente);
+    if (monto > 0.009) {
+      resultado.push({ originalId, monto: Math.round(monto * 100) / 100 });
+      pendiente = Math.round((pendiente - monto) * 100) / 100;
+    }
+    if (pendiente <= 0.009) break;
+  }
+  if (pendiente > 0.009) resultado.push({ originalId: "", monto: -pendiente });
+  return resultado;
 }
 function cronRender() {
   const t = $("#cron_t");
@@ -364,17 +420,18 @@ function cronRender() {
       mes: v("m_mes"),
       pag: v("m_pag"),
     },
-    c = cronograma(a),
-    tot = (+a.cm || 0) + c.reduce((s, x) => s + x.m, 0),
+    plan = cronograma(a),
+    c = plan.cuotas,
+    tot = plan.matricula.m + c.reduce((s, x) => s + x.m, 0),
     hoy = today();
   t.innerHTML =
     tbl(
-      ["Cuota #", "Fecha venc.", "Monto S/", "Estado"],
+      ["Cuota #", "Fecha venc.", "Importe S/", "Abonado S/", "Saldo S/", "Estado"],
       c.map((x) => {
-        const venc = x.e === "Pendiente" && x.f < hoy;
-        return `<tr><td>${x.n}</td><td>${esc(x.f)}</td><td>${money(x.m)}</td><td><span class="b ${x.e === "Pagada" ? "ok" : "no"}">${venc ? "Vencida" : x.e}</span></td></tr>`;
+        const venc = x.e !== "Pagada" && x.f < hoy;
+        return `<tr><td>${x.n}</td><td>${esc(x.f)}</td><td>${money(x.m)}</td><td>${money(x.a)}</td><td>${money(x.s)}</td><td><span class="b ${x.e === "Pagada" ? "ok" : x.e === "Parcial" ? "wa" : "no"}">${venc && x.e !== "Parcial" ? "Vencida" : x.e}</span></td></tr>`;
       }),
-    ) + `<p><b>Monto total proyectado: ${money(tot)}</b> <span class=mu>(matrícula + cuotas)</span></p>`;
+    ) + `<p><b>Matrícula: ${money(plan.matricula.m)}</b> · Abonado: ${money(plan.matricula.a)} · Saldo: ${money(plan.matricula.s)}</p><p><b>Monto total proyectado: ${money(tot)}</b> <span class=mu>(matrícula + cuotas)</span></p>`;
 }
 /* "Monto a pagar hoy" y "Monto pagado" se mantienen coherentes; el flujo de caja sigue usando Monto pagado. */
 function cronSync(el) {
