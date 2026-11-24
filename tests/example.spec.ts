@@ -105,6 +105,26 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
+  test('Filtrar alumnos por estado y restablecer filtros', async () => {
+    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+
+    const filas = page.locator('#dt table tr');
+    const cantidadInicial = await filas.count();
+    await page.getByLabel('Estado').selectOption('Activo');
+
+    const estadosVisibles = await filas.evaluateAll((rows) =>
+      rows.slice(1).map((row) => row.querySelectorAll('td')[7]?.textContent?.trim() || '')
+        .filter(Boolean)
+    );
+    expect(estadosVisibles.length).toBeGreaterThan(0);
+    expect(estadosVisibles.every((estado) => estado === 'Activo')).toBeTruthy();
+
+    await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click();
+    await expect(page.getByLabel('Estado')).toHaveValue('');
+    await expect(filas).toHaveCount(cantidadInicial);
+  });
+
   test('Buscar alumnos sin modificar registros', async () => {
     // Volvemos al directorio desde el menú lateral; la búsqueda solo filtra la vista.
     await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
