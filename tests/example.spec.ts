@@ -213,12 +213,27 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Nuevo centro de costo', exact: true })).toBeVisible();
   });
 
-  test('Navegar al modulo de Personal y Planillas', async () => {
-    // El menú y el encabezado pueden compartir el mismo texto.
+  test('Consultar personal, buscar y revisar pestañas sin modificar datos', async () => {
     await page.getByText('Personal y Planillas', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
 
-    await expect(
-      page.getByRole('heading', { name: 'Personal y Planillas', exact: true })
-    ).toBeVisible();
+    const buscador = page.getByPlaceholder('Buscar por DNI, nombre, cargo o especialidad...', { exact: true });
+    const filas = page.locator('#per_t table tr');
+    await expect(buscador).toBeVisible();
+    const cantidadInicial = await filas.count();
+    expect(cantidadInicial).toBeGreaterThan(2);
+
+    await buscador.fill('QA_PERSONAL_INEXISTENTE_9342');
+    await expect(filas).toHaveCount(2);
+    await expect(page.getByText('Sin registros todavía.', { exact: true })).toBeVisible();
+
+    await buscador.fill('');
+    await expect(filas).toHaveCount(cantidadInicial);
+
+    await page.locator('button[data-f="perTab"][data-i="c"]').click();
+    await expect(page.getByRole('heading', { name: 'Contratos del personal', exact: true })).toBeVisible();
+
+    await page.locator('button[data-f="perTab"][data-i="p"]').click();
+    await expect(page.getByRole('heading', { name: 'Pagos y liquidaciones de la semana', exact: true })).toBeVisible();
   });
 });
