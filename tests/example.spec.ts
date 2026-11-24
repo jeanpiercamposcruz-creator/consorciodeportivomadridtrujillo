@@ -59,6 +59,25 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
   });
 
+  test('Buscar alumnos sin modificar registros', async () => {
+    // Volvemos al directorio desde el menú lateral; la búsqueda solo filtra la vista.
+    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+
+    const filas = page.locator('#dt tbody tr');
+    const cantidadInicial = await filas.count();
+    const buscador = page.locator('#q');
+    await expect(buscador).toBeVisible();
+    await buscador.fill('QA_BUSQUEDA_SIN_RESULTADOS_938472');
+    await expect(filas).toHaveCount(0);
+
+    await buscador.fill('');
+    await expect(filas).toHaveCount(cantidadInicial);
+    await expect(page.getByLabel('Sede')).toBeVisible();
+    await expect(page.getByLabel('Deporte')).toBeVisible();
+    await expect(page.getByLabel('Estado')).toBeVisible();
+  });
+
   test('Navegar al modulo de Sedes y Alquileres', async () => {
     // El menú y el encabezado pueden compartir el mismo texto.
     // Selecciona la primera coincidencia para navegar y valida el encabezado por rol.
