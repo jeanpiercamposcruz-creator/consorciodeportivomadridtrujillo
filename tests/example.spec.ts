@@ -381,4 +381,25 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // Esta consulta solo cambia filtros; no pulsa Asistió, Faltó, Pagó ni Debe.
   });
 
+
+  test('Rechazar venta de indumentaria sin alumno seleccionado', async () => {
+    await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+
+    await page.locator('#k_a').fill('');
+    await page.getByRole('button', { name: 'Registrar venta', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Elige un alumno');
+    await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+  });
+
+  test('Rechazar movimiento de caja sin monto válido', async () => {
+    await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
+    await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();
+
+    await page.locator('#c_m').fill('');
+    await page.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Monto inválido');
+    await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();
+  });
+
 });
