@@ -84,11 +84,11 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const dniExistente = await page.locator('#dt table tr').evaluateAll((rows) => {
       for (const row of rows.slice(1)) {
         const dni = row.querySelectorAll('td')[2]?.textContent?.trim() || '';
-        if (/^\\d{8}$/.test(dni)) return dni;
+        if (/^\d{8}$/.test(dni)) return dni;
       }
       return '';
     });
-    expect(dniExistente).toMatch(/^\\d{8}$/);
+    expect(dniExistente).toMatch(/^\d{8}$/);
 
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
     await page.locator('#m_nom').fill('Prueba');
