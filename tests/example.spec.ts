@@ -577,8 +577,9 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   test('Rechazar certificación del personal sin nombre', async () => {
     await page.getByText('Personal y Planillas', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+    await page.locator('button[data-f="perTab"][data-i="d"]').click();
 
-    const fila = page.locator('#per_t table tr').nth(1);
+    const fila = page.locator('table tr').nth(1);
     await fila.getByRole('button', { name: 'Modificar', exact: true }).click();
     await expect(page.locator('#pc_c')).toBeVisible();
     await expect(page.locator('#pc_e')).toBeVisible();
