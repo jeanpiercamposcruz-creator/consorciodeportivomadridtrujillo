@@ -40,10 +40,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Navegar al modulo de Sedes y Alquileres', async () => {
-    await page.getByText('Sedes y Alquileres').click();
+    // El menú y el encabezado pueden compartir el mismo texto.
+    // Selecciona la primera coincidencia para navegar y valida el encabezado por rol.
+    await page.getByText('Sedes y Alquileres', { exact: true }).first().click();
 
-    await expect(page.getByText('Sedes y Alquileres'))
-      .toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Sedes y Alquileres', exact: true })
+    ).toBeVisible();
   });
 
   test('Navegar al modulo de Personal y Planillas', async () => {
