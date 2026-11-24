@@ -99,6 +99,17 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       } }).__qaSearchDiagnostics,
       inputEncontrado: document.querySelector('[data-in="dirQ"]')?.getAttribute('data-qa-found'),
       filas: document.querySelectorAll('#dt tbody tr').length,
+      filtroEstado: (() => {
+        try {
+          return {
+            consulta: (0, eval)('DF.q'),
+            resultadosFiltrados: (0, eval)('dirL().length'),
+            totalAlumnos: (0, eval)('S.alu.length'),
+          };
+        } catch (error) {
+          return { error: String(error) };
+        }
+      })(),
     }));
     console.log('DIAGNÓSTICO BÚSQUEDA QA:', JSON.stringify({ diagnostico, erroresPagina }));
     await expect(filas).toHaveCount(0);
