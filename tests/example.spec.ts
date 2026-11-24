@@ -791,4 +791,60 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // La prueba solo consulta el directorio y la lista; no marca asistencia ni pagos.
   });
 
+
+  test('Verificar importes y estados del cronograma frente a matrícula y pagos', async () => {
+    await page.getByText('Directorio de Alumnos', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+
+    const primeraFila = page.locator('#dt table tr').nth(1);
+    const codigo = (await primeraFila.locator('td').first().innerText()).trim();
+    expect(codigo).not.toBe('');
+    await primeraFila.getByRole('button', { name: 'Abrir', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Ficha ' + codigo, exact: false })).toBeVisible();
+
+    const matricula = Number(await page.locator('#m_cm').inputValue());
+    const mensualidad = Number(await page.locator('#m_cmen').inputValue());
+    const meses = Number(await page.locator('#m_mes').inputValue());
+    const pagado = Number(await page.locator('#m_pag').inputValue());
+    for (const valor of [matricula, mensualidad, meses, pagado]) {
+      expect(Number.isFinite(valor)).toBeTruthy();
+      expect(valor).toBeGreaterThanOrEqual(0);
+    }
+
+    const filas = page.locator('#cron_t table tr');
+    const datos = await filas.evaluateAll((rows) =>
+      rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+    );
+    const mesesEsperados = Math.min(36, Math.max(0, Math.trunc(meses)));
+    expect(datos).toHaveLength(mesesEsperados);
+
+    const numero = (texto: string) => Number(texto.replace(/[^\\d.-]/g, ''));
+    let saldoAplicable = Math.max(0, pagado - matricula);
+    let totalCuotas = 0;
+    let cuotasPagadas = 0;
+
+    for (const [indice, fila] of datos.entries()) {
+      expect(fila[0]).toBe(String(indice + 1));
+      expect(Math.abs(numero(fila[2]) - mensualidad)).toBeLessThanOrEqual(0.011);
+      totalCuotas += numero(fila[2]);
+      if (saldoAplicable >= mensualidad && mensualidad > 0) {
+        saldoAplicable = Math.round((saldoAplicable - mensualidad) * 100) / 100;
+        cuotasPagadas++;
+        expect(fila[3]).toBe('Pagada');
+      } else {
+        expect(['Pendiente', 'Vencida']).toContain(fila[3]);
+      }
+    }
+
+    const totalProyectado = matricula + totalCuotas;
+    const resumen = await page.locator('#cron_t').innerText();
+    expect(resumen).toContain('Monto total proyectado:');
+    expect(Math.abs(totalProyectado - (matricula + mensualidad * mesesEsperados))).toBeLessThanOrEqual(0.011);
+    expect(cuotasPagadas).toBeLessThanOrEqual(mesesEsperados);
+
+    // No se modifica ningún campo ni se guarda la ficha; solo se contrasta el cronograma visible.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+  });
+
 });
