@@ -640,4 +640,65 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // Solo se inspecciona el formulario; no se pulsa Guardar matrícula.
   });
 
+
+  test('Verificar consistencia de ingresos y egresos entre Caja y Dashboard Gerencial', async () => {
+    const ahora = new Date();
+    const anio = String(ahora.getFullYear());
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+
+    // Consultamos Caja por sede y acumulamos solo movimientos del mes actual.
+    await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Caja Chica y Finanzas', exact: true })).toBeVisible();
+
+    const selectorSede = page.locator('select[data-ch="asCs"]');
+    await expect(selectorSede).toBeVisible();
+    const sedes = await selectorSede.locator('option').evaluateAll((options) =>
+      options.filter((option) => option.value).map((option) => ({ id: option.value, nombre: option.textContent?.trim() || '' }))
+    );
+    expect(sedes.length).toBeGreaterThan(0);
+
+    const totalesCaja = new Map<string, { ingresos: number; egresos: number }>();
+    const numero = (texto: string) => Number(texto.replace(/[^\d.-]/g, ''));
+
+    for (const sede of sedes) {
+      await selectorSede.selectOption(sede.id);
+      const filas = await page.locator('table').last().locator('tr').evaluateAll((rows) =>
+        rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+      );
+      let ingresos = 0;
+      let egresos = 0;
+      for (const fila of filas) {
+        if (!fila[0]?.startsWith(anio + '-' + mes)) continue;
+        const monto = numero(fila[4] || '');
+        if (fila[1] === 'Ingreso') ingresos += monto;
+        if (fila[1] === 'Egreso') egresos += monto;
+      }
+      totalesCaja.set(sede.nombre, { ingresos, egresos });
+    }
+
+    // El Dashboard calcula esos mismos importes desde caja_movimientos.
+    await page.getByText('Dashboard Gerencial', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Dashboard Gerencial', exact: true })).toBeVisible();
+    await page.locator('select[data-ch="setGMm"]').selectOption(mes);
+    await page.locator('select[data-ch="setGMy"]').selectOption(anio);
+
+    const tablaBalance = page.locator('table').filter({
+      has: page.getByRole('columnheader', { name: 'Ingresos', exact: true }),
+    }).first();
+    await expect(tablaBalance).toBeVisible();
+    const balance = await tablaBalance.locator('tr').evaluateAll((rows) =>
+      rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+    );
+    expect(balance.length).toBeGreaterThan(0);
+
+    for (const fila of balance) {
+      const sede = fila[0];
+      const caja = totalesCaja.get(sede);
+      expect(caja, 'La sede del Dashboard debe existir en el selector de Caja: ' + sede).toBeDefined();
+      expect(Math.abs(numero(fila[1] || '') - caja!.ingresos)).toBeLessThanOrEqual(0.011);
+      expect(Math.abs(numero(fila[5] || '') - caja!.egresos)).toBeLessThanOrEqual(0.011);
+    }
+    // Solo se cambiaron filtros de consulta; no se creó ni modificó ningún movimiento.
+  });
+
 });
