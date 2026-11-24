@@ -402,4 +402,23 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();
   });
 
+
+  test('Consultar dashboard gerencial y cambiar periodo sin modificar datos', async () => {
+    await page.getByText('Dashboard Gerencial', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Dashboard Gerencial', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Balance de utilidad por sede', exact: true })).toBeVisible();
+
+    const mes = page.locator('select[data-ch="setGMm"]');
+    const anio = page.locator('select[data-ch="setGMy"]');
+    await expect(mes).toBeVisible();
+    await expect(anio).toBeVisible();
+    await mes.selectOption('10');
+    await expect(page.getByText(/Utilidad neta total del mes:/)).toBeVisible();
+    await anio.selectOption({ index: 1 });
+
+    await expect(page.getByRole('heading', { name: 'Utilidad neta por mes' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Matrículas registradas por mes' })).toBeVisible();
+    await expect(page.getByText(/Balance de utilidad por sede/)).toBeVisible();
+  });
+
 });
