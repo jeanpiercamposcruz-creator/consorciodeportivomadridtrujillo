@@ -72,8 +72,35 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const cantidadInicial = await filas.count();
     expect(cantidadInicial).toBeGreaterThan(0);
 
+    const erroresPagina: string[] = [];
+    page.on('pageerror', (error) => erroresPagina.push(error.message));
+    await page.evaluate(() => {
+      const input = document.querySelector<HTMLInputElement>('[data-in="dirQ"]');
+      const tabla = document.querySelector<HTMLElement>('#dt');
+      const diag = { eventos: 0, mutaciones: 0, target: '', atributo: '', valor: '' };
+      document.addEventListener('input', (event) => {
+        diag.eventos++;
+        diag.target = (event.target as HTMLElement)?.tagName || '';
+        diag.atributo = (event.target as HTMLElement)?.getAttribute('data-in') || '';
+        diag.valor = (event.target as HTMLInputElement)?.value || '';
+      }, true);
+      if (tabla) new MutationObserver(() => { diag.mutaciones++; })
+        .observe(tabla, { childList: true, subtree: true });
+      (window as typeof window & { __qaSearchDiagnostics?: typeof diag }).__qaSearchDiagnostics = diag;
+      if (input) input.dataset.qaFound = 'yes';
+    });
+
     await buscador.fill('QA_BUSQUEDA_SIN_RESULTADOS_938472');
     await expect(buscador).toHaveValue('QA_BUSQUEDA_SIN_RESULTADOS_938472');
+    await page.waitForTimeout(150);
+    const diagnostico = await page.evaluate(() => ({
+      ...(window as typeof window & { __qaSearchDiagnostics?: {
+        eventos: number; mutaciones: number; target: string; atributo: string; valor: string;
+      } }).__qaSearchDiagnostics,
+      inputEncontrado: document.querySelector('[data-in="dirQ"]')?.getAttribute('data-qa-found'),
+      filas: document.querySelectorAll('#dt tbody tr').length,
+    }));
+    console.log('DIAGNÓSTICO BÚSQUEDA QA:', JSON.stringify({ diagnostico, erroresPagina }));
     await expect(filas).toHaveCount(0);
 
     await buscador.fill('');
