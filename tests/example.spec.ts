@@ -64,58 +64,23 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
 
-    const filas = page.locator('#dt tbody tr');
+    // La función tbl() coloca también el encabezado dentro de tbody; contamos todas las filas.
+    const filasTabla = page.locator('#dt table tr');
     const buscador = page.getByPlaceholder('Ej. Luis, 71234567 o 260001', { exact: true });
     await expect(buscador).toHaveCount(1);
     await expect(buscador).toBeVisible();
 
-    const cantidadInicial = await filas.count();
-    expect(cantidadInicial).toBeGreaterThan(0);
-
-    const erroresPagina: string[] = [];
-    page.on('pageerror', (error) => erroresPagina.push(error.message));
-    await page.evaluate(() => {
-      const input = document.querySelector<HTMLInputElement>('[data-in="dirQ"]');
-      const tabla = document.querySelector<HTMLElement>('#dt');
-      const diag = { eventos: 0, mutaciones: 0, target: '', atributo: '', valor: '' };
-      document.addEventListener('input', (event) => {
-        diag.eventos++;
-        diag.target = (event.target as HTMLElement)?.tagName || '';
-        diag.atributo = (event.target as HTMLElement)?.getAttribute('data-in') || '';
-        diag.valor = (event.target as HTMLInputElement)?.value || '';
-      }, true);
-      if (tabla) new MutationObserver(() => { diag.mutaciones++; })
-        .observe(tabla, { childList: true, subtree: true });
-      (window as typeof window & { __qaSearchDiagnostics?: typeof diag }).__qaSearchDiagnostics = diag;
-      if (input) input.dataset.qaFound = 'yes';
-    });
+    const cantidadInicial = await filasTabla.count();
+    expect(cantidadInicial).toBeGreaterThan(2);
 
     await buscador.fill('QA_BUSQUEDA_SIN_RESULTADOS_938472');
     await expect(buscador).toHaveValue('QA_BUSQUEDA_SIN_RESULTADOS_938472');
-    await page.waitForTimeout(150);
-    const diagnostico = await page.evaluate(() => ({
-      ...(window as typeof window & { __qaSearchDiagnostics?: {
-        eventos: number; mutaciones: number; target: string; atributo: string; valor: string;
-      } }).__qaSearchDiagnostics,
-      inputEncontrado: document.querySelector('[data-in="dirQ"]')?.getAttribute('data-qa-found'),
-      filas: document.querySelectorAll('#dt tbody tr').length,
-      filtroEstado: (() => {
-        try {
-          return {
-            consulta: (0, eval)('DF.q'),
-            resultadosFiltrados: (0, eval)('dirL().length'),
-            totalAlumnos: (0, eval)('S.alu.length'),
-          };
-        } catch (error) {
-          return { error: String(error) };
-        }
-      })(),
-    }));
-    console.log('DIAGNÓSTICO BÚSQUEDA QA:', JSON.stringify({ diagnostico, erroresPagina }));
-    await expect(filas).toHaveCount(0);
+    // Dos filas esperadas: encabezado y mensaje "Sin registros todavía".
+    await expect(filasTabla).toHaveCount(2);
+    await expect(page.getByText('Sin registros todavía.', { exact: true })).toBeVisible();
 
     await buscador.fill('');
-    await expect(filas).toHaveCount(cantidadInicial);
+    await expect(filasTabla).toHaveCount(cantidadInicial);
     await expect(page.getByText('Buscar por nombre, DNI o código', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Sede')).toBeVisible();
     await expect(page.getByLabel('Deporte')).toBeVisible();
