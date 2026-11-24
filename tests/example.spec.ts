@@ -77,6 +77,34 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
+  test('Rechazar DNI duplicado sin guardar matrícula', async () => {
+    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+
+    const dniExistente = await page.locator('#dt table tr').evaluateAll((rows) => {
+      for (const row of rows.slice(1)) {
+        const dni = row.querySelectorAll('td')[2]?.textContent?.trim() || '';
+        if (/^\\d{8}$/.test(dni)) return dni;
+      }
+      return '';
+    });
+    expect(dniExistente).toMatch(/^\\d{8}$/);
+
+    await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+    await page.locator('#m_nom').fill('Prueba');
+    await page.locator('#m_ape').fill('QA');
+    await page.locator('#m_dni').fill(dniExistente);
+    await page.locator('#m_nac').fill('2011-06-15');
+    await page.getByRole('button', { name: 'Guardar matrícula' }).click();
+
+    await expect(page.locator('#toast')).toContainText('Ese DNI ya está registrado');
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+    // Cancelar sale del formulario; no se crea ni modifica ningún registro.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+  });
+
   test('Buscar alumnos sin modificar registros', async () => {
     // Volvemos al directorio desde el menú lateral; la búsqueda solo filtra la vista.
     await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
