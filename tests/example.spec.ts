@@ -283,4 +283,40 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByText(/Sueldos fijos mensuales:/)).toBeVisible();
   });
 
+
+  test('Rechazar contrato de alquiler con fechas inválidas y enlace inseguro', async () => {
+    await page.getByText('Sedes y Alquileres', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Sedes y Alquileres', exact: true })).toBeVisible();
+    await page.locator('button[data-f="sedTab"][data-i="c"]').click();
+    await expect(page.getByRole('heading', { name: 'Nuevo contrato de alquiler', exact: true })).toBeVisible();
+
+    await expect(page.locator('#c_s')).toBeVisible();
+    expect(await page.locator('#c_s option').count()).toBeGreaterThan(0);
+    await page.locator('#c_i').fill('2026-11-24');
+    await page.locator('#c_f').fill('2026-11-24');
+    await page.locator('#c_m').fill('100');
+    await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('La fecha de fin debe ser posterior al inicio');
+    await expect(page.getByRole('heading', { name: 'Nuevo contrato de alquiler', exact: true })).toBeVisible();
+
+    await page.locator('#c_f').fill('2026-11-25');
+    await page.locator('#c_u').fill('javascript:alert(1)');
+    await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('El enlace debe empezar con http:// o https://');
+    await expect(page.locator('#c_u')).toHaveValue('javascript:alert(1)');
+  });
+
+  test('Rechazar código inválido de centro de costo sin guardar', async () => {
+    await page.getByText('Sedes y Alquileres', { exact: true }).first().click();
+    await page.locator('button[data-f="sedTab"][data-i="k"]').click();
+    await expect(page.getByRole('heading', { name: 'Nuevo centro de costo', exact: true })).toBeVisible();
+
+    await page.locator('#k_c').fill('X');
+    await page.locator('#k_n').fill('Centro QA temporal');
+    await page.getByRole('button', { name: 'Guardar centro de costo', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Código: 2 a 12 letras, números o guiones');
+    await expect(page.locator('#k_c')).toHaveValue('X');
+    await expect(page.getByRole('heading', { name: 'Nuevo centro de costo', exact: true })).toBeVisible();
+  });
+
 });
