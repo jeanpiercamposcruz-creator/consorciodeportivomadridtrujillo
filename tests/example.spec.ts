@@ -386,7 +386,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
 
-    await page.locator('#k_a').fill('');
+    await expect(page.locator('#k_a')).toHaveValue('');
     await page.getByRole('button', { name: 'Registrar venta', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('Elige un alumno');
     await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
