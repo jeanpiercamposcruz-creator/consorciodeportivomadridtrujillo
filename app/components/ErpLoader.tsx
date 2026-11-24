@@ -111,6 +111,12 @@ export default function ErpLoader() {
   useEffect(() => {
     if (window.__erpLoader) return;
 
+    // Diagnóstico QA: solo registra presencia/ausencia; nunca imprime credenciales.
+    console.info("[ERP QA] Diagnóstico de configuración:", {
+      urlConfigurada: Boolean(supabaseUrl),
+      claveConfigurada: Boolean(supabaseKey),
+    });
+
     if (!supabaseUrl || !supabaseKey) {
       console.error("Faltan las variables de entorno de Supabase.");
       const app = document.getElementById("app");
