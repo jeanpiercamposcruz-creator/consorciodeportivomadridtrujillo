@@ -555,6 +555,74 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
+
+  test('Rechazar deporte con código inválido o repetido sin guardar', async () => {
+    await page.getByText('Horarios y Categorías', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Horarios y Categorías', exact: true })).toBeVisible();
+
+    await page.locator('#d_n').fill('Deporte QA');
+    await page.locator('#d_c').fill('AB');
+    await page.getByRole('button', { name: 'Agregar deporte', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Nombre y código de 3 letras');
+
+    const codigoExistente = (await page.locator('#h_d option').nth(1).getAttribute('value')) || '';
+    await page.locator('#d_c').fill(codigoExistente.replace(/^DEP-/, ''));
+    await page.getByRole('button', { name: 'Agregar deporte', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Código repetido');
+    await expect(page.getByRole('heading', { name: 'Horarios y Categorías', exact: true })).toBeVisible();
+    // Los dos intentos se detienen antes de añadir un deporte al catálogo.
+  });
+
+
+  test('Rechazar certificación del personal sin nombre', async () => {
+    await page.getByText('Personal y Planillas', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+
+    const fila = page.locator('#per_t table tr').nth(1);
+    await fila.getByRole('button', { name: 'Modificar', exact: true }).click();
+    await expect(page.locator('#pc_c')).toBeVisible();
+    await expect(page.locator('#pc_e')).toBeVisible();
+    await expect(page.locator('#pc_v')).toBeVisible();
+
+    await page.locator('#pc_c').fill('');
+    await page.locator('#pc_e').fill('Entidad QA');
+    await page.locator('#pc_v').fill('2027-12-31');
+    await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Ingresa la certificación');
+    await expect(page.locator('#pc_c')).toBeVisible();
+    // La certificación incompleta no se agrega al expediente del personal.
+  });
+
+
+  test('Rechazar archivos adjuntos con formato no permitido o tamaño excesivo', async () => {
+    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+    await page.locator('#ad_b').click();
+    const chooserTipo = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Subir', exact: true }).first().click();
+    await (await chooserTipo).setFiles({
+      name: 'archivo-no-permitido.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('contenido QA'),
+    });
+    await expect(page.locator('#toast')).toContainText('Solo JPG, PNG o PDF de hasta 5 MB');
+
+    const chooserTamano = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Subir', exact: true }).first().click();
+    await (await chooserTamano).setFiles({
+      name: 'archivo-excesivo.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.alloc(5_000_001),
+    });
+    await expect(page.locator('#toast')).toContainText('Solo JPG, PNG o PDF de hasta 5 MB');
+    await expect(page.locator('#ad_b')).toContainText('0/4');
+    // No se seleccionó un archivo válido ni se guardó la matrícula.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  });
+
   test('Abrir directamente Matrículas y Alumnos y revisar formulario sin guardar', async () => {
     await page.getByText('Matrículas y Alumnos', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Matrículas y Alumnos', exact: true })).toBeVisible();
