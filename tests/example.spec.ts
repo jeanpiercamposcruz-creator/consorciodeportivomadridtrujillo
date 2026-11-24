@@ -823,6 +823,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     let totalCuotas = 0;
     let cuotasPagadas = 0;
 
+    console.log('AUDITORIA_CRONOGRAMA', JSON.stringify({ matricula, mensualidad, meses, pagado, primeraFila: datos[0], datos }));
     for (const [indice, fila] of datos.entries()) {
       expect(fila[0]).toBe(String(indice + 1));
       expect(Math.abs(numero(fila[2]) - mensualidad)).toBeLessThanOrEqual(0.011);
