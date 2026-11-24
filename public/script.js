@@ -3354,15 +3354,23 @@ function mkP(r, pc) {
 }
 VW.kits = () => {
   const adm = KS && U.rol === "ADM",
-    ed = KE ? S.kits.find((x) => x.id === KE) || {} : {};
+    edKey = String(KE ?? "").trim(),
+    ed = edKey
+      ? S.kits.find(
+          (x) =>
+            String(x._id ?? "").trim() === edKey ||
+            String(x.id ?? "").trim() === edKey ||
+            String(x.code ?? "").trim() === edKey ||
+            String(x.codigo ?? "").trim() === edKey
+        ) || {}
+      : {};
   return `<div class=card><h3>${KE ? "Editar venta" : "Nueva venta"}</h3><div class=kitw><div class=kitf><div class=fg><label class="u-col-full">Buscar alumno (código, DNI, nombres o apellidos)<input id=k_q value="${esc(KQ)}" data-in=kitQ autocomplete=off placeholder="Escribe al menos 2 letras o números"></label><div id=k_res class="u-col-full"></div><input type=hidden id=k_a value="${esc(ed.aid || KSEL || "")}">${kSelHtml()}${fl("Prenda", "<select id=k_p>" + o(["Kit completo", "Polo", "Short", "Calcetines"].map((x) => [x, x]), ed.p || "Kit completo") + "</select>")}${fl("Talla", "<select id=k_t>" + o(["6", "8", "10", "12", "14", "S", "M", "L", "XL"].map((x) => [x, x]), ed.t || "6") + "</select>")}${fl("Nombre en camiseta", '<input id=k_n autocomplete=off placeholder="Ej. JUAN" data-in=shirtDraw value="' + esc(ed.n || "") + '">')}${fl("Número elegido", '<input id=k_u inputmode=numeric autocomplete=off maxlength=3 placeholder="00" data-in=kNumTyped value="' + esc(ed.u || KNUM || "") + '">')}${fl("Fecha de pedido", `<input id=k_f type=date value="${esc(ed.f || today())}">`)}${fl("Fecha de entrega", "<input id=k_e type=date value=" + esc(ed.e || "") + ">")}${fl("Precio público (S/)", "<input id=k_pr type=number min=0 value=" + esc(ed.pr ?? 90) + ">")}${fl("Costo de confección (S/)", "<input id=k_c type=number min=0 value=" + esc(ed.c ?? 45) + ">")}</div><div class=row><button data-f=kitPay>${KE ? "Guardar cambios" : "Registrar venta"}</button>${KE ? "<button class=g data-f=cancelKit>Cancelar</button>" : ""}</div></div>${shirtHtml()}</div></div><div class=card>${tbl(
     ["Código", "Alumno", "Prenda", "Talla", "Camiseta", "Pedido", "Entrega", "Cobrado"].concat(
       adm ? ["Costo", "Utilidad", "Acciones"] : ["Acciones"],
     ),
     S.kits.map(
       (k) =>
-        `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td>${adm ? `<td>${money(k.c)}</td><td><b>${money(k.pr - k.c)}</b></td>` : ""}<td><button class="s g act" data-f=kitEd data-i="${esc(k.id)}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${esc(k.id)}" title="Eliminar" aria-label="Eliminar">${iac("trash")}</button></td></tr>`,
-    ),
+       `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td>${adm ? `<td>${money(k.c)}</td><td><b>${money(k.pr - k.c)}</b></td>` : ""}<td><button class="s g act" data-f=kitEd data-i="${esc(k._id || k.id || k.code || k.codigo || "")}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${esc(k._id || k.id || k.code || k.codigo || "")}" title="Eliminar" aria-label="Eliminar">${iac("trash")}</button></td></tr>`),
   )}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
 };
 function saveKit() {
@@ -3375,12 +3383,34 @@ function saveKit() {
     !["Kit completo", "Polo", "Short", "Calcetines"].includes(v("k_p")) ||
     !["6", "8", "10", "12", "14", "S", "M", "L", "XL"].includes(v("k_t"))
   )
-    return toast("Prenda o talla inválida");
+  return toast("Prenda o talla inválida");
+
+  const editKey = String(KE ?? "").trim();
+  const findKitMatch = (key) => {
+    const cleanKey = String(key ?? "").trim();
+    if (!cleanKey) return undefined;
+    return S.kits.find(
+      (x) =>
+        String(x._id ?? "").trim() === cleanKey ||
+        String(x.id ?? "").trim() === cleanKey ||
+        String(x.code ?? "").trim() === cleanKey ||
+        String(x.codigo ?? "").trim() === cleanKey
+    );
+  };
+
+  const existingEdit = editKey ? findKitMatch(editKey) : null;
   const nu = KNUM ? +KNUM : "";
-  if (nu && a.mod === "Competitivo" && ocup(a).has(nu) && (!KE || (S.kits.find((x) => x.id === KE) || {}).u !== String(nu)))
+  if (
+    nu &&
+    a.mod === "Competitivo" &&
+    ocup(a).has(nu) &&
+    (!existingEdit || String(existingEdit.u ?? "") !== String(nu))
+  )
     return toast("Ese número ya está ocupado en su categoría (±2 años)");
+
   if (!RX.fecha.test(v("k_f")) || (v("k_e") && !RX.fecha.test(v("k_e"))))
     return toast("Fechas inválidas");
+
   const kit = {
     code: `KIT-${a.dep.slice(4)}-${v("k_t")}`,
     aid: a.id,
@@ -3395,16 +3425,22 @@ function saveKit() {
     pr,
     c: cc,
   };
-  if (KE) {
-    const t = S.kits.find((x) => x.id === KE);
-    if (!t) {
+
+  if (editKey) {
+    if (!existingEdit) {
       KE = null;
       return toast("La venta ya no existe. Recarga e inténtalo de nuevo.");
     }
-    Object.assign(t, kit);
-    const cx = S.caja.find((c) => c.k === "kit|" + KE);
-    if (cx) Object.assign(cx, { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr });
-    else S.caja.push({ f: kit.f, sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + KE });
+    Object.assign(existingEdit, kit);
+    const realId = String(existingEdit._id ?? existingEdit.id ?? editKey).trim();
+    const cx = S.caja.find(
+      (c) => String(c.k ?? "").trim() === "kit|" + realId || String(c.k ?? "").trim() === "kit|" + editKey
+    );
+    if (cx) {
+      Object.assign(cx, { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
+    } else {
+      S.caja.push({ f: kit.f, sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + realId });
+    }
     KE = null;
     toast("Venta actualizada");
   } else {
@@ -3413,22 +3449,38 @@ function saveKit() {
     S.caja.push({ f: kit.f || today(), sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + id });
     toast("Venta registrada");
   }
+
   save();
   KSEL = KNUM = KQ = "";
   R();
 }
 function delKit(id) {
-  if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
   const targetId = String(id ?? "").trim();
-  const targetCajaKey = "kit|" + targetId;
-
-  const beforeLen = S.kits.length;
-  S.kits = S.kits.filter((k) => String(k.id ?? "").trim() !== targetId);
-  S.caja = S.caja.filter((c) => String(c.k ?? "").trim() !== targetCajaKey);
-
-  if (S.kits.length === beforeLen) {
-    console.warn("No se encontró el kit con id:", id, "en S.kits");
+  if (!targetId) {
+    return toast("No se pudo identificar la venta a eliminar");
   }
+
+  const match = S.kits.find(
+    (k) =>
+      String(k._id ?? "").trim() === targetId ||
+      String(k.id ?? "").trim() === targetId ||
+      String(k.code ?? "").trim() === targetId ||
+      String(k.codigo ?? "").trim() === targetId
+  );
+
+  if (!match) {
+    return toast("La venta no se encontró en la lista");
+  }
+
+  if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
+
+  const realId = String(match._id ?? match.id ?? targetId).trim();
+  S.kits = S.kits.filter((k) => k !== match);
+  S.caja = S.caja.filter(
+    (c) =>
+      String(c.k ?? "").trim() !== "kit|" + realId &&
+      String(c.k ?? "").trim() !== "kit|" + targetId
+  );
 
   save();
   toast("Venta eliminada");
@@ -3611,9 +3663,17 @@ const FN = {
   },
   preDel: (i) => preDel(i),
   kitEd: (i) => {
-    const k = S.kits.find((x) => x.id === i);
+    const target = String(i ?? "").trim();
+    if (!target) return;
+    const k = S.kits.find(
+      (x) =>
+        String(x._id ?? "").trim() === target ||
+        String(x.id ?? "").trim() === target ||
+        String(x.code ?? "").trim() === target ||
+        String(x.codigo ?? "").trim() === target
+    );
     if (!k) return;
-    KE = i;
+    KE = String(k._id ?? k.id ?? k.code ?? k.codigo ?? target).trim();
     KSEL = k.aid;
     KNUM = k.u ? +k.u : "";
     R();
