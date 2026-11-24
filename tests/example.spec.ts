@@ -442,7 +442,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const modalidad = page.locator('select[data-ch="preM"]');
     await expect(modalidad).toBeVisible();
     await modalidad.selectOption('Virtual');
-    await expect(filas).toBeVisible();
+    await expect(filas.first()).toBeVisible();
 
     // No se pulsan Aceptar ni Eliminar; solo se consulta y filtra la lista.
     await expect(page.getByRole('button', { name: 'Actualizar', exact: true })).toBeVisible();
