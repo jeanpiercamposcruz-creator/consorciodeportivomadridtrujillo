@@ -852,4 +852,59 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
+  test('Distribuir abonos parciales primero a matrícula y luego a cuotas sin guardar', async () => {
+    await page.getByText('Directorio de Alumnos', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+    const primeraFila = page.locator('#dt table tr').nth(1);
+    await primeraFila.getByRole('button', { name: 'Abrir', exact: true }).click();
+    await expect(page.locator('#m_pag')).toBeVisible();
+
+    await page.locator('#m_cm').fill('50');
+    await page.locator('#m_cmen').fill('90');
+    await page.locator('#m_mes').fill('2');
+    await page.locator('#m_pag').fill('100');
+    for (const selector of ['#m_cm', '#m_cmen', '#m_mes', '#m_pag']) {
+      await page.locator(selector).dispatchEvent('input');
+    }
+
+    const datos = await page.locator('#cron_t table tr').evaluateAll((rows) =>
+      rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
+    );
+    expect(datos).toHaveLength(2);
+    expect(datos[0][2]).toContain('90');
+    expect(datos[0][3]).toContain('50');
+    expect(datos[0][4]).toContain('40');
+    expect(datos[0][5]).toBe('Parcial');
+    expect(datos[1][3]).toContain('0');
+    expect(datos[1][4]).toContain('90');
+    expect(datos[1][5]).toBe('Pendiente');
+    await expect(page.locator('#cron_t')).toContainText('Matrícula:');
+    await expect(page.locator('#cron_t')).toContainText('Saldo:');
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  });
+
+  test('Calcular reversiones parciales vinculadas al ingreso original sin borrar historial', async () => {
+    const resultado = await page.evaluate(() => {
+      type Movimiento = { _id?: string; d: string; t: string; c: string; m: number; k?: string };
+      const fn = (window as unknown as {
+        calcularReversionesCaja: (caja: Movimiento[], id: string, importe: number) => { originalId: string; monto: number }[];
+      }).calcularReversionesCaja;
+      const movimientos: Movimiento[] = [
+        { _id: 'ingreso-1', d: 'ALU-QA', t: 'I', c: 'Matrícula / mensualidad', m: 70 },
+        { _id: 'ingreso-2', d: 'ALU-QA', t: 'I', c: 'Matrícula / mensualidad', m: 30 },
+      ];
+      const primera = fn(movimientos, 'ALU-QA', 40);
+      primera.forEach((x) => movimientos.push({
+        _id: 'egreso-' + movimientos.length, d: 'ALU-QA', t: 'E',
+        c: 'Reversión de pago de matrícula', m: x.monto, k: 'reversion:' + x.originalId,
+      }));
+      const segunda = fn(movimientos, 'ALU-QA', 50);
+      return { primera, segunda, originales: movimientos.filter((x) => x.t === 'I').length };
+    });
+    expect(resultado.primera.reduce((s, x) => s + x.monto, 0)).toBe(40);
+    expect(resultado.segunda.reduce((s, x) => s + x.monto, 0)).toBe(50);
+    expect(resultado.originales).toBe(2);
+  });
+
+
 });
