@@ -38,6 +38,21 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Wait for QA preview deployment
+        env:
+          ERP_URL: ${{ secrets.ERP_URL }}
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error "${ERP_URL%/}/app/14-vistas-horarios.js" 2>/dev/null | grep -q "function calcularReversionesCaja"; then
+              echo "La vista previa de QA ya sirve la versión esperada."
+              exit 0
+            fi
+            echo "Esperando despliegue de QA (${attempt}/60)..."
+            sleep 10
+          done
+          echo "La vista previa de QA no publicó la versión esperada dentro de 10 minutos."
+          exit 1
+
       - name: Run Playwright tests
         run: npx playwright test
         env:
