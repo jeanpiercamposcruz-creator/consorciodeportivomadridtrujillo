@@ -263,6 +263,28 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
   });
 
+
+  test('Rechazar tarifa o sueldo fijo inválido en contrato del personal', async () => {
+    await page.getByText('Personal y Planillas', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+    await page.locator('button[data-f="perTab"][data-i="d"]').click();
+
+    const fila = page.locator('table tr').nth(1);
+    await expect(fila).toBeVisible();
+    await fila.getByRole('button', { name: 'Modificar', exact: true }).click();
+    await expect(page.locator('#p_p')).toBeVisible();
+    await expect(page.locator('#p_sf')).toBeVisible();
+
+    await page.locator('#p_p').fill('-1');
+    await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Tarifa o sueldo fijo inválido');
+    await expect(page.locator('#p_p')).toHaveValue('-1');
+
+    // Cancelar descarta la tarifa inválida; no se actualiza el contrato existente.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+  });
+
   test('Consultar pagos y verificar importes sin modificar registros', async () => {
     await page.getByText('Personal y Planillas', { exact: true }).first().click();
     await page.locator('button[data-f="perTab"][data-i="p"]').click();
