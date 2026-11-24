@@ -17,7 +17,7 @@ if (url) {
 
   const esQA =
     destino.hostname ===
-    'consorciodeportivomadridtrujillo-aolm.vercel.app';
+    'consorciodeportivomadridtrujillo-ao.vercel.app';
 
   if (!esLocal && (!esQA || destino.protocol !== 'https:')) {
     throw new Error(
