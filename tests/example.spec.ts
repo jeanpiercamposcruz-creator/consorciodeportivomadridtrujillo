@@ -274,11 +274,22 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const filas = tabla.locator('tr');
     expect(await filas.count()).toBeGreaterThan(1);
 
-    const importes = await filas.nth(1).locator('td').evaluateAll((celdas) =>
-      celdas.slice(3).map((celda) => celda.textContent?.trim() || '')
+    const datosPago = await filas.evaluateAll((rows) =>
+      rows.slice(1).map((row) =>
+        Array.from(row.querySelectorAll('td')).slice(3, 6).map((cell) => cell.textContent?.trim() || '')
+      )
     );
-    expect(importes.length).toBeGreaterThanOrEqual(4);
-    expect(importes.every((valor) => /^(S\/\s*)?-?[\d,.]+$/.test(valor))).toBeTruthy();
+    expect(datosPago.length).toBeGreaterThan(0);
+    const numero = (valor: string) => Number(valor.replace(/[^\d.-]/g, ''));
+    for (const [tarifaTexto, horasTexto, pagoTexto] of datosPago) {
+      const tarifa = numero(tarifaTexto);
+      const horas = numero(horasTexto);
+      const pago = numero(pagoTexto);
+      expect(Number.isFinite(tarifa)).toBeTruthy();
+      expect(Number.isFinite(horas)).toBeTruthy();
+      expect(Number.isFinite(pago)).toBeTruthy();
+      expect(Math.abs(pago - Math.round(tarifa * horas * 100) / 100)).toBeLessThanOrEqual(0.011);
+    }
     await expect(page.getByText(/Total pago por horas de la semana:/)).toBeVisible();
     await expect(page.getByText(/Sueldos fijos mensuales:/)).toBeVisible();
   });
@@ -292,9 +303,22 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
     await expect(page.locator('#c_s')).toBeVisible();
     expect(await page.locator('#c_s option').count()).toBeGreaterThan(0);
+
+    await page.locator('#c_i').fill('');
+    await page.locator('#c_f').fill('');
+    await page.locator('#c_m').fill('100');
+    await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Las fechas de inicio y fin son obligatorias');
+
+    await page.locator('#c_i').fill('2026-11-24');
+    await page.locator('#c_f').fill('2026-11-25');
+    await page.locator('#c_m').fill('0');
+    await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Monto mensual inválido');
+
+    await page.locator('#c_m').fill('100');
     await page.locator('#c_i').fill('2026-11-24');
     await page.locator('#c_f').fill('2026-11-24');
-    await page.locator('#c_m').fill('100');
     await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('La fecha de fin debe ser posterior al inicio');
     await expect(page.getByRole('heading', { name: 'Nuevo contrato de alquiler', exact: true })).toBeVisible();
@@ -378,6 +402,14 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByText('Completa los 4 filtros para ver la lista.', { exact: true })).toHaveCount(0);
     await expect(page.locator('table')).toBeVisible();
 
+    // Cambiar la sede debe limpiar los filtros dependientes y evitar una lista desactualizada.
+    if (await sede.locator('option').count() > 2) {
+      await sede.selectOption({ index: 2 });
+      await expect(grupo).toHaveValue('');
+      await expect(hora).toHaveValue('');
+      await expect(page.getByText('Completa los 4 filtros para ver la lista.', { exact: true })).toBeVisible();
+    }
+
     // Esta consulta solo cambia filtros; no pulsa Asistió, Faltó, Pagó ni Debe.
   });
 
@@ -392,14 +424,41 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
   });
 
+
+  test('Rechazar venta con precio o costo fuera de rango sin registrar', async () => {
+    await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+
+    await page.getByText('Matrículas y Alumnos', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+    const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
+
+    await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
+    await page.locator('#k_q').fill(codigoAlumno);
+    const resultado = page.locator('#k_res button').first();
+    await expect(resultado).toBeVisible();
+    await resultado.click();
+    await expect(page.locator('#k_a')).toHaveValue(codigoAlumno);
+
+    await page.locator('#k_pr').fill('100000');
+    await page.getByRole('button', { name: 'Registrar venta', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Precio o costo inválido');
+    await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+    // La validación termina antes de insertar la venta o su ingreso automático en caja.
+  });
+
   test('Rechazar movimiento de caja sin monto válido', async () => {
     await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
     await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();
 
-    await page.locator('#c_m').fill('');
-    await page.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
-    await expect(page.locator('#toast')).toContainText('Monto inválido');
-    await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();
+    const registrar = page.getByRole('button', { name: 'Registrar movimiento', exact: true });
+    for (const monto of ['', '0', '-1', '100000']) {
+      await page.locator('#c_m').fill(monto);
+      await registrar.click();
+      await expect(page.locator('#toast')).toContainText('Monto inválido');
+      await expect(registrar).toBeVisible();
+    }
+    // Todas las entradas se rechazan antes de añadir un movimiento a caja.
   });
 
 
