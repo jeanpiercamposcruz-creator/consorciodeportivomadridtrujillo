@@ -50,9 +50,11 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Navegar al modulo de Personal y Planillas', async () => {
-    await page.getByText('Personal y Planillas').click();
+    // El menú y el encabezado pueden compartir el mismo texto.
+    await page.getByText('Personal y Planillas', { exact: true }).first().click();
 
-    await expect(page.getByText('Personal y Planillas'))
-      .toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Personal y Planillas', exact: true })
+    ).toBeVisible();
   });
 });
