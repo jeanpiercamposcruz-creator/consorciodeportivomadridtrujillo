@@ -1,14 +1,21 @@
+import { test, expect, type Page } from '@playwright/test';
 
-import { test, expect, Page } from '@playwright/test';
+const url = process.env.ERP_URL;
+const usuario = process.env.ERP_USER;
+const password = process.env.ERP_PASSWORD;
+const e2eConfigurado = Boolean(url && usuario && password);
 
 test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
+  // En CI sin credenciales de QA, omite las pruebas autenticadas de forma explícita.
+  // Nunca se deben guardar credenciales dentro del repositorio.
+  test.skip(
+    !e2eConfigurado,
+    'Pruebas E2E omitidas: configura ERP_URL, ERP_USER y ERP_PASSWORD como secretos de GitHub Actions.'
+  );
+
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    const url = process.env.ERP_URL;
-    const usuario = process.env.ERP_USER;
-    const password = process.env.ERP_PASSWORD;
-
     if (!url || !usuario || !password) {
       throw new Error('Faltan ERP_URL, ERP_USER o ERP_PASSWORD.');
     }
