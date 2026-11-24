@@ -818,7 +818,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const mesesEsperados = Math.min(36, Math.max(0, Math.trunc(meses)));
     expect(datos).toHaveLength(mesesEsperados);
 
-    const numero = (texto: string) => Number(texto.replace(/[^\\d.-]/g, ''));
+    const numero = (texto: string) => Number(texto.replace(/[^\d.-]/g, ''));
     let saldoAplicable = Math.max(0, pagado - matricula);
     let totalCuotas = 0;
     let cuotasPagadas = 0;
