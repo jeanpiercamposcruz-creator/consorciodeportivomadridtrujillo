@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party browser libraries are not project source code.
+    "public/vendor/**",
   ]),
 ]);
 
