@@ -319,4 +319,36 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Nuevo centro de costo', exact: true })).toBeVisible();
   });
 
+
+  test('Rechazar horarios incompletos o con horas inválidas sin guardar', async () => {
+    await page.getByText('Horarios y Categorías', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Horarios y Categorías', exact: true })).toBeVisible();
+
+    await expect(page.locator('#h_s')).toBeVisible();
+    await expect(page.locator('#h_d')).toBeVisible();
+    expect(await page.locator('#h_s option').count()).toBeGreaterThan(0);
+    expect(await page.locator('#h_d option').count()).toBeGreaterThan(0);
+    expect(await page.locator('#h_c input[type="checkbox"]').count()).toBeGreaterThan(0);
+
+    const guardar = page.getByRole('button', { name: 'Guardar horario', exact: true });
+    await guardar.click();
+    await expect(page.locator('#toast')).toContainText('Elige al menos una categoría');
+
+    await page.locator('#h_c input[type="checkbox"]').first().check();
+    await guardar.click();
+    await expect(page.locator('#toast')).toContainText('Elige al menos un día');
+
+    await page.locator('.h_dia').first().check();
+    await page.locator('#h_i').fill('18:00');
+    await page.locator('#h_f').fill('18:00');
+    await guardar.click();
+    await expect(page.locator('#toast')).toContainText('La hora de fin debe ser posterior');
+
+    await page.locator('#h_i').fill('16:00');
+    await page.locator('#h_f').fill('18:00');
+    await guardar.click();
+    await expect(page.locator('#toast')).toContainText('Asigna al menos un profesor');
+    await expect(page.getByRole('heading', { name: 'Horarios y Categorías', exact: true })).toBeVisible();
+  });
+
 });
