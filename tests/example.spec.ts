@@ -189,6 +189,30 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     ).toBeVisible();
   });
 
+  test('Consultar sedes, buscar y revisar pestañas sin modificar datos', async () => {
+    await page.getByText('Sedes y Alquileres', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Sedes y Alquileres', exact: true })).toBeVisible();
+
+    const buscador = page.getByPlaceholder('Buscar por código, nombre o dirección...', { exact: true });
+    const filas = page.locator('#sed_t table tr');
+    await expect(buscador).toBeVisible();
+    const cantidadInicial = await filas.count();
+    expect(cantidadInicial).toBeGreaterThan(2);
+
+    await buscador.fill('QA_SEDE_INEXISTENTE_9342');
+    await expect(filas).toHaveCount(2);
+    await expect(page.getByText('Sin registros todavía.', { exact: true })).toBeVisible();
+
+    await buscador.fill('');
+    await expect(filas).toHaveCount(cantidadInicial);
+
+    await page.locator('button[data-f="sedTab"][data-i="c"]').click();
+    await expect(page.getByRole('heading', { name: 'Nuevo contrato de alquiler', exact: true })).toBeVisible();
+
+    await page.locator('button[data-f="sedTab"][data-i="k"]').click();
+    await expect(page.getByRole('heading', { name: 'Nuevo centro de costo', exact: true })).toBeVisible();
+  });
+
   test('Navegar al modulo de Personal y Planillas', async () => {
     // El menú y el encabezado pueden compartir el mismo texto.
     await page.getByText('Personal y Planillas', { exact: true }).first().click();
