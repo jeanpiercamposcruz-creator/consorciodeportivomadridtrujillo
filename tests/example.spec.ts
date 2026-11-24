@@ -65,14 +65,20 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
 
     const filas = page.locator('#dt tbody tr');
-    const cantidadInicial = await filas.count();
-    const buscador = page.locator('#q');
+    const buscador = page.getByPlaceholder('Ej. Luis, 71234567 o 260001', { exact: true });
+    await expect(buscador).toHaveCount(1);
     await expect(buscador).toBeVisible();
+
+    const cantidadInicial = await filas.count();
+    expect(cantidadInicial).toBeGreaterThan(0);
+
     await buscador.fill('QA_BUSQUEDA_SIN_RESULTADOS_938472');
+    await expect(buscador).toHaveValue('QA_BUSQUEDA_SIN_RESULTADOS_938472');
     await expect(filas).toHaveCount(0);
 
     await buscador.fill('');
     await expect(filas).toHaveCount(cantidadInicial);
+    await expect(page.getByText('Buscar por nombre, DNI o código', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Sede')).toBeVisible();
     await expect(page.getByLabel('Deporte')).toBeVisible();
     await expect(page.getByLabel('Estado')).toBeVisible();
