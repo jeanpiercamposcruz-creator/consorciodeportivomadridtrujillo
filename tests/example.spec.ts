@@ -429,7 +429,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
 
-    await page.getByText('Matrículas y Alumnos', { exact: true }).first().click();
+    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
 
