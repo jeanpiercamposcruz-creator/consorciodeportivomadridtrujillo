@@ -652,9 +652,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
     const selectorSede = page.locator('select[data-ch="asCs"]');
     await expect(selectorSede).toBeVisible();
-    const sedes = await selectorSede.locator('option').evaluateAll((options) =>
-      options.filter((option) => option.value).map((option) => ({ id: option.value, nombre: option.textContent?.trim() || '' }))
-    );
+    const sedes = await selectorSede.locator('option').evaluateAll((options) => {
+      const elementos = options as HTMLOptionElement[];
+      return elementos
+        .filter((option) => option.value)
+        .map((option) => ({ id: option.value, nombre: option.textContent?.trim() || '' }));
+    });
     expect(sedes.length).toBeGreaterThan(0);
 
     const totalesCaja = new Map<string, { ingresos: number; egresos: number }>();
