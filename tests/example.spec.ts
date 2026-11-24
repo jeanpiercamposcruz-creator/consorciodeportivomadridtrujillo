@@ -426,4 +426,15 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByText(/Balance de utilidad por sede/)).toBeVisible();
   });
 
+
+  test('Rechazar pre-registro público vacío sin enviar solicitudes', async () => {
+    await page.goto(url + '#prereg');
+    await expect(page.getByRole('heading', { name: 'Pre-registro de alumno', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Enviar pre-registro', exact: true }).click();
+    await expect(page.locator('#toast')).toBeVisible();
+    await expect(page.locator('#toast')).not.toBeEmpty();
+    await expect(page.getByRole('heading', { name: 'Pre-registro de alumno', exact: true })).toBeVisible();
+  });
+
 });
