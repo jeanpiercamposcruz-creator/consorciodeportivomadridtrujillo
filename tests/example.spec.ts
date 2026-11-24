@@ -621,7 +621,9 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.locator('#toast')).toContainText('Solo JPG, PNG o PDF de hasta 5 MB');
     await expect(page.locator('#ad_b')).toContainText('0/4');
     // No se seleccionó un archivo válido ni se guardó la matrícula.
-    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await expect(page.locator('#mod')).not.toHaveClass(/o/);
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
   });
 
   test('Abrir directamente Matrículas y Alumnos y revisar formulario sin guardar', async () => {
