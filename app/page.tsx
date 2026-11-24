@@ -5,13 +5,13 @@ import ErpLoader from "./components/ErpLoader";
  *
  * Es un Server Component A PROPÓSITO (sin 'use client', sin estado, sin efectos):
  * React nunca vuelve a renderizarla en el navegador, así que no puede recrear ni
- * vaciar #app, #mod o #toast, que son los nodos que public/script.js maneja a mano.
+ * vaciar #app, #mod o #toast, que son los nodos que public/app/*.js maneja a mano.
  * Este HTML es el mismo body del index.html original (ERP.zip).
  */
 export default function Page() {
   return (
     <>
-      {/* Fondo de video decorativo (public/script.js lo reproduce en initBackgroundVideo) */}
+      {/* Fondo de video decorativo (public/app/*.js lo reproduce en initBackgroundVideo) */}
       <div className="video-bg-container" aria-hidden="true">
         <video
           id="bgv"
@@ -27,7 +27,7 @@ export default function Page() {
         <div className="video-overlay" />
       </div>
 
-      {/* Raíz de la SPA: script.js renderiza aquí <header>, <aside>/<nav> y <main> */}
+      {/* Raíz de la SPA: la aplicación renderiza aquí <header>, <aside>/<nav> y <main> */}
       <div id="app" suppressHydrationWarning />
 
       {/* Modal accesible (recibos, carnet, cámara, archivos adjuntos) */}
@@ -38,7 +38,7 @@ export default function Page() {
 
       <noscript>Esta aplicación necesita JavaScript habilitado para funcionar.</noscript>
 
-      {/* Carga qrcode + jsQR y después /script.js, una sola vez y en orden */}
+      {/* Carga qrcode + jsQR y después los módulos de /app/, una sola vez y en orden */}
       <ErpLoader />
     </>
   );

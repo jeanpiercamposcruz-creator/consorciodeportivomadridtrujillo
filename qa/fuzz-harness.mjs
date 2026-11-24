@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Banco de pruebas negativas / fuzzing defensivo para el ERP CDMT (public/script.js)
+ * Banco de pruebas negativas / fuzzing defensivo para el ERP CDMT (public/script.js o public/app/*.js)
  * ---------------------------------------------------------------------------------
  * - Sin dependencias: solo Node >= 20.
  * - Carga el script.js REAL dentro de un sandbox (vm) con un DOM mínimo simulado
@@ -9,8 +9,8 @@
  *   Cuando corrijas el código, el caso pasa a "PASA" (sirve como suite de regresión).
  *
  * Uso:
- *   node qa/fuzz-harness.mjs                    # usa ./public/script.js
- *   node qa/fuzz-harness.mjs ruta/script.js     # otro archivo (p. ej. uno parcheado)
+ *   node qa/fuzz-harness.mjs                    # usa ./public/app/ (modulos) o ./public/script.js
+ *   node qa/fuzz-harness.mjs ruta/script.js     # otro archivo o carpeta de modulos
  *   node qa/fuzz-harness.mjs --json salida.json # además guarda el reporte en JSON
  * Código de salida: 0 = todo pasa, 1 = hay defectos.
  */
@@ -23,9 +23,15 @@ import { webcrypto } from "node:crypto";
 const args = process.argv.slice(2);
 const jsonIdx = args.indexOf("--json");
 const JSON_OUT = jsonIdx >= 0 ? args.splice(jsonIdx, 2)[1] : null;
-const SCRIPT = path.resolve(args[0] || "./public/script.js");
-const ROOT = path.resolve(path.dirname(SCRIPT), "..");
-const SRC = fs.readFileSync(SCRIPT, "utf8");
+// Acepta un archivo (monolito) o una carpeta de modulos (por defecto ./public/app si existe).
+// Los modulos se ejecutan UNO POR UNO y en orden, igual que el navegador (comparten el ambito global).
+const SCRIPT = path.resolve(args[0] || (fs.existsSync("./public/app") ? "./public/app" : "./public/script.js"));
+const IS_DIR = fs.statSync(SCRIPT).isDirectory();
+const ROOT = IS_DIR ? path.resolve(SCRIPT, "..", "..") : path.resolve(path.dirname(SCRIPT), "..");
+const PARTS = IS_DIR
+  ? fs.readdirSync(SCRIPT).filter((f) => f.endsWith(".js")).sort().map((f) => ({ name: f, src: fs.readFileSync(path.join(SCRIPT, f), "utf8") }))
+  : [{ name: "script.js", src: fs.readFileSync(SCRIPT, "utf8") }];
+const SRC = PARTS.map((p) => p.src).join(""); // para las pruebas que inspeccionan el codigo
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const unhandled = [];
 process.on("unhandledRejection", (e) => unhandled.push(String((e && e.message) || e)));
@@ -172,6 +178,7 @@ function loadCtx(mock) {
   const intervals = [];
   const errs = [];
   const g = {
+    __ERP_CONFIG__: { supabaseUrl: "https://qa.supabase.co", supabaseKey: "qa-anon-key" }, // lo inyecta ErpLoader en produccion
     document: {
       querySelector: (s) => nodes[s] ?? null, querySelectorAll: () => [], getElementById: (i) => fields[i] ?? null,
       createElement: () => el(), body: { appendChild() {} }, hidden: false, activeElement: null, addEventListener() {},
@@ -188,7 +195,7 @@ function loadCtx(mock) {
   };
   g.window = g;
   const ctx = vm.createContext(g);
-  vm.runInContext(SRC, ctx, { filename: "script.js" });
+  for (const p of PARTS) vm.runInContext(p.src, ctx, { filename: p.name });
   const run = (code) => vm.runInContext(code, ctx);
   return { ctx, run, nodes, fields, intervals, errs };
 }
@@ -196,7 +203,7 @@ function loadCtx(mock) {
 async function newEnv() {
   if (!SEED_ROWS) {
     const tmp = loadCtx(new MockSupabase({}));
-    SEED_ROWS = JSON.parse(tmp.run("S = seed(); JSON.stringify(Object.fromEntries(TB.map(t => [t.n, t.rows()])))"));
+    SEED_ROWS = JSON.parse(tmp.run("S = seed(); for (const k of [\"cc\", \"contratos\", \"psedes\", \"pcert\"]) S[k] = S[k] || []; JSON.stringify(Object.fromEntries(TB.map(t => [t.n, t.rows()])))"));
   }
   const mock = new MockSupabase(SEED_ROWS);
   const e = loadCtx(mock);
