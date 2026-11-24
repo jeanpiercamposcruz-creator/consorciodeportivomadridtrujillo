@@ -87,6 +87,29 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByLabel('Estado')).toBeVisible();
   });
 
+  test('Abrir ficha de alumno y cancelar sin guardar cambios', async () => {
+    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+
+    const primeraFila = page.locator('#dt table tr').nth(1);
+    const codigo = (await primeraFila.locator('td').first().innerText()).trim();
+    expect(codigo).not.toBe('');
+    await primeraFila.getByRole('button', { name: 'Abrir', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: 'Ficha ' + codigo, exact: false })).toBeVisible();
+    await expect(page.locator('#m_nom')).toBeVisible();
+    await expect(page.locator('#m_nom')).not.toHaveValue('');
+    await expect(page.locator('#m_ape')).toBeVisible();
+    await expect(page.locator('#m_ape')).not.toHaveValue('');
+    await expect(page.locator('#m_dni')).toBeVisible();
+    await expect(page.locator('#m_sed')).toBeVisible();
+    await expect(page.locator('#m_dep')).toBeVisible();
+
+    // Cancelar vuelve al directorio; no se pulsa Guardar matrícula.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+  });
+
   test('Navegar al modulo de Sedes y Alquileres', async () => {
     // El menú y el encabezado pueden compartir el mismo texto.
     // Selecciona la primera coincidencia para navegar y valida el encabezado por rol.
