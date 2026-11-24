@@ -409,9 +409,9 @@ const dirL = () => {
       (!DF.e || (DF.e === "Incompleto" ? falta(a).length : a.est === DF.e)) &&
       (!DF.p || (DF.p === "Moroso") === deuda(a) > 0) &&
       (!q ||
-        (a.nom + " " + a.ape).toLowerCase().includes(q) ||
-        (a.dni || "").includes(q) ||
-        a.id.includes(q)),
+        (String(a.nom || "") + " " + String(a.ape || "")).toLowerCase().includes(q) ||
+        String(a.dni || "").includes(q) ||
+        String(a.id || "").includes(q)),
   );
 };
 const dirT = () =>
