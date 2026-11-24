@@ -77,6 +77,31 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
+
+  test('Rechazar fecha de nacimiento fuera de rango y monto de matrícula inválido', async () => {
+    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+    await page.locator('#m_nom').fill('Prueba');
+    await page.locator('#m_ape').fill('QA');
+    await page.locator('#m_nac').fill('1900-01-01');
+    await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Fecha de nacimiento fuera del rango');
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+    await page.locator('#m_nac').fill('2016-01-01');
+    await page.locator('#m_cm').fill('100000');
+    await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+    await expect(page.locator('#toast')).toContainText('Monto inválido');
+    await expect(page.locator('#m_cm')).toHaveValue('100000');
+
+    // Cancelar descarta los datos inválidos; no se crea una matrícula ni un movimiento de caja.
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+  });
+
   test('Rechazar DNI duplicado sin guardar matrícula', async () => {
     await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
