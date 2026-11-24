@@ -811,6 +811,11 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(valor).toBeGreaterThanOrEqual(0);
     }
 
+    // Sincroniza el cronograma con los valores ya cargados en la ficha.
+    // El formulario usa delegación de eventos input para recalcular la vista previa.
+    for (const selector of ['#m_cm', '#m_cmen', '#m_mes', '#m_pag']) {
+      await page.locator(selector).dispatchEvent('input');
+    }
     const filas = page.locator('#cron_t table tr');
     const datos = await filas.evaluateAll((rows) =>
       rows.slice(1).map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || ''))
@@ -823,7 +828,6 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     let totalCuotas = 0;
     let cuotasPagadas = 0;
 
-    console.log('AUDITORIA_CRONOGRAMA', JSON.stringify({ matricula, mensualidad, meses, pagado, primeraFila: datos[0], datos }));
     for (const [indice, fila] of datos.entries()) {
       expect(fila[0]).toBe(String(indice + 1));
       expect(Math.abs(numero(fila[2]) - mensualidad)).toBeLessThanOrEqual(0.011);
