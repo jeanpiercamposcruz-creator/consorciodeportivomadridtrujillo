@@ -831,13 +831,19 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     for (const [indice, fila] of datos.entries()) {
       expect(fila[0]).toBe(String(indice + 1));
       expect(Math.abs(numero(fila[2]) - mensualidad)).toBeLessThanOrEqual(0.011);
+      const abonadoEsperado = Math.min(mensualidad, saldoAplicable);
+      const saldoEsperado = Math.max(0, mensualidad - abonadoEsperado);
+      expect(Math.abs(numero(fila[3]) - abonadoEsperado)).toBeLessThanOrEqual(0.011);
+      expect(Math.abs(numero(fila[4]) - saldoEsperado)).toBeLessThanOrEqual(0.011);
       totalCuotas += numero(fila[2]);
-      if (saldoAplicable >= mensualidad && mensualidad > 0) {
-        saldoAplicable = Math.round((saldoAplicable - mensualidad) * 100) / 100;
+      saldoAplicable = Math.round((saldoAplicable - abonadoEsperado) * 100) / 100;
+      if (saldoEsperado <= 0.009) {
         cuotasPagadas++;
-        expect(fila[3]).toBe('Pagada');
+        expect(fila[5]).toBe('Pagada');
+      } else if (abonadoEsperado > 0.009) {
+        expect(fila[5]).toBe('Parcial');
       } else {
-        expect(['Pendiente', 'Vencida']).toContain(fila[3]);
+        expect(['Pendiente', 'Vencida']).toContain(fila[5]);
       }
     }
 
