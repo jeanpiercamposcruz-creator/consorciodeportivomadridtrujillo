@@ -88,8 +88,11 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Abrir ficha de alumno y cancelar sin guardar cambios', async () => {
-    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+    const encabezadoDirectorio = page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true });
+    if (!(await encabezadoDirectorio.isVisible())) {
+      await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
+    }
+    await expect(encabezadoDirectorio).toBeVisible();
 
     const primeraFila = page.locator('#dt table tr').nth(1);
     const codigo = (await primeraFila.locator('td').first().innerText()).trim();
