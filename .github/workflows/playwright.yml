@@ -48,7 +48,7 @@ jobs:
           ERP_URL: ${{ secrets.ERP_URL }}
         run: |
           for attempt in $(seq 1 12); do
-            if curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -q 'qa-kit-caja-link-v1-20261125'; then
+            if curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -q 'qa-atomic-lote-erp-v1-20261125'; then
               echo "La vista previa de QA sirve el helper de persistencia real esperado."
               echo "deployed=true" >> "$GITHUB_OUTPUT"
               exit 0

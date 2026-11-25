@@ -529,6 +529,21 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
+  test('Revertir todas las tablas cuando falla una escritura del lote ERP', async () => {
+    type HerramientaAtomica = {
+      probarRollbackLote: () => Promise<{ rejected: boolean; rollback: boolean; residual: number }>;
+    };
+    const resultado = await page.evaluate(async () => {
+      const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAtomica }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No está disponible la prueba de atomicidad QA.');
+      return api.probarRollbackLote();
+    });
+    expect(resultado.rejected).toBeTruthy();
+    expect(resultado.rollback).toBeTruthy();
+    expect(resultado.residual).toBe(0);
+  });
+
+
   test('Mantener una única relación entre venta de indumentaria y Caja al crear, editar y eliminar', async () => {
     const id = 'QA-KIT-' + Date.now();
     type ResultadoKit = {
