@@ -1092,6 +1092,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         return api.cleanupMatricula(dniPrueba);
       }, dni);
       expect(limpieza.removed).toBeTruthy();
+      // Guardar una matrícula con pago abre el comprobante; cerrarlo evita
+      // que el diálogo bloquee las pruebas seriales siguientes.
+      const cerrarComprobante = page.getByRole('button', { name: 'Cerrar', exact: true });
+      if (await cerrarComprobante.isVisible().catch(() => false)) {
+        await cerrarComprobante.click();
+      }
     }
   });
 
