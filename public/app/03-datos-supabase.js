@@ -251,6 +251,8 @@ const TB = [
       n: "numero_cuota",
       f: "fecha_vencimiento",
       m: "monto",
+      a: "monto_abonado",
+      s: "saldo_pendiente",
       e: "estado",
     }),
     opt: true,

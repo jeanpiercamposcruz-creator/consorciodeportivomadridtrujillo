@@ -1020,4 +1020,26 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     expect(resultado.reversa).toEqual([{ originalId: 'ingreso-auditado', monto: 25 }]);
   });
 
+  test('Conservar abonado y saldo de cuotas al serializar y recargar desde Supabase', async () => {
+    const resultado = await page.evaluate(() => {
+      type Cuota = { id: string; aid: string; n: number; f: string; m: number; a: number; s: number; e: string };
+      type Tabla = { n: string; rows: () => Record<string, unknown>[]; load: (rows: Record<string, unknown>[]) => void };
+      const tablas = eval('TB') as Tabla[];
+      const estado = eval('S') as { cuotas: Cuota[] };
+      const tabla = tablas.find((x) => x.n === 'cronograma_cuotas');
+      if (!tabla) throw new Error('No existe el mapeo de cronograma_cuotas');
+      const original = estado.cuotas;
+      try {
+        estado.cuotas = [{ id: 'CUO-QA-1', aid: 'ALU-QA', n: 1, f: '2026-12-25', m: 90, a: 50, s: 40, e: 'Parcial' }];
+        const filasDb = tabla.rows();
+        tabla.load(filasDb);
+        return { filaDb: filasDb[0], cuotaRecargada: estado.cuotas[0] };
+      } finally {
+        estado.cuotas = original;
+      }
+    });
+    expect(resultado.filaDb).toMatchObject({ monto: 90, monto_abonado: 50, saldo_pendiente: 40, estado: 'Parcial' });
+    expect(resultado.cuotaRecargada).toMatchObject({ m: 90, a: 50, s: 40, e: 'Parcial' });
+  });
+
 });
