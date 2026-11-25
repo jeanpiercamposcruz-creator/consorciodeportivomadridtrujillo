@@ -1022,8 +1022,6 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
   test('Persistir y recuperar monto_abonado y saldo_pendiente mediante el ERP y Supabase QA', async () => {
     const id = 'QA-PERSIST-CUOTA-' + Date.now();
-    let alumnoId = '';
-
     try {
       const resultado = await page.evaluate(async (idPrueba) => {
         type Cuota = { id: string; aid: string; n: number; f: string; m: number; a: number; s: number; e: string };
@@ -1059,7 +1057,6 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         return { alumnoId: aid, filaDb: filasDb[0], recuperada };
       }, id);
 
-      alumnoId = resultado.alumnoId;
       expect(Number(resultado.filaDb.monto)).toBe(90);
       expect(Number(resultado.filaDb.monto_abonado)).toBe(50);
       expect(Number(resultado.filaDb.saldo_pendiente)).toBe(40);
