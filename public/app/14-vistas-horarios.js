@@ -754,6 +754,30 @@ function delKit(id) {
   toast("Venta eliminada");
   R();
 }
+function cajaAuditoria(x) {
+  const origen = String(x.k || "");
+  if (origen.startsWith("matricula:")) {
+    const raw = origen.split("|aplicacion:")[1];
+    if (raw) {
+      try {
+        const partes = JSON.parse(decodeURIComponent(raw));
+        return partes.map((p) =>
+          `${p.destino}${p.cuota ? " " + p.cuota : ""}: ${money(p.monto)}`
+        ).join(" · ");
+      } catch (e) {
+        return "Abono de matrícula (detalle no disponible)";
+      }
+    }
+  }
+  if (origen.startsWith("reversion:")) {
+    const id = origen.slice("reversion:".length),
+      ingreso = S.caja.find((m) => m._id === id);
+    return ingreso
+      ? `Reversión vinculada al ingreso del ${ingreso.f} por ${money(ingreso.m)}`
+      : `Reversión vinculada al ingreso ${id}`;
+  }
+  return "—";
+}
 VW.caja = () => {
   const s = AS.cs || S.sedes[0].id,
     L = S.caja.filter((x) => x.sede === s),
@@ -773,12 +797,12 @@ VW.caja = () => {
       ]) +
       "</select>",
   )}${fl("Concepto", "<select id=c_c>" + o(["Matrícula / mensualidad", "Indumentaria", "Pago de campo", "Pago de alquiler", "Planilla de entrenadores", "Compras", "Otros"].filter((x) => U.rol === "ADM" || !/alquiler|Planilla/.test(x)).map((x) => [x, x])) + "</select>")}${fl("Detalle", "<input id=c_d>")}${fl("Monto (S/)", "<input id=c_m type=number min=0>")}</div><div class=row><button data-f="addCaja" data-i="${esc(s)}">Registrar movimiento</button></div></div><div class=card><h3>Saldo de ${esc(sn(s))}: ${money(b)}</h3>${tbl(
-    ["Fecha", "Tipo", "Concepto", "Detalle", "Monto"],
+    ["Fecha", "Tipo", "Concepto", "Detalle", "Trazabilidad", "Monto"],
     L.slice()
       .reverse()
       .map(
         (x) =>
-          `<tr><td>${esc(x.f)}</td><td><span class="b ${x.t === "I" ? "ok" : "no"}">${x.t === "I" ? "Ingreso" : "Egreso"}</span></td><td>${esc(x.c)}</td><td>${esc(x.d)}</td><td>${money(x.m)}</td></tr>`,
+          `<tr><td>${esc(x.f)}</td><td><span class="b ${x.t === "I" ? "ok" : "no"}">${x.t === "I" ? "Ingreso" : "Egreso"}</span></td><td>${esc(x.c)}</td><td>${esc(x.d)}</td><td>${esc(cajaAuditoria(x))}</td><td>${money(x.m)}</td></tr>`,
       ),
   )}<div class=row><button class=g data-f=cp data-i=caja>Copiar para Excel</button></div></div>`;
 };
