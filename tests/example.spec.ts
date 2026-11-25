@@ -1032,6 +1032,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       restored: { pagado: string | number; cuotas: Array<{ n: number; monto: number; abonado: number; saldo: number; estado: string }>; caja: Array<{ monto: number; origen: string }> };
     };
     type HerramientaQA = {
+      prepararIdMatricula: (dni: string) => Promise<string>;
       verificarMatriculaCompleta: (dni: string) => Promise<Resultado>;
       cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
     };
@@ -1051,6 +1052,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       await page.locator('#m_mes').fill('2');
       await page.locator('#m_pag').fill('230');
       await expect(page.locator('#cron_t')).toContainText('Pagada');
+      const idPreparado = await page.evaluate(async (dniPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la preparación de identificador QA');
+        return api.prepararIdMatricula(dniPrueba);
+      }, dni);
+      expect(idPreparado).toBe('QA-MAT-' + dni);
       await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
       await expect(page.locator('#toast')).toContainText('Matrícula guardada', { timeout: 15000 });
 
@@ -1060,7 +1067,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         return api.verificarMatriculaCompleta(dniPrueba);
       }, dni);
 
-      expect(resultado.id).toMatch(/^\d{6}$/);
+      expect(resultado.id).toMatch(/^QA-MAT-\d{8}$/);
       expect(Number(resultado.alumno.costo_matricula)).toBe(50);
       expect(Number(resultado.alumno.costo_mensualidad)).toBe(90);
       expect(resultado.alumno.meses).toBe(2);
