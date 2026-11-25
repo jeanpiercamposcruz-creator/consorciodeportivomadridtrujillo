@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { randomInt, randomUUID } from 'node:crypto';
 
 const url = process.env.ERP_URL;
 const usuario = process.env.ERP_USER;
@@ -544,7 +545,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
 
   test('Mantener la trazabilidad de Caja al crear, editar y anular una venta de indumentaria', async () => {
-    const id = 'QA-KIT-' + Date.now();
+    const id = 'QA-KIT-' + randomInt(1_000_000_000_000, 9_999_999_999_999);
     type ResultadoKit = {
       database: {
         kits: Array<{ id: string; precio_publico: string | number; alumno_id: string; estado: string }>;
@@ -1161,7 +1162,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Completar una matrícula con pago inicial y conciliar ficha, cuotas y Caja en Supabase QA', async () => {
-    const dni = String(10000000 + Math.floor(Math.random() * 89999999));
+    const dni = String(randomInt(10_000_000, 99_999_999));
     type Cuota = { numero_cuota: number; monto: string | number; monto_abonado: string | number; saldo_pendiente: string | number; estado: string };
     type Resultado = {
       id: string;
@@ -1242,7 +1243,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Persistir y recuperar el ingreso de matrícula y su distribución en Caja desde Supabase QA', async () => {
-    const id = 'QA-PERSIST-CAJA-' + Date.now();
+    const id = 'QA-PERSIST-CAJA-' + randomUUID();
     type Tramo = { destino: string; cuota: number; monto: number };
     type Resultado = {
       database: { id: string; detalle: string; monto: string | number; origen: string };
@@ -1286,7 +1287,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Persistir y recuperar monto_abonado y saldo_pendiente mediante el ERP y Supabase QA', async () => {
-    const id = 'QA-PERSIST-CUOTA-' + Date.now();
+    const id = 'QA-PERSIST-CUOTA-' + randomUUID();
     type Resultado = {
       database: { monto: string | number; monto_abonado: string | number; saldo_pendiente: string | number; estado: string };
       restored: { m: string | number; a: string | number; s: string | number; e: string };
