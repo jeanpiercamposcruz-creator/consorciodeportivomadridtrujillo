@@ -155,24 +155,27 @@ const TB = [
     }),
     opt: true,
   },
-  G("personal", "personal", {
-    id: "id",
-    nom: "nombres",
-    dni: "dni",
-    tel: "telefono",
-    esp: "especialidad",
-    rol: "rol",
-    precio: "precio_hora",
-    activo: "activo",
-    foto: "foto",
-    correo: "correo",
-    tc: "tipo_contrato",
-    fi: "fecha_inicio",
-    ff: "fecha_fin",
-    sf: "sueldo_fijo",
-    jor: "jornada",
-    mv: "permite_varias_sedes",
-  }),
+  {
+    ...G("personal", "personal", {
+      id: "id",
+      nom: "nombres",
+      dni: "dni",
+      tel: "telefono",
+      esp: "especialidad",
+      rol: "rol",
+      precio: "precio_hora",
+      activo: "activo",
+      foto: "foto",
+      correo: "correo",
+      tc: "tipo_contrato",
+      fi: "fecha_inicio",
+      ff: "fecha_fin",
+      sf: "sueldo_fijo",
+      jor: "jornada",
+      mv: "permite_varias_sedes",
+    }),
+    read: () => U?.rol === "ADM" ? all("personal") : all("personal_publico"),
+  },
   {
     ...G("personal_sedes", "psedes", {
       id: "id",
@@ -355,7 +358,7 @@ async function pull() {
   // 1) descargar TODO primero (si algo falla aquí, S y SN siguen intactos)
   const raw = {};
   for (const t of TB)
-    raw[t.n] = t.n === "ajustes" ? aj : t.opt ? await all(t.n).catch(() => []) : await all(t.n);
+    raw[t.n] = t.n === "ajustes" ? aj : t.read ? await t.read() : t.opt ? await all(t.n).catch(() => []) : await all(t.n);
   // 2) reemplazar el estado de golpe, sin ningún await en medio
   S = {
     sedes: [],
@@ -459,7 +462,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-kit-void-and-number-v1-20261125",
+      build: "qa-personal-private-fields-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
