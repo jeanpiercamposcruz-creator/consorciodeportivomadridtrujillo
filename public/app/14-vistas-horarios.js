@@ -287,7 +287,7 @@ async function saveAlu() {
   if (delta < 0) {
     const reversas = calcularReversionesCaja(S.caja, id, -delta);
     const disponible = reversas.reduce((s, x) => s + x.monto, 0);
-    if (Math.abs(disponible + delta) > 0.009)
+    if (Math.abs(disponible - -delta) > 0.009)
       return toast("No se puede reducir el pago: los ingresos originales disponibles en caja no cubren la reversión.");
   }
   try {
@@ -394,8 +394,12 @@ function calcularReversionesCaja(caja, alumnoId, importe) {
   const ingresos = caja.filter((x) => x.d === alumnoId && x.t === "I" &&
     (x.c === "Matrícula / mensualidad" || x.k === "matricula:" + alumnoId));
   const resultado = [];
+  // Revertir primero el ingreso más reciente, sin modificar los movimientos originales.
   for (const ingreso of ingresos.slice().reverse()) {
-    const originalId = ingreso._id || (ingreso._id = uid());
+    // Los movimientos persistidos reciben _id desde la capa de datos. No inventar
+    // identificadores aquí: esta función también se usa para prevalidar el ajuste.
+    const originalId = ingreso._id;
+    if (!originalId) continue;
     const revertido = caja.filter((x) => x.t === "E" && x.k === "reversion:" + originalId)
       .reduce((s, x) => s + (+x.m || 0), 0);
     const disponible = Math.max(0, Math.round(((+ingreso.m || 0) - revertido) * 100) / 100);
@@ -406,7 +410,8 @@ function calcularReversionesCaja(caja, alumnoId, importe) {
     }
     if (pendiente <= 0.009) break;
   }
-  if (pendiente > 0.009) resultado.push({ originalId: "", monto: -pendiente });
+  // Si no alcanza el saldo original, devolver solo lo realmente reversible.
+  // saveAlu compara la suma con el importe solicitado y bloquea el guardado.
   return resultado;
 }
 function cronRender() {
