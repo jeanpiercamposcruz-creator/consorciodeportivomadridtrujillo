@@ -392,36 +392,32 @@ async function flush() {
     ]);
     D.unshift([t, [...o.keys()].filter((k) => !m.has(k)), m]);
   }
-  for (const [t, ins, upd, m] of W) {
-    if (ins.length) {
-      const r = await sb("/rest/v1/" + t.n, {
-        method: "POST",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify(ins),
-      });
-      if (r.status === 409) throw "dup";
-      if (!r.ok) throw await r.text();
-    }
-    if (upd.length) {
-      const r = await sb("/rest/v1/" + t.n, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(upd),
-      });
-      if (!r.ok) throw await r.text();
-    }
-    SN[t.n] = new Map([...(SN[t.n] || []), ...m]);
+
+  // Una única RPC hace todos los INSERT/UPDATE/DELETE en una transacción PostgreSQL.
+  // Si cualquier tabla o trigger rechaza una fila, Supabase revierte el lote completo.
+  const delByTable = new Map(D.map(([t, del]) => [t.n, del]));
+  const payload = W.map(([t, ins, upd]) => ({
+    name: t.n,
+    insert: ins,
+    update: upd,
+    delete: delByTable.get(t.n) || [],
+  }));
+  const changed = payload.some((x) => x.insert.length || x.update.length || x.delete.length);
+  if (!changed) return;
+
+  const r = await sb("/rest/v1/rpc/erp_persistir_lote", {
+    method: "POST",
+    body: JSON.stringify({ p_payload: payload }),
+  });
+  if (r.status === 409) throw "dup";
+  if (!r.ok) {
+    const detalle = await r.text();
+    if (/23505|duplicate key/i.test(detalle)) throw "dup";
+    throw detalle;
   }
-  for (const [t, del, m] of D) {
-    if (del.length) {
-      const r = await sb(
-        `/rest/v1/${esc(t.n)}?id=in.(${del.map((k) => encodeURIComponent('"' + String(k).replace(/[\\"]/g, "\\$&") + '"')).join(",")})`,
-        { method: "DELETE" },
-      );
-      if (!r.ok) throw await r.text();
-    }
-    SN[t.n] = m;
-  }
+
+  // Solo se actualiza el snapshot local después de confirmar el lote completo.
+  for (const [t, ins, upd, m] of W) SN[t.n] = m;
 }
 let SAVE_OK = true; // resultado del último guardado (lo consultan recibos y borrado de pre-registros)
 function save() {
@@ -462,7 +458,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-kit-caja-link-v1-20261125",
+      build: "qa-atomic-lote-erp-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -591,6 +587,41 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("El ERP aún conserva datos vinculados a la matrícula QA.");
         }
         return { removed: true, id };
+      },
+      async probarRollbackLote() {
+        if (U?.rol !== "ADM") throw new Error("La prueba de atomicidad requiere una sesión administradora QA.");
+        const suffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const personalId = "QA-ATOMIC-P-" + suffix;
+        const asignacionId = "QA-ATOMIC-H-" + suffix;
+        const payload = [
+          {
+            name: "personal",
+            insert: [{ id: personalId, nombres: "QA Atomicidad", rol: "ENT", activo: 1, permite_varias_sedes: false }],
+            update: [],
+            delete: [],
+          },
+          {
+            name: "horario_profesores",
+            insert: [{ id: asignacionId, horario_id: "QA-HORARIO-INEXISTENTE", personal_id: personalId }],
+            update: [],
+            delete: [],
+          },
+        ];
+        const intento = await sb("/rest/v1/rpc/erp_persistir_lote", {
+          method: "POST",
+          body: JSON.stringify({ p_payload: payload }),
+        });
+        const detalle = await intento.text();
+        if (intento.ok || !/23503|foreign key/i.test(detalle)) {
+          throw new Error("La escritura inválida no produjo el error FK esperado: " + detalle);
+        }
+        const persona = await sb("/rest/v1/personal?id=eq." + encodeURIComponent(personalId) + "&select=id");
+        const asignacion = await sb("/rest/v1/horario_profesores?id=eq." + encodeURIComponent(asignacionId) + "&select=id");
+        if (!persona.ok || !asignacion.ok) throw new Error("No se pudo verificar la reversión del lote.");
+        if ((await persona.json()).length || (await asignacion.json()).length) {
+          throw new Error("FALLO DE ATOMICIDAD: quedó persistida una parte del lote rechazado.");
+        }
+        return { rejected: true, rollback: true, residual: 0 };
       },
       async prepararIdKit(id) {
         if (U?.rol !== "ADM") throw new Error("La preparación de venta QA requiere una sesión administradora.");
