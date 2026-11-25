@@ -459,7 +459,7 @@ function save() {
           window.__ERP_QA_LAST_SAVE_ERROR__ = String(e);
         }
         console.error(e);
-        if (e === "dup") {
+        if (e === "dup" || String(e).startsWith("dup:")) {
           toast(
             "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro.",
           );
