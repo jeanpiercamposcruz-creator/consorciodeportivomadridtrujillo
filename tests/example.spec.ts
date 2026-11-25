@@ -984,4 +984,39 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
   });
 
+
+  test('Reconocer ingresos con aplicación codificada y mostrar su trazabilidad en Caja', async () => {
+    const resultado = await page.evaluate(() => {
+      const cajaAuditoriaFn = (window as unknown as {
+        cajaAuditoria: (movimiento: { k: string }) => string;
+      }).cajaAuditoria;
+      const reversasFn = (window as unknown as {
+        calcularReversionesCaja: (
+          caja: { _id: string; d: string; t: string; c: string; m: number; k: string }[],
+          id: string,
+          importe: number
+        ) => { originalId: string; monto: number }[];
+      }).calcularReversionesCaja;
+      const aplicacion = encodeURIComponent(JSON.stringify([
+        { destino: 'Matrícula', cuota: 0, monto: 50 },
+        { destino: 'Cuota', cuota: 1, monto: 50 },
+      ]));
+      const ingreso = {
+        _id: 'ingreso-auditado',
+        d: 'ALU-QA',
+        t: 'I',
+        c: 'Abono matrícula',
+        m: 100,
+        k: 'matricula:ALU-QA|aplicacion:' + aplicacion,
+      };
+      return {
+        detalle: cajaAuditoriaFn(ingreso),
+        reversa: reversasFn([ingreso], 'ALU-QA', 25),
+      };
+    });
+    expect(resultado.detalle).toContain('Matrícula');
+    expect(resultado.detalle).toContain('Cuota 1');
+    expect(resultado.reversa).toEqual([{ originalId: 'ingreso-auditado', monto: 25 }]);
+  });
+
 });
