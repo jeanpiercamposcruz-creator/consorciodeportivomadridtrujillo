@@ -514,6 +514,95 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // La validación termina antes de insertar la venta o su ingreso automático en caja.
   });
 
+  test('Mantener una única relación entre venta de indumentaria y Caja al crear, editar y eliminar', async () => {
+    const id = 'QA-KIT-' + Date.now();
+    type ResultadoKit = {
+      database: {
+        kits: Array<{ id: string; precio_publico: string | number; alumno_id: string }>;
+        caja: Array<{ id: string; origen: string; monto: string | number; detalle: string }>;
+      };
+      restored: {
+        kit: { id: string; pr: string | number; aid: string } | null;
+        caja: Array<{ id: string; m: string | number; d: string; k: string }>;
+      };
+    };
+    type HerramientaKit = {
+      prepararIdKit: (id: string) => Promise<string>;
+      verificarKitCaja: (id: string) => Promise<ResultadoKit>;
+      cleanupKit: (id: string) => Promise<{ removed: boolean }>;
+    };
+    try {
+      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+      const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
+
+      await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
+      await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+      const preparado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está habilitada la prueba de ventas en Supabase QA.');
+        return api.prepararIdKit(idPrueba);
+      }, id);
+      expect(preparado).toBe(id);
+
+      await page.locator('#k_q').fill(codigoAlumno);
+      const resultado = page.locator('#k_res button').first();
+      await expect(resultado).toBeVisible();
+      await resultado.click();
+      await expect(page.locator('#k_a')).toHaveValue(codigoAlumno);
+      await page.locator('#k_pr').fill('75');
+      await page.locator('#k_c').fill('35');
+      await page.getByRole('button', { name: 'Registrar venta', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Venta registrada');
+
+      let verificado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de venta QA.');
+        return api.verificarKitCaja(idPrueba);
+      }, id);
+      expect(verificado.database.kits).toHaveLength(1);
+      expect(verificado.database.caja).toHaveLength(1);
+      expect(Number(verificado.database.caja[0].monto)).toBe(75);
+      expect(verificado.restored.caja).toHaveLength(1);
+
+      await page.locator('button[data-f="kitEd"][data-i="' + id + '"]').click();
+      await expect(page.getByRole('heading', { name: 'Editar venta', exact: true })).toBeVisible();
+      await page.locator('#k_pr').fill('85');
+      await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Venta actualizada');
+
+      verificado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de venta QA.');
+        return api.verificarKitCaja(idPrueba);
+      }, id);
+      expect(verificado.database.kits).toHaveLength(1);
+      expect(verificado.database.caja).toHaveLength(1);
+      expect(Number(verificado.database.caja[0].monto)).toBe(85);
+
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.locator('button[data-f="delKit"][data-i="' + id + '"]').click();
+      await expect(page.locator('#toast')).toContainText('Venta eliminada');
+      verificado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de venta QA.');
+        return api.verificarKitCaja(idPrueba);
+      }, id);
+      expect(verificado.database.kits).toHaveLength(0);
+      expect(verificado.database.caja).toHaveLength(0);
+      expect(verificado.restored.kit).toBeNull();
+      expect(verificado.restored.caja).toHaveLength(0);
+    } finally {
+      const limpieza = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de la venta QA.');
+        return api.cleanupKit(idPrueba);
+      }, id);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
+
   test('Rechazar movimiento de caja sin monto válido', async () => {
     await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
     await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();

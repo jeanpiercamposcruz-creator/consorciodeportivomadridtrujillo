@@ -462,7 +462,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-alumno-horario-integrity-v1-20261125",
+      build: "qa-kit-caja-link-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -591,6 +591,72 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("El ERP aún conserva datos vinculados a la matrícula QA.");
         }
         return { removed: true, id };
+      },
+      async prepararIdKit(id) {
+        if (U?.rol !== "ADM") throw new Error("La preparación de venta QA requiere una sesión administradora.");
+        if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
+        if (S.kits.some((x) => x._id === id)) throw new Error("El identificador de venta QA ya existe en el ERP.");
+        const r = await sb("/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) + "&select=id");
+        if (!r.ok) throw new Error("No se pudo comprobar la unicidad de la venta QA.");
+        if ((await r.json()).length) throw new Error("El identificador de venta QA ya existe en Supabase.");
+        window.__ERP_QA_NEXT_KIT_ID__ = id;
+        return id;
+      },
+      async verificarKitCaja(id) {
+        if (U?.rol !== "ADM") throw new Error("La verificación de venta QA requiere una sesión administradora.");
+        if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
+        await sv;
+        if (!SAVE_OK) throw new Error("El guardado de la venta QA no terminó correctamente.");
+        const kitRuta = "/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) +
+          "&select=id,codigo,precio_publico,alumno_id";
+        const cajaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id) +
+          "&select=id,origen,monto,detalle";
+        const kitResp = await sb(kitRuta);
+        const cajaResp = await sb(cajaRuta);
+        if (!kitResp.ok || !cajaResp.ok) throw new Error("No se pudo consultar la relación venta-Caja en Supabase.");
+        const kitsDb = await kitResp.json();
+        const cajaDb = await cajaResp.json();
+        await pull();
+        const kitRestaurado = S.kits.find((x) => x._id === id);
+        const cajaRestaurada = S.caja.filter((x) => x.k === "kit|" + id);
+        return {
+          database: { kits: kitsDb, caja: cajaDb },
+          restored: {
+            kit: kitRestaurado ? { id: kitRestaurado._id, pr: kitRestaurado.pr, aid: kitRestaurado.aid } : null,
+            caja: cajaRestaurada.map((x) => ({ id: x._id, m: x.m, d: x.d, k: x.k })),
+          },
+        };
+      },
+      async cleanupKit(id) {
+        if (U?.rol !== "ADM") throw new Error("La limpieza de venta QA requiere una sesión administradora.");
+        if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
+        if (window.__ERP_QA_NEXT_KIT_ID__ === id) delete window.__ERP_QA_NEXT_KIT_ID__;
+        await sv;
+        await pull();
+        S.kits = S.kits.filter((x) => x._id !== id);
+        S.caja = S.caja.filter((x) => x.k !== "kit|" + id);
+        save();
+        await sv;
+        if (!SAVE_OK) throw new Error("No se pudo guardar la limpieza de la venta QA.");
+        const borrar = async (tabla, filtro) => {
+          const ruta = "/rest/v1/" + tabla + "?" + filtro;
+          let r = await sb(ruta + "&select=id");
+          if (!r.ok) throw new Error("No se pudo verificar la limpieza de " + tabla + ".");
+          let filas = await r.json();
+          if (filas.length) {
+            r = await sb(ruta, { method: "DELETE" });
+            if (!r.ok) throw new Error("No se pudo limpiar " + tabla + ": " + await r.text());
+          }
+          r = await sb(ruta + "&select=id");
+          if (!r.ok || (await r.json()).length) throw new Error("Quedaron residuos QA en " + tabla + ".");
+        };
+        await borrar("caja_movimientos", "origen=eq." + encodeURIComponent("kit|" + id));
+        await borrar("kits_ventas", "id=eq." + encodeURIComponent(id));
+        await pull();
+        if (S.kits.some((x) => x._id === id) || S.caja.some((x) => x.k === "kit|" + id)) {
+          throw new Error("El ERP aún conserva datos de la venta temporal QA.");
+        }
+        return { removed: true };
       },
       async roundTripCuota(id) {
         if (U?.rol !== "ADM") throw new Error("La prueba de persistencia requiere una sesión administradora QA.");

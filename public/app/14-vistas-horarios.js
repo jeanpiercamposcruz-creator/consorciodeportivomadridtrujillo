@@ -711,21 +711,25 @@ function saveKit() {
       KE = null;
       return toast("La venta ya no existe. Recarga e inténtalo de nuevo.");
     }
-    Object.assign(existingEdit, kit);
-    const realId = String(existingEdit._id ?? existingEdit.id ?? editKey).trim();
-    const cx = S.caja.find(
-      (c) => String(c.k ?? "").trim() === "kit|" + realId || String(c.k ?? "").trim() === "kit|" + editKey
-    );
-    if (cx) {
-      Object.assign(cx, { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
-    } else {
-      S.caja.push({ f: kit.f, sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + realId });
+    const realId = String(existingEdit._id ?? "").trim();
+    const movimientos = S.caja.filter((c) => String(c.k ?? "").trim() === "kit|" + realId);
+    if (!realId || movimientos.length !== 1) {
+      return toast("No se puede editar esta venta: su ingreso de Caja no está vinculado de forma única. No se modificó nada.");
     }
+    Object.assign(existingEdit, kit);
+    Object.assign(movimientos[0], { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
     KE = null;
     toast("Venta actualizada");
   } else {
-    const id = nxl(S.kits, "KIT-", 4);
-    S.kits.push({ id, ...kit });
+    const qaId = window.__ERP_QA_NEXT_KIT_ID__;
+    const id =
+      SB === "https://yiredilknlwbzwvwlqyx.supabase.co" &&
+      U?.rol === "ADM" &&
+      /^QA-KIT-\d{13}$/.test(String(qaId || "")) &&
+      !S.kits.some((x) => x._id === qaId)
+        ? (delete window.__ERP_QA_NEXT_KIT_ID__, qaId)
+        : uid();
+    S.kits.push({ _id: id, ...kit });
     S.caja.push({ f: kit.f || today(), sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + id });
     toast("Venta registrada");
   }
@@ -752,15 +756,15 @@ function delKit(id) {
     return toast("La venta no se encontró en la lista");
   }
 
+  const realId = String(match._id ?? "").trim();
+  const movimientos = S.caja.filter((c) => String(c.k ?? "").trim() === "kit|" + realId);
+  if (!realId || movimientos.length !== 1) {
+    return toast("No se puede eliminar esta venta: su ingreso de Caja no está vinculado de forma única. No se modificó nada.");
+  }
   if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
 
-  const realId = String(match._id ?? match.id ?? targetId).trim();
   S.kits = S.kits.filter((k) => k !== match);
-  S.caja = S.caja.filter(
-    (c) =>
-      String(c.k ?? "").trim() !== "kit|" + realId &&
-      String(c.k ?? "").trim() !== "kit|" + targetId
-  );
+  S.caja = S.caja.filter((c) => c !== movimientos[0]);
 
   save();
   toast("Venta eliminada");
