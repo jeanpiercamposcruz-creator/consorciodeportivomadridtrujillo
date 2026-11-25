@@ -931,4 +931,37 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
+
+  test('Registrar trazabilidad de cada abono por matrícula y cuota en orden', async () => {
+    const resultado = await page.evaluate(() => {
+      const fn = (window as unknown as {
+        distribuirAbonoMatricula: (cm: number, cmen: number, meses: number, desde: number, hasta: number) =>
+          { destino: string; cuota: number; monto: number }[];
+      }).distribuirAbonoMatricula;
+      return {
+        primero: fn(50, 90, 2, 0, 100),
+        segundo: fn(50, 90, 2, 100, 190),
+        tercero: fn(50, 90, 2, 190, 230),
+      };
+    });
+    expect(resultado.primero).toEqual([
+      { destino: 'Matrícula', cuota: 0, monto: 50 },
+      { destino: 'Cuota', cuota: 1, monto: 50 },
+    ]);
+    expect(resultado.segundo).toEqual([
+      { destino: 'Cuota', cuota: 1, monto: 40 },
+      { destino: 'Cuota', cuota: 2, monto: 50 },
+    ]);
+    expect(resultado.tercero).toEqual([
+      { destino: 'Cuota', cuota: 2, monto: 40 },
+    ]);
+    for (const [desde, hasta, tramos] of [
+      [0, 100, resultado.primero],
+      [100, 190, resultado.segundo],
+      [190, 230, resultado.tercero],
+    ] as const) {
+      expect(tramos.reduce((s, x) => s + x.monto, 0)).toBe(hasta - desde);
+    }
+  });
+
 });
