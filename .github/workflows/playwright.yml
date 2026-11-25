@@ -47,13 +47,13 @@ jobs:
         env:
           ERP_URL: ${{ secrets.ERP_URL }}
         run: |
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 12); do
             if curl --fail --silent --show-error "${ERP_URL%/}/app/14-vistas-horarios.js" 2>/dev/null | grep -q 'qa-pagos-v4-caja-auditoria-20261125'; then
               echo "La vista previa de QA sirve exactamente la versión de pagos esperada."
               echo "deployed=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "Esperando el despliegue correcto de QA (${attempt}/60)..."
+            echo "Esperando el despliegue correcto de QA (${attempt}/12)..."
             sleep 10
           done
           echo "::warning::Vercel todavía no publicó la versión QA esperada; las pruebas E2E se omitirán para no probar código antiguo."
