@@ -514,6 +514,27 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // La validación termina antes de insertar la venta o su ingreso automático en caja.
   });
 
+  test('Dashboard no duplica alquiler ni planilla dentro de otros egresos', async () => {
+    const resultado = await page.evaluate(() => {
+      const sede = S.sedes[0];
+      if (!sede) throw new Error('No hay sede disponible para comprobar el Dashboard.');
+      const mes = today().slice(0, 7);
+      const antes = gerRow(sede, mes);
+      const originales = S.caja;
+      S.caja = originales.concat([
+        { _id: 'QA-DASH-RENT', f: mes + '-10', sede: sede.id, t: 'E', c: 'Pago de alquiler', d: 'QA', m: 100 },
+        { _id: 'QA-DASH-PAYROLL', f: mes + '-11', sede: sede.id, t: 'E', c: 'Planilla de entrenadores', d: 'QA', m: 200 },
+        { _id: 'QA-DASH-OTHER', f: mes + '-12', sede: sede.id, t: 'E', c: 'Compras', d: 'QA', m: 50 },
+      ]);
+      const despues = gerRow(sede, mes);
+      S.caja = originales;
+      return { deltaOtrosEgresos: despues.eg - antes.eg, deltaUtilidad: despues.u - antes.u };
+    });
+    expect(resultado.deltaOtrosEgresos).toBe(50);
+    expect(resultado.deltaUtilidad).toBe(-50);
+  });
+
+
   test('Revertir todas las tablas cuando falla una escritura del lote ERP', async () => {
     type HerramientaAtomica = {
       probarRollbackLote: () => Promise<{ rejected: boolean; rollback: boolean; residual: number }>;

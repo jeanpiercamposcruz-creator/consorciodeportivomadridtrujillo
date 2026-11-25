@@ -836,7 +836,10 @@ const WARN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke
 function gerRow(s, ym) {
   const mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(ym)),
     ing = mc.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
-    eg = mc.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
+    // Alquiler y planilla se calculan por separado abajo; no deben repetirse en "otros egresos".
+    eg = mc
+      .filter((x) => x.t === "E" && !["Pago de alquiler", "Planilla de entrenadores"].includes(x.c))
+      .reduce((t, x) => t + x.m, 0),
     kc = S.kits.filter((k) => k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
       .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym))
