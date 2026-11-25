@@ -243,7 +243,29 @@ function upHor() {
     "Sin horario aún",
   );
 }
-async function saveAlu() {
+async /* Asigna el tramo de un abono nuevo a matrícula y cuotas, conservando el detalle
+   dentro del movimiento de caja para que sobreviva a la sincronización con Supabase. */
+function distribuirAbonoMatricula(cm, cmen, meses, desde, hasta) {
+  const cent = (n) => Math.round((Math.max(0, +n || 0) + Number.EPSILON) * 100) / 100;
+  let inicio = cent(desde), fin = cent(hasta);
+  if (fin <= inicio) return [];
+  const tramos = [],
+    matricula = cent(cm),
+    mensualidad = cent(cmen),
+    totalMeses = Math.min(36, Math.max(0, parseInt(meses) || 0));
+  if (matricula > 0) tramos.push({ destino: "Matrícula", cuota: 0, inicio: 0, fin: matricula });
+  for (let n = 1; n <= totalMeses && mensualidad > 0; n++) {
+    const a = matricula + (n - 1) * mensualidad;
+    tramos.push({ destino: "Cuota", cuota: n, inicio: a, fin: a + mensualidad });
+  }
+  return tramos.map((t) => ({
+    destino: t.destino,
+    cuota: t.cuota,
+    monto: cent(Math.max(0, Math.min(fin, t.fin) - Math.max(inicio, t.inicio))),
+  })).filter((x) => x.monto > 0.009);
+}
+
+function saveAlu() {
   const { d, e } = validarAlumno({
       nom: v("m_nom"),
       ape: v("m_ape"),
@@ -312,7 +334,10 @@ async function saveAlu() {
       c: "Matrícula / mensualidad",
       d: id,
       m: delta,
-      k: "matricula:" + id,
+      // La aplicación por concepto/cuota queda ligada al ingreso original.
+      k: "matricula:" + id + "|aplicacion:" + encodeURIComponent(JSON.stringify(
+        distribuirAbonoMatricula(d.cm, d.cmen, d.mes, old ? old.pag : 0, d.pag),
+      )),
     });
   } else if (delta < 0) {
     calcularReversionesCaja(S.caja, id, -delta).forEach((x) => {
