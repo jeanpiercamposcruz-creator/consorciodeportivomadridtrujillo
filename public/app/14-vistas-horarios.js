@@ -807,8 +807,13 @@ function delKit(id) {
   save();
   sv = sv.then(async () => {
     if (SAVE_OK) {
-      await pull();
-      R();
+      try {
+        await pull();
+        R();
+      } catch (e) {
+        console.error("La venta se anuló, pero no se pudo refrescar la vista de Caja.", e);
+        toast("Venta anulada. Recarga para actualizar la reversión de Caja.");
+      }
     }
   });
   toast("Venta anulada y reversión registrada en Caja");
