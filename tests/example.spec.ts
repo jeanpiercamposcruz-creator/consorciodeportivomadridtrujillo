@@ -543,16 +543,18 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
-  test('Mantener una única relación entre venta de indumentaria y Caja al crear, editar y eliminar', async () => {
+  test('Mantener la trazabilidad de Caja al crear, editar y anular una venta de indumentaria', async () => {
     const id = 'QA-KIT-' + Date.now();
     type ResultadoKit = {
       database: {
-        kits: Array<{ id: string; precio_publico: string | number; alumno_id: string }>;
-        caja: Array<{ id: string; origen: string; monto: string | number; detalle: string }>;
+        kits: Array<{ id: string; precio_publico: string | number; alumno_id: string; estado: string }>;
+        caja: Array<{ id: string; origen: string; monto: string | number; detalle: string; tipo: string; concepto: string }>;
+        reversas: Array<{ id: string; origen: string; monto: string | number; detalle: string; tipo: string; concepto: string }>;
       };
       restored: {
-        kit: { id: string; pr: string | number; aid: string } | null;
-        caja: Array<{ id: string; m: string | number; d: string; k: string }>;
+        kit: { id: string; pr: string | number; aid: string; est: string } | null;
+        caja: Array<{ id: string; m: string | number; d: string; k: string; t: string }>;
+        reversas: Array<{ id: string; m: string | number; d: string; k: string; t: string }>;
       };
     };
     type HerramientaKit = {
@@ -611,16 +613,22 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
       page.once('dialog', (dialog) => dialog.accept());
       await page.locator('button[data-f="delKit"][data-i="' + id + '"]').click();
-      await expect(page.locator('#toast')).toContainText('Venta eliminada');
+      await expect(page.locator('#toast')).toContainText('Venta anulada y reversión registrada en Caja');
       verificado = await page.evaluate(async (idPrueba) => {
         const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación de venta QA.');
         return api.verificarKitCaja(idPrueba);
       }, id);
-      expect(verificado.database.kits).toHaveLength(0);
-      expect(verificado.database.caja).toHaveLength(0);
-      expect(verificado.restored.kit).toBeNull();
-      expect(verificado.restored.caja).toHaveLength(0);
+      expect(verificado.database.kits).toHaveLength(1);
+      expect(verificado.database.kits[0].estado).toBe('Anulada');
+      expect(verificado.database.caja).toHaveLength(1);
+      expect(verificado.database.reversas).toHaveLength(1);
+      expect(verificado.database.caja[0].tipo).toBe('I');
+      expect(verificado.database.reversas[0].tipo).toBe('E');
+      expect(Number(verificado.database.reversas[0].monto)).toBe(85);
+      expect(verificado.restored.kit?.est).toBe('Anulada');
+      expect(verificado.restored.caja).toHaveLength(1);
+      expect(verificado.restored.reversas).toHaveLength(1);
     } finally {
       const limpieza = await page.evaluate(async (idPrueba) => {
         const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;

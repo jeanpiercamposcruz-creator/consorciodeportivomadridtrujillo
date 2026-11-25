@@ -661,20 +661,26 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         const kitRuta = "/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) +
           "&select=id,codigo,precio_publico,alumno_id";
         const cajaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id) +
-          "&select=id,origen,monto,detalle";
+          "&select=id,origen,monto,detalle,tipo,concepto";
+        const reversaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("reversion-kit|" + id) +
+          "&select=id,origen,monto,detalle,tipo,concepto";
         const kitResp = await sb(kitRuta);
         const cajaResp = await sb(cajaRuta);
-        if (!kitResp.ok || !cajaResp.ok) throw new Error("No se pudo consultar la relación venta-Caja en Supabase.");
+        const reversaResp = await sb(reversaRuta);
+        if (!kitResp.ok || !cajaResp.ok || !reversaResp.ok) throw new Error("No se pudo consultar la relación venta-Caja en Supabase.");
         const kitsDb = await kitResp.json();
         const cajaDb = await cajaResp.json();
+        const reversaDb = await reversaResp.json();
         await pull();
         const kitRestaurado = S.kits.find((x) => x._id === id);
         const cajaRestaurada = S.caja.filter((x) => x.k === "kit|" + id);
+        const reversaRestaurada = S.caja.filter((x) => x.k === "reversion-kit|" + id);
         return {
-          database: { kits: kitsDb, caja: cajaDb },
+          database: { kits: kitsDb, caja: cajaDb, reversas: reversaDb },
           restored: {
-            kit: kitRestaurado ? { id: kitRestaurado._id, pr: kitRestaurado.pr, aid: kitRestaurado.aid } : null,
-            caja: cajaRestaurada.map((x) => ({ id: x._id, m: x.m, d: x.d, k: x.k })),
+            kit: kitRestaurado ? { id: kitRestaurado._id, pr: kitRestaurado.pr, aid: kitRestaurado.aid, est: kitRestaurado.est } : null,
+            caja: cajaRestaurada.map((x) => ({ id: x._id, m: x.m, d: x.d, k: x.k, t: x.t })),
+            reversas: reversaRestaurada.map((x) => ({ id: x._id, m: x.m, d: x.d, k: x.k, t: x.t })),
           },
         };
       },
@@ -685,7 +691,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         await sv;
         await pull();
         S.kits = S.kits.filter((x) => x._id !== id);
-        S.caja = S.caja.filter((x) => x.k !== "kit|" + id);
+        S.caja = S.caja.filter((x) => x.k !== "kit|" + id && x.k !== "reversion-kit|" + id);
         save();
         await sv;
         // Si el guardado normal falla, la limpieza continúa por REST para no dejar residuos QA.
@@ -702,6 +708,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           if (!r.ok || (await r.json()).length) throw new Error("Quedaron residuos QA en " + tabla + ".");
         };
         await borrar("caja_movimientos", "origen=eq." + encodeURIComponent("kit|" + id));
+        await borrar("caja_movimientos", "origen=eq." + encodeURIComponent("reversion-kit|" + id));
         await borrar("kits_ventas", "id=eq." + encodeURIComponent(id));
         await pull();
         if (S.kits.some((x) => x._id === id) || S.caja.some((x) => x.k === "kit|" + id)) {
