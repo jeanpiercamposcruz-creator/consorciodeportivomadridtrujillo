@@ -637,7 +637,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         S.caja = S.caja.filter((x) => x.k !== "kit|" + id);
         save();
         await sv;
-        if (!SAVE_OK) throw new Error("No se pudo guardar la limpieza de la venta QA.");
+        // Si el guardado normal falla, la limpieza continúa por REST para no dejar residuos QA.
         const borrar = async (tabla, filtro) => {
           const ruta = "/rest/v1/" + tabla + "?" + filtro;
           let r = await sb(ruta + "&select=id");
