@@ -1060,7 +1060,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         return api.verificarMatriculaCompleta(dniPrueba);
       }, dni);
 
-      expect(resultado.id).toMatch(/^\\d{6}$/);
+      expect(resultado.id).toMatch(/^\d{6}$/);
       expect(Number(resultado.alumno.costo_matricula)).toBe(50);
       expect(Number(resultado.alumno.costo_mensualidad)).toBe(90);
       expect(resultado.alumno.meses).toBe(2);
