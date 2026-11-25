@@ -56,8 +56,9 @@ jobs:
             echo "Esperando el despliegue correcto de QA (${attempt}/12)..."
             sleep 10
           done
-          echo "::warning::Vercel todavía no publicó la versión QA esperada; las pruebas E2E se omitirán para no probar código antiguo."
+          echo "::error::Vercel todavía no publicó la versión QA esperada. No se puede declarar aprobada una ejecución sin pruebas E2E."
           echo "deployed=false" >> "$GITHUB_OUTPUT"
+          exit 1
 
       - name: Run Playwright tests
         if: steps.qa_preview.outputs.deployed == 'true'
