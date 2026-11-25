@@ -48,7 +48,7 @@ jobs:
           ERP_URL: ${{ secrets.ERP_URL }}
         run: |
           for attempt in $(seq 1 60); do
-            if curl --fail --silent --show-error "${ERP_URL%/}/app/14-vistas-horarios.js" 2>/dev/null | grep -q 'qa-pagos-v3-20261125'; then
+            if curl --fail --silent --show-error "${ERP_URL%/}/app/14-vistas-horarios.js" 2>/dev/null | grep -q 'qa-pagos-v4-caja-auditoria-20261125'; then
               echo "La vista previa de QA sirve exactamente la versión de pagos esperada."
               echo "deployed=true" >> "$GITHUB_OUTPUT"
               exit 0
