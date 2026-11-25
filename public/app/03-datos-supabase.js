@@ -659,7 +659,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         await sv;
         if (!SAVE_OK) throw new Error("El guardado de la venta QA no terminó correctamente.");
         const kitRuta = "/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) +
-          "&select=id,codigo,precio_publico,alumno_id";
+          "&select=id,codigo,precio_publico,alumno_id,estado";
         const cajaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id) +
           "&select=id,origen,monto,detalle,tipo,concepto";
         const reversaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("reversion-kit|" + id) +
