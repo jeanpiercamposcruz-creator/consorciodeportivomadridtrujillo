@@ -1030,10 +1030,6 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       roundTripCuota: (id: string) => Promise<Resultado>;
       cleanupCuota: (id: string) => Promise<{ removed: boolean }>;
     };
-    const helper = () => (window as unknown as {
-      __ERP_QA_PERSISTENCIA__?: HerramientaQA;
-    }).__ERP_QA_PERSISTENCIA__;
-
     try {
       const resultado = await page.evaluate(async (idPrueba) => {
         const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
