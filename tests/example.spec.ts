@@ -1222,7 +1222,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
 
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Matrículas y Alumnos', exact: true })).toBeVisible();
+    // Cancelar la ficha vuelve al directorio, no al panel de Matrículas.
+    await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
 
