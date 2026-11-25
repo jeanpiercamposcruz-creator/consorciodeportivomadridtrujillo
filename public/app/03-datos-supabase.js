@@ -459,7 +459,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-dashboard-expenses-v2-v1-20261125",
+      build: "qa-kit-void-and-number-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -705,6 +705,11 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         } finally {
           for (const id of kitIds) await borrar("kits_ventas", "id", "QA-KIT-" + id);
           for (const alumno of alumnos) await borrar("alumnos", "id", alumno.id);
+          const kitsRestantes = await sb("/rest/v1/kits_ventas?id=in.(" + kitIds.map((id) => encodeURIComponent("QA-KIT-" + id)).join(",") + ")&select=id");
+          const alumnosRestantes = await sb("/rest/v1/alumnos?id=in.(" + alumnos.map((a) => encodeURIComponent(a.id)).join(",") + ")&select=id");
+          if (!kitsRestantes.ok || !alumnosRestantes.ok || (await kitsRestantes.json()).length || (await alumnosRestantes.json()).length) {
+            throw new Error("La prueba de camisetas dejó residuos en Supabase QA.");
+          }
         }
       },
       async prepararIdKit(id) {
@@ -775,7 +780,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         await borrar("caja_movimientos", "origen=eq." + encodeURIComponent("reversion-kit|" + id));
         await borrar("kits_ventas", "id=eq." + encodeURIComponent(id));
         await pull();
-        if (S.kits.some((x) => x._id === id) || S.caja.some((x) => x.k === "kit|" + id)) {
+        if (S.kits.some((x) => x._id === id) || S.caja.some((x) => x.k === "kit|" + id || x.k === "reversion-kit|" + id)) {
           throw new Error("El ERP aún conserva datos de la venta temporal QA.");
         }
         return { removed: true };
