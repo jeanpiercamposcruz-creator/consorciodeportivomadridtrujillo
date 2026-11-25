@@ -801,7 +801,7 @@ function delKit(id) {
   if (!confirm("¿Anular esta venta? Se conservará el ingreso original y se registrará un egreso de reversión en Caja.")) return;
 
   match.est = "Anulada";
-  S.caja.push({ _id: "REV-KIT-" + realId, f: today(), sede: match.sede, t: "E", c: "Reversión de indumentaria", d: match.aid, m: movimientos[0].m, k: "reversion-kit|" + realId });
+  S.caja.push({ _id: uid(), f: today(), sede: match.sede, t: "E", c: "Reversión de indumentaria", d: match.aid, m: movimientos[0].m, k: "reversion-kit|" + realId });
 
   save();
   toast("Venta anulada y reversión registrada en Caja");
