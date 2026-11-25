@@ -455,6 +455,69 @@ function save() {
     .catch((e) => console.error("cola de guardado", e)); // la cadena nunca queda rechazada
 }
 
+
+/* Herramienta E2E de persistencia, limitada al proyecto Supabase QA y a administradores.
+   No expone el estado interno general ni se habilita contra la base de producción. */
+if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
+  Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
+    configurable: true,
+    value: Object.freeze({
+      async roundTripCuota(id) {
+        if (U?.rol !== "ADM") throw new Error("La prueba de persistencia requiere una sesión administradora QA.");
+        if (!/^QA-PERSIST-CUOTA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("Identificador temporal QA inválido.");
+        if (S.cuotas.some((x) => x.id === id)) throw new Error("El identificador temporal ya existe.");
+        const alumno = S.alu.find((x) => x.id);
+        if (!alumno) throw new Error("No hay alumno QA para asociar la cuota temporal.");
+
+        S.cuotas.push({
+          id, aid: alumno.id, n: 99, f: "2026-12-31",
+          m: 90, a: 50, s: 40, e: "Parcial",
+        });
+        save();
+        await sv;
+        if (!SAVE_OK) throw new Error("El guardado real del ERP falló.");
+
+        const ruta = "/rest/v1/cronograma_cuotas?id=eq." + encodeURIComponent(id) +
+          "&select=id,alumno_id,numero_cuota,monto,monto_abonado,saldo_pendiente,estado";
+        const respuesta = await sb(ruta);
+        if (!respuesta.ok) throw new Error("Consulta posterior al guardado falló: " + await respuesta.text());
+        const filas = await respuesta.json();
+        if (filas.length !== 1) throw new Error("Supabase no devolvió una única cuota temporal.");
+
+        await pull();
+        const recuperada = S.cuotas.find((x) => x.id === id);
+        if (!recuperada) throw new Error("El ERP no recuperó la cuota desde Supabase.");
+        return {
+          database: filas[0],
+          restored: { id: recuperada.id, m: recuperada.m, a: recuperada.a, s: recuperada.s, e: recuperada.e },
+        };
+      },
+      async cleanupCuota(id) {
+        if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
+        if (!/^QA-PERSIST-CUOTA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
+        S.cuotas = S.cuotas.filter((x) => x.id !== id);
+        save();
+        await sv;
+
+        const ruta = "/rest/v1/cronograma_cuotas?id=eq." + encodeURIComponent(id);
+        let verificacion = await sb(ruta + "&select=id");
+        if (!verificacion.ok) throw new Error("No se pudo verificar la limpieza: " + await verificacion.text());
+        let filas = await verificacion.json();
+        if (filas.length) {
+          const borrado = await sb(ruta, { method: "DELETE" });
+          if (!borrado.ok) throw new Error("No se pudo eliminar el ID temporal QA: " + await borrado.text());
+        }
+        verificacion = await sb(ruta + "&select=id");
+        if (!verificacion.ok) throw new Error("No se pudo confirmar la limpieza QA.");
+        filas = await verificacion.json();
+        if (filas.length) throw new Error("El registro temporal QA continúa en Supabase.");
+        await pull();
+        return { removed: true };
+      },
+    }),
+  });
+}
+
 async function backup() {
   try {
     await pull();
