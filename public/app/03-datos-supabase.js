@@ -543,6 +543,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       async cleanupMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
+        if (window.__ERP_QA_NEXT_ALUMNO_ID__ === "QA-MAT-" + dni) delete window.__ERP_QA_NEXT_ALUMNO_ID__;
         await sv;
         await pull();
         const alumno = S.alu.find((x) => x.dni === dni);
