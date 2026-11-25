@@ -692,7 +692,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       let egresos = 0;
       for (const fila of filas) {
         if (!fila[0]?.startsWith(anio + '-' + mes)) continue;
-        const monto = numero(fila[4] || '');
+        // Caja ahora incluye la columna Trazabilidad antes del importe.
+        const monto = numero(fila[5] || '');
         if (fila[1] === 'Ingreso') ingresos += monto;
         if (fila[1] === 'Egreso') egresos += monto;
       }
