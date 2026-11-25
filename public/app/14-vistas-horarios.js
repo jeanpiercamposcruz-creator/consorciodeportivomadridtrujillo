@@ -291,7 +291,17 @@ async function saveAlu() {
     e.push("Sede o deporte inválido");
   if (e.length) return toast(e[0]);
   const old = ED ? S.alu.find((x) => x.id === ED) : null,
-    hh = S.hor.find((h) => h.id === v("m_hor"));
+    horarioId = v("m_hor"),
+    hh = horarioId ? S.hor.find((h) => h.id === horarioId) : null;
+  if (
+    horarioId &&
+    (!hh ||
+      hh.est === "Inactivo" ||
+      hh.sede !== v("m_sed") ||
+      hh.dep !== v("m_dep") ||
+      +hh.cat !== y)
+  )
+    return toast("El horario seleccionado no corresponde a la sede, deporte y categoría del alumno, o está inactivo.");
   Object.assign(d, {
     dep: v("m_dep"),
     sede: v("m_sed"),

@@ -1174,4 +1174,50 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
   });
 
+
+  test('Rechazar matrícula con horario de otra sede o deporte antes de persistir', async () => {
+    await page.getByText('Matrículas y Alumnos', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Matrículas y Alumnos', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+    await page.locator('#m_nom').fill('QA');
+    await page.locator('#m_ape').fill('Prueba de integridad');
+    await page.locator('#m_nac').fill('2012-01-15');
+    await page.locator('#m_sex').selectOption('M');
+    await page.locator('#m_mod').selectOption('Formativo');
+    await page.locator('#m_con').selectOption('Ninguna');
+    await page.locator('#m_est').selectOption('Activo');
+    await page.locator('#m_dep').selectOption('DEP-FUT');
+    await page.locator('#m_sed').selectOption('SED-CSJ');
+
+    // HOR-0002 existe en QA, pero pertenece a SED-EST / DEP-VOL.
+    // Se inyecta como opción para simular una selección manipulada del navegador.
+    await page.locator('#m_hor').evaluate((node) => {
+      (node as HTMLSelectElement).add(new Option('QA: horario incompatible', 'HOR-0002'));
+    });
+    await page.locator('#m_hor').selectOption('HOR-0002');
+
+    let intentoDeEscritura = false;
+    const bloquearEscritura = async (route: import('@playwright/test').Route) => {
+      if (route.request().method() !== 'GET') {
+        intentoDeEscritura = true;
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    };
+    await page.route('**/rest/v1/alumnos**', bloquearEscritura);
+    try {
+      await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('El horario seleccionado no corresponde');
+      expect(intentoDeEscritura, 'La validación debe bloquear la operación antes de llamar a Supabase').toBeFalsy();
+    } finally {
+      await page.unroute('**/rest/v1/alumnos**', bloquearEscritura);
+    }
+
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Matrículas y Alumnos', exact: true })).toBeVisible();
+  });
+
+
 });
