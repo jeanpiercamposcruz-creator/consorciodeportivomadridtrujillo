@@ -411,6 +411,19 @@ async function flush() {
     update: upd,
     delete: delByTable.get(t.n) || [],
   }));
+  if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co" && U?.rol === "ADM") {
+    const caja = payload.find((x) => x.name === "caja_movimientos");
+    const kits = payload.find((x) => x.name === "kits_ventas");
+    const asignaciones = payload.find((x) => x.name === "horario_profesores");
+    const ids = (caja?.insert || []).map((x) => x.id);
+    window.__ERP_QA_LAST_PERSISTENCIA_DIAG__ = {
+      cajaInsertIds: ids,
+      cajaDuplicateIds: ids.filter((id, i) => ids.indexOf(id) !== i),
+      kitInsertIds: (kits?.insert || []).map((x) => x.id),
+      horarioProfesorInsert: (asignaciones?.insert || []).map((x) => ({ id: x.id, horario_id: x.horario_id, personal_id: x.personal_id })),
+    };
+    window.__ERP_QA_LAST_SAVE_ERROR__ = null;
+  }
   const changed = payload.some((x) => x.insert.length || x.update.length || x.delete.length);
   if (!changed) return;
 
@@ -439,6 +452,9 @@ function save() {
         await ver();
       } catch (e) {
         SAVE_OK = false;
+        if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co" && U?.rol === "ADM") {
+          window.__ERP_QA_LAST_SAVE_ERROR__ = String(e);
+        }
         console.error(e);
         if (e === "dup") {
           toast(
@@ -467,7 +483,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-uid-uuid-v1-20261125",
+      build: "qa-uid-debug-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -754,7 +770,13 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         if (U?.rol !== "ADM") throw new Error("La verificación de venta QA requiere una sesión administradora.");
         if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
         await sv;
-        if (!SAVE_OK) throw new Error("El guardado de la venta QA no terminó correctamente.");
+        if (!SAVE_OK) {
+          const diagnostico = {
+            error: window.__ERP_QA_LAST_SAVE_ERROR__ || "desconocido",
+            lote: window.__ERP_QA_LAST_PERSISTENCIA_DIAG__ || null,
+          };
+          throw new Error("El guardado de la venta QA no terminó correctamente: " + JSON.stringify(diagnostico));
+        }
         const kitRuta = "/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) +
           "&select=id,codigo,precio_publico,alumno_id,estado";
         const cajaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id) +
