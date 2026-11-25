@@ -467,7 +467,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-personal-private-fields-v2-20261125",
+      build: "qa-matricula-atomic-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -650,6 +650,22 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("FALLO DE ATOMICIDAD: quedó persistida una parte del lote rechazado.");
         }
         return { rejected: true, rollback: true, residual: 0 };
+      },
+      async probarIdsMatriculaConcurrentes() {
+        if (U?.rol !== "ADM" || SB !== "https://yiredilknlwbzwvwlqyx.supabase.co") throw new Error("La prueba de IDs de matrícula requiere sesión administradora en QA.");
+        const anio = Number(String(Y).slice(2));
+        const ruta = "/rest/v1/rpc/siguiente_id_matricula";
+        const resultados = await Promise.all([
+          sb(ruta, { method: "POST", body: JSON.stringify({ p_anio: anio }) }),
+          sb(ruta, { method: "POST", body: JSON.stringify({ p_anio: anio }) }),
+        ]);
+        const ids = await Promise.all(resultados.map(async (r) => {
+          if (!r.ok) throw new Error("Supabase rechazó la reserva concurrente de matrícula: " + await r.text());
+          return r.json();
+        }));
+        const patron = new RegExp("^" + String(anio).padStart(2, "0") + "[0-9]{4}$");
+        if (ids.length !== 2 || ids[0] === ids[1] || ids.some((id) => typeof id !== "string" || !patron.test(id))) throw new Error("El generador concurrente produjo IDs repetidos o inválidos.");
+        return { ids, unique: new Set(ids).size };
       },
       async probarNumeroCamisetaConcurrente() {
         if (U?.rol !== "ADM" || SB !== "https://yiredilknlwbzwvwlqyx.supabase.co") {
