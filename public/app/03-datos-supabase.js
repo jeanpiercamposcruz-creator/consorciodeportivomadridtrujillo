@@ -418,8 +418,11 @@ async function flush() {
     const ids = (caja?.insert || []).map((x) => x.id);
     window.__ERP_QA_LAST_PERSISTENCIA_DIAG__ = {
       cajaInsertIds: ids,
+      cajaUpdateIds: (caja?.update || []).map((x) => x.id),
+      cajaDeleteIds: (caja?.delete || []),
       cajaDuplicateIds: ids.filter((id, i) => ids.indexOf(id) !== i),
       kitInsertIds: (kits?.insert || []).map((x) => x.id),
+      kitUpdateIds: (kits?.update || []).map((x) => x.id),
       horarioProfesorInsert: (asignaciones?.insert || []).map((x) => ({ id: x.id, horario_id: x.horario_id, personal_id: x.personal_id })),
     };
     window.__ERP_QA_LAST_SAVE_ERROR__ = null;
@@ -434,7 +437,7 @@ async function flush() {
   if (r.status === 409) throw "dup";
   if (!r.ok) {
     const detalle = await r.text();
-    if (/23505|duplicate key/i.test(detalle)) throw "dup";
+    if (/23505|duplicate key/i.test(detalle)) throw "dup: HTTP " + r.status + " " + detalle;
     throw detalle;
   }
 
@@ -483,7 +486,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-uid-debug-v1-20261125",
+      build: "qa-uid-debug-v2-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
