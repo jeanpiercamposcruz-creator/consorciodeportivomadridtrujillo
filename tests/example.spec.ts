@@ -1020,6 +1020,50 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     expect(resultado.reversa).toEqual([{ originalId: 'ingreso-auditado', monto: 25 }]);
   });
 
+  test('Persistir y recuperar el ingreso de matrícula y su distribución en Caja desde Supabase QA', async () => {
+    const id = 'QA-PERSIST-CAJA-' + Date.now();
+    type Tramo = { destino: string; cuota: number; monto: number };
+    type Resultado = {
+      database: { id: string; detalle: string; monto: string | number; origen: string };
+      restored: { id: string; d: string; m: string | number; k: string };
+      allocation: Tramo[];
+    };
+    type HerramientaQA = {
+      roundTripCaja: (id: string) => Promise<Resultado>;
+      cleanupCaja: (id: string) => Promise<{ removed: boolean }>;
+    };
+    try {
+      const resultado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('La prueba de Caja no está habilitada en este proyecto Supabase QA');
+        return api.roundTripCaja(idPrueba);
+      }, id);
+
+      expect(resultado.database.id).toBe(id);
+      expect(resultado.database.detalle).toBe('QA-ABONO');
+      expect(Number(resultado.database.monto)).toBe(230);
+      expect(resultado.database.origen).toContain('matricula:QA-ABONO|aplicacion:');
+      expect(resultado.restored.id).toBe(id);
+      expect(resultado.restored.d).toBe('QA-ABONO');
+      expect(Number(resultado.restored.m)).toBe(230);
+      expect(resultado.restored.k).toBe(resultado.database.origen);
+      expect(resultado.allocation).toEqual([
+        { destino: 'Matrícula', cuota: 0, monto: 50 },
+        { destino: 'Cuota', cuota: 1, monto: 90 },
+        { destino: 'Cuota', cuota: 2, monto: 90 },
+      ]);
+      const encoded = resultado.database.origen.split('|aplicacion:')[1];
+      expect(JSON.parse(decodeURIComponent(encoded))).toEqual(resultado.allocation);
+    } finally {
+      const limpieza = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de movimientos QA');
+        return api.cleanupCaja(idPrueba);
+      }, id);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
   test('Persistir y recuperar monto_abonado y saldo_pendiente mediante el ERP y Supabase QA', async () => {
     const id = 'QA-PERSIST-CUOTA-' + Date.now();
     type Resultado = {
