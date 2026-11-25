@@ -1020,6 +1020,74 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     expect(resultado.reversa).toEqual([{ originalId: 'ingreso-auditado', monto: 25 }]);
   });
 
+  test('Completar una matrícula con pago inicial y conciliar ficha, cuotas y Caja en Supabase QA', async () => {
+    const dni = String(10000000 + Math.floor(Math.random() * 89999999));
+    type Cuota = { numero_cuota: number; monto: string | number; monto_abonado: string | number; saldo_pendiente: string | number; estado: string };
+    type Resultado = {
+      id: string;
+      alumno: { monto_pagado: string | number; costo_matricula: string | number; costo_mensualidad: string | number; meses: number };
+      cuotas: Cuota[];
+      caja: { monto: string | number; origen: string };
+      allocation: Array<{ destino: string; cuota: number; monto: number }>;
+      restored: { pagado: string | number; cuotas: Array<{ n: number; monto: number; abonado: number; saldo: number; estado: string }>; caja: Array<{ monto: number; origen: string }> };
+    };
+    type HerramientaQA = {
+      verificarMatriculaCompleta: (dni: string) => Promise<Resultado>;
+      cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
+    };
+    try {
+      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+      await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+      await page.locator('#m_nom').fill('QA');
+      await page.locator('#m_ape').fill('Persistencia');
+      await page.locator('#m_dni').fill(dni);
+      await page.locator('#m_sex').selectOption('M');
+      await page.locator('#m_nac').fill('2014-06-15');
+      await page.locator('#m_cm').fill('50');
+      await page.locator('#m_cmen').fill('90');
+      await page.locator('#m_mes').fill('2');
+      await page.locator('#m_pag').fill('230');
+      await expect(page.locator('#cron_t')).toContainText('Pagada');
+      await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Matrícula guardada', { timeout: 15000 });
+
+      const resultado = await page.evaluate(async (dniPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación integral de matrícula en Supabase QA');
+        return api.verificarMatriculaCompleta(dniPrueba);
+      }, dni);
+
+      expect(resultado.id).toMatch(/^\\d{6}$/);
+      expect(Number(resultado.alumno.costo_matricula)).toBe(50);
+      expect(Number(resultado.alumno.costo_mensualidad)).toBe(90);
+      expect(resultado.alumno.meses).toBe(2);
+      expect(Number(resultado.alumno.monto_pagado)).toBe(230);
+      expect(resultado.cuotas).toHaveLength(2);
+      expect(resultado.cuotas.map((x) => [Number(x.monto), Number(x.monto_abonado), Number(x.saldo_pendiente), x.estado]))
+        .toEqual([[90, 90, 0, 'Pagada'], [90, 90, 0, 'Pagada']]);
+      expect(Number(resultado.caja.monto)).toBe(230);
+      expect(resultado.allocation).toEqual([
+        { destino: 'Matrícula', cuota: 0, monto: 50 },
+        { destino: 'Cuota', cuota: 1, monto: 90 },
+        { destino: 'Cuota', cuota: 2, monto: 90 },
+      ]);
+      expect(Number(resultado.restored.pagado)).toBe(230);
+      expect(resultado.restored.cuotas).toHaveLength(2);
+      expect(resultado.restored.caja).toHaveLength(1);
+      expect(Number(resultado.restored.caja[0].monto)).toBe(230);
+    } finally {
+      const limpieza = await page.evaluate(async (dniPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de matrícula QA');
+        return api.cleanupMatricula(dniPrueba);
+      }, dni);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
   test('Persistir y recuperar el ingreso de matrícula y su distribución en Caja desde Supabase QA', async () => {
     const id = 'QA-PERSIST-CAJA-' + Date.now();
     type Tramo = { destino: string; cuota: number; monto: number };
