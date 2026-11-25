@@ -1020,26 +1020,85 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     expect(resultado.reversa).toEqual([{ originalId: 'ingreso-auditado', monto: 25 }]);
   });
 
-  test('Conservar abonado y saldo de cuotas al serializar y recargar desde Supabase', async () => {
-    const resultado = await page.evaluate(() => {
-      type Cuota = { id: string; aid: string; n: number; f: string; m: number; a: number; s: number; e: string };
-      type Tabla = { n: string; rows: () => Record<string, unknown>[]; load: (rows: Record<string, unknown>[]) => void };
-      const tablas = eval('TB') as Tabla[];
-      const estado = eval('S') as { cuotas: Cuota[] };
-      const tabla = tablas.find((x) => x.n === 'cronograma_cuotas');
-      if (!tabla) throw new Error('No existe el mapeo de cronograma_cuotas');
-      const original = estado.cuotas;
-      try {
-        estado.cuotas = [{ id: 'CUO-QA-1', aid: 'ALU-QA', n: 1, f: '2026-12-25', m: 90, a: 50, s: 40, e: 'Parcial' }];
-        const filasDb = tabla.rows();
-        tabla.load(filasDb);
-        return { filaDb: filasDb[0], cuotaRecargada: estado.cuotas[0] };
-      } finally {
-        estado.cuotas = original;
-      }
-    });
-    expect(resultado.filaDb).toMatchObject({ monto: 90, monto_abonado: 50, saldo_pendiente: 40, estado: 'Parcial' });
-    expect(resultado.cuotaRecargada).toMatchObject({ m: 90, a: 50, s: 40, e: 'Parcial' });
+  test('Persistir y recuperar monto_abonado y saldo_pendiente mediante el ERP y Supabase QA', async () => {
+    const id = 'QA-PERSIST-CUOTA-' + Date.now();
+    let alumnoId = '';
+
+    try {
+      const resultado = await page.evaluate(async (idPrueba) => {
+        type Cuota = { id: string; aid: string; n: number; f: string; m: number; a: number; s: number; e: string };
+        type Estado = { alu: { id: string }[]; cuotas: Cuota[] };
+        const estado = eval('S') as Estado;
+        const alumno = estado.alu.find((x) => x.id);
+        if (!alumno) throw new Error('No hay alumno QA disponible para asociar la cuota temporal');
+        const aid = alumno.id;
+        estado.cuotas.push({
+          id: idPrueba, aid, n: 99, f: '2026-12-31',
+          m: 90, a: 50, s: 40, e: 'Parcial',
+        });
+
+        (eval('save') as () => void)();
+        await (eval('sv') as Promise<void>);
+        if (!(eval('SAVE_OK') as boolean)) {
+          throw new Error('El guardado real del ERP informó SAVE_OK=false');
+        }
+
+        const consultar = eval('sb') as (path: string, options?: RequestInit) => Promise<Response>;
+        const ruta = '/rest/v1/cronograma_cuotas?id=eq.' + encodeURIComponent(idPrueba) +
+          '&select=id,alumno_id,numero_cuota,monto,monto_abonado,saldo_pendiente,estado';
+        const respuestaDb = await consultar(ruta);
+        if (!respuestaDb.ok) throw new Error('No se pudo consultar Supabase después del guardado: ' + await respuestaDb.text());
+        const filasDb = await respuestaDb.json() as Record<string, unknown>[];
+        if (filasDb.length !== 1) throw new Error('Supabase no devolvió exactamente el registro temporal guardado');
+
+        // Ejecuta el mismo pull() de la aplicación para reconstruir el estado desde Supabase.
+        await (eval('pull') as () => Promise<void>)();
+        const recuperada = (eval('S') as Estado).cuotas.find((x) => x.id === idPrueba);
+        if (!recuperada) throw new Error('El ERP no recuperó la cuota temporal al volver a cargar Supabase');
+
+        return { alumnoId: aid, filaDb: filasDb[0], recuperada };
+      }, id);
+
+      alumnoId = resultado.alumnoId;
+      expect(Number(resultado.filaDb.monto)).toBe(90);
+      expect(Number(resultado.filaDb.monto_abonado)).toBe(50);
+      expect(Number(resultado.filaDb.saldo_pendiente)).toBe(40);
+      expect(resultado.filaDb.estado).toBe('Parcial');
+      expect(Number(resultado.recuperada.m)).toBe(90);
+      expect(Number(resultado.recuperada.a)).toBe(50);
+      expect(Number(resultado.recuperada.s)).toBe(40);
+      expect(resultado.recuperada.e).toBe('Parcial');
+    } finally {
+      // Limpieza estricta del único ID temporal creado por esta prueba.
+      await page.evaluate(async (idPrueba) => {
+        const consultar = eval('sb') as (path: string, options?: RequestInit) => Promise<Response>;
+        const estado = eval('S') as { cuotas: { id: string }[] };
+        estado.cuotas = estado.cuotas.filter((x) => x.id !== idPrueba);
+        (eval('save') as () => void)();
+        await (eval('sv') as Promise<void>);
+
+        let verificacion = await consultar(
+          '/rest/v1/cronograma_cuotas?id=eq.' + encodeURIComponent(idPrueba) + '&select=id'
+        );
+        if (!verificacion.ok) throw new Error('No se pudo verificar la limpieza de la cuota QA: ' + await verificacion.text());
+        let filas = await verificacion.json() as { id: string }[];
+        if (filas.length) {
+          // Respaldo limitado al ID temporal único; nunca afecta registros existentes.
+          const borrado = await consultar(
+            '/rest/v1/cronograma_cuotas?id=eq.' + encodeURIComponent(idPrueba),
+            { method: 'DELETE' }
+          );
+          if (!borrado.ok) throw new Error('No se pudo limpiar el registro temporal QA: ' + await borrado.text());
+        }
+        verificacion = await consultar(
+          '/rest/v1/cronograma_cuotas?id=eq.' + encodeURIComponent(idPrueba) + '&select=id'
+        );
+        if (!verificacion.ok) throw new Error('No se pudo confirmar la ausencia del registro QA');
+        filas = await verificacion.json() as { id: string }[];
+        if (filas.length) throw new Error('Quedó un registro temporal QA sin limpiar');
+        await (eval('pull') as () => Promise<void>)();
+      }, id);
+    }
   });
 
 });
