@@ -86,6 +86,8 @@ function addHor() {
   for (const p of ps) {
     const pe = S.personal.find((x) => x.id === p);
     if (!pe) return toast("Profesor inválido");
+    if (!S.psedes.some((x) => x.pid === p && x.sede === n.sede))
+      return toast(`${pe.nom} no está asignado a la sede seleccionada`);
     if (!pe.mv && S.hor.some((h) => h.est !== "Inactivo" && h.profs.includes(p) && h.sede !== n.sede))
       return toast(`${pe.nom} no tiene permitido dictar en varias sedes`);
   }
