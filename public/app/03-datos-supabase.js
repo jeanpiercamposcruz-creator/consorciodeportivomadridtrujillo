@@ -174,7 +174,12 @@ const TB = [
       jor: "jornada",
       mv: "permite_varias_sedes",
     }),
-    read: () => U?.rol === "ADM" ? all("personal") : all("personal_publico"),
+    read: async () => {
+      if (U?.rol === "ADM") return all("personal");
+      const r = await sb("/rest/v1/rpc/personal_directorio", { method: "POST", body: "{}" });
+      if (!r.ok) throw new Error("No se pudo cargar el directorio público del personal.");
+      return await r.json();
+    },
   },
   {
     ...G("personal_sedes", "psedes", {
