@@ -139,6 +139,7 @@ const ocup = (a) => {
   S.kits.forEach((k) => {
     const b = S.alu.find((x) => x.id === k.aid);
     if (
+      k.est !== "Anulada" &&
       b &&
       b.id !== a.id &&
       b.mod === "Competitivo" &&

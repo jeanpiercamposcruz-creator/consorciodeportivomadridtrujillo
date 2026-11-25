@@ -157,9 +157,10 @@ const XL = {
       "Pedido",
       "Entrega",
       "Precio público (S/)",
+      "Estado",
     ].concat(KS ? ["Costo (S/)", "Utilidad (S/)"] : []),
     S.kits.map((k) =>
-      [k.code, k.al, k.p, k.t, k.n, k.u, k.f, k.e, +k.pr].concat(KS ? [+k.c, k.pr - k.c] : []),
+      [k.code, k.al, k.p, k.t, k.n, k.u, k.f, k.e, +k.pr, k.est || "Activa"].concat(KS ? [+k.c, k.est === "Anulada" ? 0 : k.pr - k.c] : []),
     ),
   ],
   caja: () => {

@@ -299,6 +299,7 @@ const TB = [
     e: "fecha_entrega",
     pr: "precio_publico",
     c: "costo_confeccion",
+    est: "estado",
   }),
   G("caja_movimientos", "caja", {
     _id: "id",

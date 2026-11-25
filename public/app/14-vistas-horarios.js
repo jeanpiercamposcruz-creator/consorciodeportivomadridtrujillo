@@ -645,13 +645,14 @@ VW.kits = () => {
         ) || {}
       : {};
   return `<div class=card><h3>${KE ? "Editar venta" : "Nueva venta"}</h3><div class=kitw><div class=kitf><div class=fg><label class="u-col-full">Buscar alumno (código, DNI, nombres o apellidos)<input id=k_q value="${esc(KQ)}" data-in=kitQ autocomplete=off placeholder="Escribe al menos 2 letras o números"></label><div id=k_res class="u-col-full"></div><input type=hidden id=k_a value="${esc(ed.aid || KSEL || "")}">${kSelHtml()}${fl("Prenda", "<select id=k_p>" + o(["Kit completo", "Polo", "Short", "Calcetines"].map((x) => [x, x]), ed.p || "Kit completo") + "</select>")}${fl("Talla", "<select id=k_t>" + o(["6", "8", "10", "12", "14", "S", "M", "L", "XL"].map((x) => [x, x]), ed.t || "6") + "</select>")}${fl("Nombre en camiseta", '<input id=k_n autocomplete=off placeholder="Ej. JUAN" data-in=shirtDraw value="' + esc(ed.n || "") + '">')}${fl("Número elegido", '<input id=k_u inputmode=numeric autocomplete=off maxlength=3 placeholder="00" data-in=kNumTyped value="' + esc(ed.u || KNUM || "") + '">')}${fl("Fecha de pedido", `<input id=k_f type=date value="${esc(ed.f || today())}">`)}${fl("Fecha de entrega", "<input id=k_e type=date value=" + esc(ed.e || "") + ">")}${fl("Precio público (S/)", "<input id=k_pr type=number min=0 value=" + esc(ed.pr ?? 90) + ">")}${fl("Costo de confección (S/)", "<input id=k_c type=number min=0 value=" + esc(ed.c ?? 45) + ">")}</div><div class=row><button data-f=kitPay>${KE ? "Guardar cambios" : "Registrar venta"}</button>${KE ? "<button class=g data-f=cancelKit>Cancelar</button>" : ""}</div></div>${shirtHtml()}</div></div><div class=card>${tbl(
-    ["Código", "Alumno", "Prenda", "Talla", "Camiseta", "Pedido", "Entrega", "Cobrado"].concat(
+    ["Código", "Alumno", "Prenda", "Talla", "Camiseta", "Pedido", "Entrega", "Cobrado", "Estado"].concat(
       adm ? ["Costo", "Utilidad", "Acciones"] : ["Acciones"],
     ),
-    S.kits.map(
-      (k) =>
-       `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td>${adm ? `<td>${money(k.c)}</td><td><b>${money(k.pr - k.c)}</b></td>` : ""}<td><button class="s g act" data-f=kitEd data-i="${esc(k._id || k.id || k.code || k.codigo || "")}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${esc(k._id || k.id || k.code || k.codigo || "")}" title="Eliminar" aria-label="Eliminar">${iac("trash")}</button></td></tr>`),
-  )}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
+    S.kits.map((k) => {
+      const anulada = k.est === "Anulada";
+      const key = esc(k._id || k.id || k.code || k.codigo || "");
+      return `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td><td><span class="b ${anulada ? "no" : "ok"}">${anulada ? "Anulada" : "Activa"}</span></td>${adm ? `<td>${money(k.c)}</td><td><b>${money(anulada ? 0 : k.pr - k.c)}</b></td>` : ""}<td>${anulada ? "—" : `<button class="s g act" data-f=kitEd data-i="${key}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${key}" title="Anular" aria-label="Anular">${iac("trash")}</button>`}</td></tr>`;
+    })}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.filter((k) => k.est !== "Anulada").reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
 };
 function saveKit() {
   const a = S.alu.find((x) => x.id === v("k_a"));
@@ -704,6 +705,7 @@ function saveKit() {
     e: v("k_e"),
     pr,
     c: cc,
+    est: existingEdit?.est || "Activa",
   };
 
   if (editKey) {
@@ -711,6 +713,7 @@ function saveKit() {
       KE = null;
       return toast("La venta ya no existe. Recarga e inténtalo de nuevo.");
     }
+    if (existingEdit.est === "Anulada") return toast("Una venta anulada no se puede modificar.");
     const realId = String(existingEdit._id ?? "").trim();
     const movimientos = S.caja.filter((c) => String(c.k ?? "").trim() === "kit|" + realId);
     if (!realId || movimientos.length !== 1) {
@@ -758,16 +761,18 @@ function delKit(id) {
 
   const realId = String(match._id ?? "").trim();
   const movimientos = S.caja.filter((c) => String(c.k ?? "").trim() === "kit|" + realId);
-  if (!realId || movimientos.length !== 1) {
-    return toast("No se puede eliminar esta venta: su ingreso de Caja no está vinculado de forma única. No se modificó nada.");
+  if (match.est === "Anulada") return toast("La venta ya está anulada.");
+  if (!realId || movimientos.length !== 1 || movimientos[0].t !== "I" || movimientos[0].c !== "Indumentaria" || movimientos[0].sede !== match.sede || Math.abs((+movimientos[0].m || 0) - (+match.pr || 0)) >= 0.01) {
+    return toast("No se puede anular: el ingreso original de Caja no está vinculado y conciliado de forma única.");
   }
-  if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
+  if (S.caja.some((c) => c.k === "reversion-kit|" + realId)) return toast("La venta ya tiene una reversión registrada.");
+  if (!confirm("¿Anular esta venta? Se conservará el ingreso original y se registrará un egreso de reversión en Caja.")) return;
 
-  S.kits = S.kits.filter((k) => k !== match);
-  S.caja = S.caja.filter((c) => c !== movimientos[0]);
+  match.est = "Anulada";
+  S.caja.push({ _id: "REV-KIT-" + realId, f: today(), sede: match.sede, t: "E", c: "Reversión de indumentaria", d: match.aid, m: movimientos[0].m, k: "reversion-kit|" + realId });
 
   save();
-  toast("Venta eliminada");
+  toast("Venta anulada y reversión registrada en Caja");
   R();
 }
 function cajaAuditoria(x) {
@@ -784,6 +789,10 @@ function cajaAuditoria(x) {
         return "Abono de matrícula (detalle no disponible)";
       }
     }
+  }
+  if (origen.startsWith("reversion-kit|")) {
+    const id = origen.slice("reversion-kit|".length);
+    return `Reversión de venta de indumentaria ${id}`;
   }
   if (origen.startsWith("reversion:")) {
     const id = origen.slice("reversion:".length),
@@ -840,7 +849,7 @@ function gerRow(s, ym) {
     eg = mc
       .filter((x) => x.t === "E" && !["Pago de alquiler", "Planilla de entrenadores"].includes(x.c))
       .reduce((t, x) => t + x.m, 0),
-    kc = S.kits.filter((k) => k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
+    kc = S.kits.filter((k) => k.est !== "Anulada" && k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
       .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym))
       .reduce((t, x) => {
