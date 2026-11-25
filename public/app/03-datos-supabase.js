@@ -467,7 +467,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-matricula-atomic-v1-20261125",
+      build: "qa-matricula-rpc-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -476,8 +476,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         const r = await sb("/rest/v1/alumnos?dni=eq." + encodeURIComponent(dni) + "&select=id");
         if (!r.ok) throw new Error("No se pudo comprobar la unicidad del DNI QA.");
         if ((await r.json()).length) throw new Error("El DNI temporal ya existe en Supabase QA.");
-        window.__ERP_QA_NEXT_ALUMNO_ID__ = id;
-        return id;
+        return "RPC";
       },
       async verificarMatriculaCompleta(dni) {
         if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
@@ -485,7 +484,10 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         await sv;
         if (!SAVE_OK) throw new Error("El guardado de matrícula no terminó correctamente.");
         const alumno = S.alu.find((x) => x.dni === dni && x.nom === "QA" && x.ape === "Persistencia");
-        if (!alumno || !/^QA-MAT-\d{8}$/.test(String(alumno.id))) throw new Error("No se encontró la matrícula temporal identificada.");
+        const prefijo = String(Y).slice(-2);
+        if (!alumno || !/^\d{6}$/.test(String(alumno.id)) || !String(alumno.id).startsWith(prefijo)) {
+          throw new Error("No se encontró la matrícula QA con código reservado por Supabase.");
+        }
         const id = alumno.id;
         const leer = async (ruta) => {
           const r = await sb(ruta);
@@ -560,7 +562,9 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           if (filas.length) throw new Error("El DNI existe, pero no coincide con la matrícula temporal esperada; se protege el registro.");
           return { removed: true };
         }
-        if (alumno.nom !== "QA" || alumno.ape !== "Persistencia" || !/^QA-MAT-\d{8}$/.test(String(alumno.id))) {
+        const prefijo = String(Y).slice(-2);
+        if (alumno.nom !== "QA" || alumno.ape !== "Persistencia" || alumno.dni !== dni ||
+            !/^\d{6}$/.test(String(alumno.id)) || !String(alumno.id).startsWith(prefijo)) {
           throw new Error("El registro no tiene las marcas de seguridad QA; no se eliminará.");
         }
         const id = alumno.id;
