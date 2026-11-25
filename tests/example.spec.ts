@@ -20,12 +20,32 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       throw new Error('Faltan ERP_URL, ERP_USER o ERP_PASSWORD.');
     }
 
+    const diagnosticos: string[] = [];
     page = await browser.newPage();
-    await page.goto(url);
+    page.on('pageerror', (e) => diagnosticos.push('pageerror: ' + e.message));
+    page.on('console', (m) => {
+      if (m.type() === 'error') diagnosticos.push('console: ' + m.text());
+    });
+    page.on('requestfailed', (r) =>
+      diagnosticos.push('request: ' + r.url() + ' -> ' + (r.failure()?.errorText || 'falló'))
+    );
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => {
+      const app = document.querySelector('#app');
+      const texto = app?.textContent || '';
+      return texto.includes('Usuario') || texto.includes('No se pudo cargar') ||
+        texto.includes('Error de configuración');
+    }, null, { timeout: 30000 });
 
-    await page.getByLabel('Usuario').fill(usuario);
+    const inicio = await page.locator('#app').innerText();
+    if (!inicio.includes('Usuario')) {
+      throw new Error('El ERP no terminó de iniciar. Pantalla: ' + inicio +
+        '. Diagnóstico: ' + diagnosticos.join(' | '));
+    }
+
+    await page.locator('#lu').fill(usuario);
     await page.locator('#lp').fill(password);
-    await page.getByRole('button', { name: /Iniciar/i }).click();
+    await page.getByRole('button', { name: /Iniciar sesión/i }).click();
 
     await expect(page.getByText('Alumnos activos'))
       .toBeVisible({ timeout: 20000 });
