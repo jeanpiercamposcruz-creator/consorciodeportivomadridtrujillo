@@ -92,7 +92,7 @@ async function sess() {
   U = { id: "ADMIN", nom: EM, rol: "ADM" };
   V = "home";
 }
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const uid = () => crypto.randomUUID();
 const G = (n, a, c) => ({
   n,
   rows: () =>
