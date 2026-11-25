@@ -243,7 +243,7 @@ function upHor() {
     "Sin horario aún",
   );
 }
-async /* Asigna el tramo de un abono nuevo a matrícula y cuotas, conservando el detalle
+/* Asigna el tramo de un abono nuevo a matrícula y cuotas, conservando el detalle
    dentro del movimiento de caja para que sobreviva a la sincronización con Supabase. */
 function distribuirAbonoMatricula(cm, cmen, meses, desde, hasta) {
   const cent = (n) => Math.round((Math.max(0, +n || 0) + Number.EPSILON) * 100) / 100;
@@ -417,7 +417,7 @@ function regenCuotas(id, a) {
 function calcularReversionesCaja(caja, alumnoId, importe) {
   let pendiente = Math.round(Math.max(0, importe) * 100) / 100;
   const ingresos = caja.filter((x) => x.d === alumnoId && x.t === "I" &&
-    (x.c === "Matrícula / mensualidad" || x.k === "matricula:" + alumnoId));
+    (x.c === "Matrícula / mensualidad" || (typeof x.k === "string" && x.k.startsWith("matricula:" + alumnoId + "|"))));
   const resultado = [];
   // Revertir primero el ingreso más reciente, sin modificar los movimientos originales.
   for (const ingreso of ingresos.slice().reverse()) {
