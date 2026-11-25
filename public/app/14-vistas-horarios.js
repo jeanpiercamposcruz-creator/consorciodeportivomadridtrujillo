@@ -304,7 +304,8 @@ async function saveAlu() {
   if (d.dni && S.alu.some((x) => x.dni === d.dni && x.id !== ED))
     return toast("Ese DNI ya está registrado");
   const id = old ? old.id : nid(),
-    delta = Math.round((d.pag - (old ? old.pag : 0)) * 100) / 100,
+    pagadoAnterior = old ? Math.max(0, +old.pag || 0) : 0,
+    delta = Math.round((d.pag - pagadoAnterior) * 100) / 100,
     dc = { qt: old && old.qt ? old.qt : tok() };
   if (delta < 0) {
     const reversas = calcularReversionesCaja(S.caja, id, -delta);
@@ -336,7 +337,7 @@ async function saveAlu() {
       m: delta,
       // La aplicación por concepto/cuota queda ligada al ingreso original.
       k: "matricula:" + id + "|aplicacion:" + encodeURIComponent(JSON.stringify(
-        distribuirAbonoMatricula(d.cm, d.cmen, d.mes, old ? old.pag : 0, d.pag),
+        distribuirAbonoMatricula(d.cm, d.cmen, d.mes, pagadoAnterior, d.pag),
       )),
     });
   } else if (delta < 0) {
