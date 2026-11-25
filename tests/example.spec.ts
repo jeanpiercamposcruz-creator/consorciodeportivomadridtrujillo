@@ -515,20 +515,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Dashboard no duplica alquiler ni planilla dentro de otros egresos', async () => {
-    const resultado = await page.evaluate(() => {
-      const sede = S.sedes[0];
-      if (!sede) throw new Error('No hay sede disponible para comprobar el Dashboard.');
-      const mes = today().slice(0, 7);
-      const antes = gerRow(sede, mes);
-      const originales = S.caja;
-      S.caja = originales.concat([
-        { _id: 'QA-DASH-RENT', f: mes + '-10', sede: sede.id, t: 'E', c: 'Pago de alquiler', d: 'QA', m: 100 },
-        { _id: 'QA-DASH-PAYROLL', f: mes + '-11', sede: sede.id, t: 'E', c: 'Planilla de entrenadores', d: 'QA', m: 200 },
-        { _id: 'QA-DASH-OTHER', f: mes + '-12', sede: sede.id, t: 'E', c: 'Compras', d: 'QA', m: 50 },
-      ]);
-      const despues = gerRow(sede, mes);
-      S.caja = originales;
-      return { deltaOtrosEgresos: despues.eg - antes.eg, deltaUtilidad: despues.u - antes.u };
+    type HerramientaDashboard = {
+      probarDashboardSinDobleConteo: () => Promise<{ deltaOtrosEgresos: number; deltaUtilidad: number }>;
+    };
+    const resultado = await page.evaluate(async () => {
+      const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaDashboard }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No está disponible la prueba financiera QA.');
+      return api.probarDashboardSinDobleConteo();
     });
     expect(resultado.deltaOtrosEgresos).toBe(50);
     expect(resultado.deltaUtilidad).toBe(-50);

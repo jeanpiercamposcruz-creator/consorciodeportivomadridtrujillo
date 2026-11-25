@@ -458,7 +458,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-dashboard-expenses-v1-20261125",
+      build: "qa-dashboard-expenses-v2-v1-20261125",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
@@ -587,6 +587,25 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("El ERP aún conserva datos vinculados a la matrícula QA.");
         }
         return { removed: true, id };
+      },
+      async probarDashboardSinDobleConteo() {
+        if (U?.rol !== "ADM") throw new Error("La prueba financiera requiere una sesión administradora QA.");
+        const sede = S.sedes[0];
+        if (!sede) throw new Error("No hay sede para probar el Dashboard.");
+        const mes = today().slice(0, 7);
+        const antes = gerRow(sede, mes);
+        const originales = S.caja;
+        try {
+          S.caja = originales.concat([
+            { _id: "QA-DASH-RENT", f: mes + "-10", sede: sede.id, t: "E", c: "Pago de alquiler", d: "QA", m: 100 },
+            { _id: "QA-DASH-PAYROLL", f: mes + "-11", sede: sede.id, t: "E", c: "Planilla de entrenadores", d: "QA", m: 200 },
+            { _id: "QA-DASH-OTHER", f: mes + "-12", sede: sede.id, t: "E", c: "Compras", d: "QA", m: 50 },
+          ]);
+          const despues = gerRow(sede, mes);
+          return { deltaOtrosEgresos: despues.eg - antes.eg, deltaUtilidad: despues.u - antes.u };
+        } finally {
+          S.caja = originales;
+        }
       },
       async probarRollbackLote() {
         if (U?.rol !== "ADM") throw new Error("La prueba de atomicidad requiere una sesión administradora QA.");
