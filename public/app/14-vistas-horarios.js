@@ -2,6 +2,7 @@
 /* ==================================================================
    HORARIOS Y CATEGORÍAS (calendario semanal, un horario por día y categoría)
    ================================================================== */
+const QA_PAGOS_BUILD = "qa-pagos-v3-20261125";
 const tmin = (x) => +x.slice(0, 2) * 60 + +x.slice(3, 5),
   solapa = (a, b) => tmin(a.ini) < tmin(b.fin) && tmin(b.ini) < tmin(a.fin),
   mismaSes = (a, b) => a.sede === b.sede && a.dep === b.dep && a.ini === b.ini && a.fin === b.fin;
