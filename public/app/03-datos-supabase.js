@@ -462,6 +462,123 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
+      async verificarMatriculaCompleta(dni) {
+        if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
+        await sv;
+        if (!SAVE_OK) throw new Error("El guardado de matrícula no terminó correctamente.");
+        const alumno = S.alu.find((x) => x.dni === dni && x.nom === "QA" && x.ape === "Persistencia");
+        if (!alumno || !/^\\d{6}$/.test(String(alumno.id))) throw new Error("No se encontró la matrícula temporal identificada.");
+        const id = alumno.id;
+        const leer = async (ruta) => {
+          const r = await sb(ruta);
+          if (!r.ok) throw new Error("Falló la lectura QA: " + await r.text());
+          return r.json();
+        };
+        const alumnosDb = await leer("/rest/v1/alumnos?id=eq." + encodeURIComponent(id) +
+          "&select=id,dni,nombres,apellidos,costo_matricula,costo_mensualidad,meses,monto_pagado");
+        const cuotasDb = await leer("/rest/v1/cronograma_cuotas?alumno_id=eq." + encodeURIComponent(id) +
+          "&select=id,alumno_id,numero_cuota,monto,monto_abonado,saldo_pendiente,estado&order=numero_cuota");
+        const cajaDb = await leer("/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(id) +
+          "&select=id,tipo,concepto,detalle,monto,origen");
+        if (alumnosDb.length !== 1) throw new Error("Supabase no contiene exactamente la matrícula QA.");
+        if (Number(alumnosDb[0].monto_pagado) !== 230) throw new Error("El monto pagado de la ficha no coincide con S/230.");
+        if (cuotasDb.length !== 2 || cuotasDb.some((x) =>
+          Number(x.monto) !== 90 || Number(x.monto_abonado) !== 90 ||
+          Number(x.saldo_pendiente) !== 0 || x.estado !== "Pagada")) {
+          throw new Error("El cronograma persistido no contiene las dos cuotas pagadas esperadas.");
+        }
+        const ingresos = cajaDb.filter((x) => x.tipo === "I" && x.concepto === "Matrícula / mensualidad");
+        const totalCaja = ingresos.reduce((s, x) => s + Number(x.monto || 0), 0);
+        if (Math.abs(totalCaja - 230) > 0.009 || ingresos.length !== 1) {
+          throw new Error("Caja no conserva un único ingreso por S/230 para esta matrícula.");
+        }
+        const origen = ingresos[0].origen || "";
+        const codificado = origen.split("|aplicacion:")[1];
+        if (!origen.startsWith("matricula:" + id + "|") || !codificado) {
+          throw new Error("El ingreso de Caja no conserva la trazabilidad de la matrícula.");
+        }
+        const aplicacion = JSON.parse(decodeURIComponent(codificado));
+        const esperada = [
+          { destino: "Matrícula", cuota: 0, monto: 50 },
+          { destino: "Cuota", cuota: 1, monto: 90 },
+          { destino: "Cuota", cuota: 2, monto: 90 },
+        ];
+        if (JSON.stringify(aplicacion) !== JSON.stringify(esperada)) {
+          throw new Error("La distribución persistida no coincide con matrícula S/50 y cuotas S/90 + S/90.");
+        }
+        await pull();
+        const recuperado = S.alu.find((x) => x.id === id);
+        const cuotasRestauradas = S.cuotas.filter((x) => x.aid === id).sort((a, b) => +a.n - +b.n);
+        const cajaRestaurada = S.caja.filter((x) => x.d === id && x.t === "I");
+        if (!recuperado || Number(recuperado.pag) !== 230 || cuotasRestauradas.length !== 2 ||
+          cuotasRestauradas.some((x) => Number(x.a) !== 90 || Number(x.s) !== 0 || x.e !== "Pagada") ||
+          cajaRestaurada.length !== 1 || Number(cajaRestaurada[0].m) !== 230) {
+          throw new Error("La recarga del ERP no recuperó íntegramente matrícula, cuotas y Caja.");
+        }
+        return {
+          id,
+          alumno: alumnosDb[0],
+          cuotas: cuotasDb,
+          caja: ingresos[0],
+          allocation: aplicacion,
+          restored: {
+            pagado: recuperado.pag,
+            cuotas: cuotasRestauradas.map((x) => ({ n: x.n, monto: x.m, abonado: x.a, saldo: x.s, estado: x.e })),
+            caja: cajaRestaurada.map((x) => ({ monto: x.m, origen: x.k })),
+          },
+        };
+      },
+      async cleanupMatricula(dni) {
+        if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
+        await sv;
+        await pull();
+        const alumno = S.alu.find((x) => x.dni === dni);
+        if (!alumno) {
+          const r = await sb("/rest/v1/alumnos?dni=eq." + encodeURIComponent(dni) + "&select=id,nombres,apellidos");
+          if (!r.ok) throw new Error("No se pudo comprobar si quedó una matrícula temporal.");
+          const filas = await r.json();
+          if (filas.length) throw new Error("El DNI existe, pero no coincide con la matrícula temporal esperada; se protege el registro.");
+          return { removed: true };
+        }
+        if (alumno.nom !== "QA" || alumno.ape !== "Persistencia" || !/^\\d{6}$/.test(String(alumno.id))) {
+          throw new Error("El registro no tiene las marcas de seguridad QA; no se eliminará.");
+        }
+        const id = alumno.id;
+        S.asis = S.asis.filter((x) => !(x.t === "A" && x.ref === id));
+        S.kits = S.kits.filter((x) => x.aid !== id);
+        S.caja = S.caja.filter((x) => x.d !== id);
+        S.cuotas = S.cuotas.filter((x) => x.aid !== id);
+        S.alu = S.alu.filter((x) => x.id !== id);
+        save();
+        await sv;
+        if (!SAVE_OK) throw new Error("No se pudo guardar la limpieza de la matrícula QA.");
+        const borrarSiQueda = async (tabla, filtro) => {
+          const ruta = "/rest/v1/" + tabla + "?" + filtro;
+          let r = await sb(ruta + "&select=id");
+          if (!r.ok) throw new Error("No se pudo verificar limpieza en " + tabla + ".");
+          let filas = await r.json();
+          if (filas.length) {
+            r = await sb(ruta, { method: "DELETE" });
+            if (!r.ok) throw new Error("No se pudo limpiar " + tabla + ": " + await r.text());
+          }
+          r = await sb(ruta + "&select=id");
+          if (!r.ok || (await r.json()).length) throw new Error("Quedaron registros temporales en " + tabla + ".");
+        };
+        await borrarSiQueda("asistencias", "alumno_id=eq." + encodeURIComponent(id));
+        await borrarSiQueda("cronograma_cuotas", "alumno_id=eq." + encodeURIComponent(id));
+        await borrarSiQueda("kits_ventas", "alumno_id=eq." + encodeURIComponent(id));
+        await borrarSiQueda("caja_movimientos", "detalle=eq." + encodeURIComponent(id));
+        await borrarSiQueda("alumnos", "id=eq." + encodeURIComponent(id));
+        await pull();
+        if (S.alu.some((x) => x.id === id) || S.cuotas.some((x) => x.aid === id) ||
+          S.caja.some((x) => x.d === id) || S.asis.some((x) => x.ref === id) ||
+          S.kits.some((x) => x.aid === id)) {
+          throw new Error("El ERP aún conserva datos vinculados a la matrícula QA.");
+        }
+        return { removed: true, id };
+      },
       async roundTripCuota(id) {
         if (U?.rol !== "ADM") throw new Error("La prueba de persistencia requiere una sesión administradora QA.");
         if (!/^QA-PERSIST-CUOTA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("Identificador temporal QA inválido.");
