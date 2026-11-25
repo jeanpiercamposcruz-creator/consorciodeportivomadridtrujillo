@@ -640,6 +640,20 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
+  test('Bloquear dos ventas simultáneas del mismo número de camiseta en categorías competitivas próximas', async () => {
+    type HerramientaCamiseta = {
+      probarNumeroCamisetaConcurrente: () => Promise<{ aceptados: number; rechazados: number; persistidos: number }>;
+    };
+    const resultado = await page.evaluate(async () => {
+      const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaCamiseta }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No está disponible la prueba de concurrencia de camisetas QA.');
+      return api.probarNumeroCamisetaConcurrente();
+    });
+    expect(resultado.aceptados).toBe(1);
+    expect(resultado.rechazados).toBe(1);
+    expect(resultado.persistidos).toBe(1);
+  });
+
   test('Rechazar movimiento de caja sin monto válido', async () => {
     await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
     await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();

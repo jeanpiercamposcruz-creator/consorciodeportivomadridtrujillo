@@ -643,6 +643,70 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         return { rejected: true, rollback: true, residual: 0 };
       },
+      async probarNumeroCamisetaConcurrente() {
+        if (U?.rol !== "ADM" || SB !== "https://yiredilknlwbzwvwlqyx.supabase.co") {
+          throw new Error("La prueba de números de camiseta requiere sesión administradora en QA.");
+        }
+        const sede = S.sedes[0];
+        const deporte = S.deportes.find((x) => x.id);
+        if (!sede || !deporte) throw new Error("No hay sede o deporte para la prueba de camisetas.");
+        const base = String(Date.now() + Math.floor(Math.random() * 800));
+        const alumnos = ["A", "B"].map((suffix, index) => ({
+          id: "QA-SHIRT-" + base + "-" + suffix,
+          nombres: "QA Camiseta " + suffix,
+          apellidos: "Temporal",
+          fecha_nacimiento: index ? "2013-01-01" : "2012-01-01",
+          deporte_id: deporte.id,
+          sede_id: sede.id,
+          modalidad: "Competitivo",
+          estado: "Activo",
+        }));
+        const kitIds = [base, String(Number(base) + 1)];
+        const borrar = async (tabla, campo, valor) => {
+          const ruta = "/rest/v1/" + tabla + "?" + campo + "=eq." + encodeURIComponent(valor);
+          const r = await sb(ruta, { method: "DELETE" });
+          if (!r.ok) throw new Error("No se pudo limpiar el registro QA de " + tabla + ": " + await r.text());
+        };
+        try {
+          const alta = await sb("/rest/v1/alumnos", { method: "POST", body: JSON.stringify(alumnos) });
+          if (!alta.ok) throw new Error("No se pudieron preparar los alumnos temporales: " + await alta.text());
+          const intentos = await Promise.all(kitIds.map((id, index) => sb("/rest/v1/kits_ventas", {
+            method: "POST",
+            body: JSON.stringify({
+              id: "QA-KIT-" + id,
+              codigo: "QA-KIT-TEST",
+              alumno_id: alumnos[index].id,
+              alumno_nombre: alumnos[index].nombres,
+              sede_id: sede.id,
+              prenda: "Polo",
+              talla: "M",
+              nombre_camiseta: "QA",
+              numero: "77",
+              fecha_pedido: today(),
+              precio_publico: 85,
+              costo_confeccion: 35,
+              estado: "Activa",
+            }),
+          })));
+          const cuerpos = await Promise.all(intentos.map((r) => r.text()));
+          const aceptados = intentos.filter((r) => r.ok).length;
+          const rechazados = intentos.filter((r, i) => !r.ok && /23505|Ese número de camiseta ya está ocupado/.test(cuerpos[i])).length;
+          if (aceptados !== 1 || rechazados !== 1) {
+            throw new Error("La concurrencia de números de camiseta no se bloqueó como se esperaba: " + cuerpos.join(" | "));
+          }
+          const ids = kitIds.map((id) => "QA-KIT-" + id);
+          const consulta = await sb("/rest/v1/kits_ventas?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,estado");
+          if (!consulta.ok) throw new Error("No se pudo verificar el resultado concurrente.");
+          const persistidos = await consulta.json();
+          if (persistidos.length !== 1 || persistidos[0].estado !== "Activa") {
+            throw new Error("La base no conserva exactamente una camiseta activa para el mismo número.");
+          }
+          return { aceptados, rechazados, persistidos: persistidos.length };
+        } finally {
+          for (const id of kitIds) await borrar("kits_ventas", "id", "QA-KIT-" + id);
+          for (const alumno of alumnos) await borrar("alumnos", "id", alumno.id);
+        }
+      },
       async prepararIdKit(id) {
         if (U?.rol !== "ADM") throw new Error("La preparación de venta QA requiere una sesión administradora.");
         if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
