@@ -265,7 +265,7 @@ function distribuirAbonoMatricula(cm, cmen, meses, desde, hasta) {
   })).filter((x) => x.monto > 0.009);
 }
 
-function saveAlu() {
+async function saveAlu() {
   const { d, e } = validarAlumno({
       nom: v("m_nom"),
       ape: v("m_ape"),
