@@ -169,9 +169,9 @@ function seed() {
 const nid = () => {
   const qaId = window.__ERP_QA_NEXT_ALUMNO_ID__;
   if (
-    window.__ERP_CONFIG__?.supabaseUrl?.replace(/\\/+$/, "") === "https://yiredilknlwbzwvwlqyx.supabase.co" &&
+    window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabase.co" &&
     U?.rol === "ADM" &&
-    /^QA-MAT-\\d{8}$/.test(String(qaId || "")) &&
+    /^QA-MAT-[0-9]{8}$/.test(String(qaId || "")) &&
     !S.alu.some((a) => a.id === qaId)
   ) {
     delete window.__ERP_QA_NEXT_ALUMNO_ID__;
