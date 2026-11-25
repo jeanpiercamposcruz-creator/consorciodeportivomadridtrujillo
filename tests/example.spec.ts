@@ -889,7 +889,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   });
 
-  test('Calcular reversiones parciales vinculadas al ingreso original sin borrar historial', async () => {
+  test('Calcular reversiones parciales FIFO sin mutar ingresos ni exceder el saldo original', async () => {
     const resultado = await page.evaluate(() => {
       type Movimiento = { _id?: string; d: string; t: string; c: string; m: number; k?: string };
       const fn = (window as unknown as {
@@ -905,11 +905,29 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         c: 'Reversión de pago de matrícula', m: x.monto, k: 'reversion:' + x.originalId,
       }));
       const segunda = fn(movimientos, 'ALU-QA', 50);
-      return { primera, segunda, originales: movimientos.filter((x) => x.t === 'I').length };
+      segunda.forEach((x) => movimientos.push({
+        _id: 'egreso-' + movimientos.length, d: 'ALU-QA', t: 'E',
+        c: 'Reversión de pago de matrícula', m: x.monto, k: 'reversion:' + x.originalId,
+      }));
+      const insuficiente = fn(movimientos, 'ALU-QA', 100);
+      return {
+        primera, segunda, insuficiente,
+        originales: movimientos.filter((x) => x.t === 'I'),
+        egresos: movimientos.filter((x) => x.t === 'E'),
+      };
     });
-    expect(resultado.primera.reduce((s, x) => s + x.monto, 0)).toBe(40);
-    expect(resultado.segunda.reduce((s, x) => s + x.monto, 0)).toBe(50);
-    expect(resultado.originales).toBe(2);
+    expect(resultado.primera).toEqual([
+      { originalId: 'ingreso-2', monto: 30 },
+      { originalId: 'ingreso-1', monto: 10 },
+    ]);
+    expect(resultado.segunda).toEqual([{ originalId: 'ingreso-1', monto: 50 }]);
+    expect(resultado.insuficiente.reduce((s, x) => s + x.monto, 0)).toBe(10);
+    expect(resultado.insuficiente.every((x) => x.monto > 0 && x.originalId)).toBeTruthy();
+    expect(resultado.originales).toEqual([
+      { _id: 'ingreso-1', d: 'ALU-QA', t: 'I', c: 'Matrícula / mensualidad', m: 70 },
+      { _id: 'ingreso-2', d: 'ALU-QA', t: 'I', c: 'Matrícula / mensualidad', m: 30 },
+    ]);
+    expect(resultado.egresos.reduce((s, x) => s + x.m, 0)).toBe(90);
   });
 
 
