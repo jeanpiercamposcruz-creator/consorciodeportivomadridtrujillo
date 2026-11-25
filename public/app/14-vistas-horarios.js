@@ -652,7 +652,7 @@ VW.kits = () => {
       const anulada = k.est === "Anulada";
       const key = esc(k._id || k.id || k.code || k.codigo || "");
       return `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td><td><span class="b ${anulada ? "no" : "ok"}">${anulada ? "Anulada" : "Activa"}</span></td>${adm ? `<td>${money(k.c)}</td><td><b>${money(anulada ? 0 : k.pr - k.c)}</b></td>` : ""}<td>${anulada ? "—" : `<button class="s g act" data-f=kitEd data-i="${key}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${key}" title="Anular" aria-label="Anular">${iac("trash")}</button>`}</td></tr>`;
-    })}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.filter((k) => k.est !== "Anulada").reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
+    }))}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.filter((k) => k.est !== "Anulada").reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
 };
 function saveKit() {
   const a = S.alu.find((x) => x.id === v("k_a"));
