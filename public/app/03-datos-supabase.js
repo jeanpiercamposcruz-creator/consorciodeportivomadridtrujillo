@@ -492,6 +492,59 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           restored: { id: recuperada.id, m: recuperada.m, a: recuperada.a, s: recuperada.s, e: recuperada.e },
         };
       },
+      async roundTripCaja(id) {
+        if (U?.rol !== "ADM") throw new Error("La prueba de Caja requiere una sesión administradora QA.");
+        if (!/^QA-PERSIST-CAJA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("Identificador temporal de Caja inválido.");
+        if (S.caja.some((x) => x._id === id)) throw new Error("El identificador temporal de Caja ya existe.");
+        const aplicacion = [
+          { destino: "Matrícula", cuota: 0, monto: 50 },
+          { destino: "Cuota", cuota: 1, monto: 90 },
+          { destino: "Cuota", cuota: 2, monto: 90 },
+        ];
+        const origen = "matricula:QA-ABONO|aplicacion:" + encodeURIComponent(JSON.stringify(aplicacion));
+        S.caja.push({
+          _id: id, f: today(), sede: S.sedes[0]?.id || "", t: "I",
+          c: "Matrícula / mensualidad", d: "QA-ABONO", m: 230, k: origen,
+        });
+        save();
+        await sv;
+        if (!SAVE_OK) throw new Error("El guardado real del movimiento de Caja falló.");
+        const ruta = "/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(id);
+        const respuesta = await sb(ruta + "&select=id,detalle,monto,origen");
+        if (!respuesta.ok) throw new Error("La consulta del movimiento en Supabase falló: " + await respuesta.text());
+        const filas = await respuesta.json();
+        if (filas.length !== 1) throw new Error("Supabase no devolvió un único movimiento temporal.");
+        await pull();
+        const recuperado = S.caja.find((x) => x._id === id);
+        if (!recuperado) throw new Error("El ERP no recuperó el movimiento de Caja desde Supabase.");
+        return {
+          database: filas[0],
+          restored: { id: recuperado._id, d: recuperado.d, m: recuperado.m, k: recuperado.k },
+          allocation: aplicacion,
+        };
+      },
+      async cleanupCaja(id) {
+        if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
+        if (!/^QA-PERSIST-CAJA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
+        S.caja = S.caja.filter((x) => x._id !== id);
+        save();
+        await sv;
+        if (!SAVE_OK) throw new Error("No se pudo guardar la limpieza del movimiento temporal.");
+        const ruta = "/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(id);
+        let verificacion = await sb(ruta + "&select=id");
+        if (!verificacion.ok) throw new Error("No se pudo verificar la limpieza: " + await verificacion.text());
+        let filas = await verificacion.json();
+        if (filas.length) {
+          const borrado = await sb(ruta, { method: "DELETE" });
+          if (!borrado.ok) throw new Error("No se pudo eliminar el movimiento temporal QA: " + await borrado.text());
+        }
+        verificacion = await sb(ruta + "&select=id");
+        if (!verificacion.ok) throw new Error("No se pudo confirmar la limpieza QA.");
+        filas = await verificacion.json();
+        if (filas.length) throw new Error("El movimiento temporal continúa en Supabase.");
+        await pull();
+        return { removed: true };
+      },
       async cleanupCuota(id) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
         if (!/^QA-PERSIST-CUOTA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
