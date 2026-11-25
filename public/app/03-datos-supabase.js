@@ -464,11 +464,11 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
     value: Object.freeze({
       async verificarMatriculaCompleta(dni) {
         if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
         await sv;
         if (!SAVE_OK) throw new Error("El guardado de matrícula no terminó correctamente.");
         const alumno = S.alu.find((x) => x.dni === dni && x.nom === "QA" && x.ape === "Persistencia");
-        if (!alumno || !/^\\d{6}$/.test(String(alumno.id))) throw new Error("No se encontró la matrícula temporal identificada.");
+        if (!alumno || !/^\d{6}$/.test(String(alumno.id))) throw new Error("No se encontró la matrícula temporal identificada.");
         const id = alumno.id;
         const leer = async (ruta) => {
           const r = await sb(ruta);
@@ -531,7 +531,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async cleanupMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
         await sv;
         await pull();
         const alumno = S.alu.find((x) => x.dni === dni);
@@ -542,7 +542,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           if (filas.length) throw new Error("El DNI existe, pero no coincide con la matrícula temporal esperada; se protege el registro.");
           return { removed: true };
         }
-        if (alumno.nom !== "QA" || alumno.ape !== "Persistencia" || !/^\\d{6}$/.test(String(alumno.id))) {
+        if (alumno.nom !== "QA" || alumno.ape !== "Persistencia" || !/^\d{6}$/.test(String(alumno.id))) {
           throw new Error("El registro no tiene las marcas de seguridad QA; no se eliminará.");
         }
         const id = alumno.id;
