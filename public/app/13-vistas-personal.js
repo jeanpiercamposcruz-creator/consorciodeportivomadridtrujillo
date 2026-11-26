@@ -181,14 +181,14 @@ function addPer() {
     Object.assign(t, x);
     EP = null;
     PFOTO = "";
-    toast("Personal actualizado");
+    var mensajeExitoPersonal = "Personal actualizado";
   } else {
     const id = `PER-${r}-${nx("PER-" + r, 4)}`;
     S.personal.push({ id, ...x });
     EP = id;
-    toast("Personal guardado: ya puedes asignarle sedes y certificaciones");
+    var mensajeExitoPersonal = "Personal guardado: ya puedes asignarle sedes y certificaciones";
   }
-  save();
+  save(mensajeExitoPersonal);
   R();
 }
 function perSedAdd() {
@@ -203,8 +203,7 @@ function perSedAdd() {
     hs = v("ps_r") === "" ? a.horas : monto(v("ps_r"));
   if (hs === null) return toast("Horas semanales inválidas");
   S.psedes.push({ id: uid(), pid: EP, sede: sid, hr, hs });
-  save();
-  toast("Sede asignada");
+  save("Sede asignada");
   R();
 }
 function perSedDel(id) {
@@ -220,8 +219,7 @@ function perCerAdd() {
   const x = { id: uid(), pid: EP, cert: c, ent: limpiar(v("pc_e"), 60), ven };
   x.est = certEst(x);
   S.pcert.push(x);
-  save();
-  toast("Certificación agregada");
+  save("Certificación agregada");
   R();
 }
 function perCerDel(id) {
