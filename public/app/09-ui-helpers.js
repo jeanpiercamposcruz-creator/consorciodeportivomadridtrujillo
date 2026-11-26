@@ -16,7 +16,7 @@ const sn = (id) => (S.sedes.find((x) => x.id === id) || {}).nombre || "-",
   dn = (id) => (S.deportes.find((x) => x.id === id) || {}).nombre || "-";
 const hrs = (h) => {
   const minutos = (valor) => {
-    const m = /^(\\d{1,2}):(\\d{2})(?::\\d{2}(?:\\.\\d+)?)?$/.exec(String(valor || ""));
+    const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(String(valor || ""));
     return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
   };
   const inicio = minutos(h?.ini), fin = minutos(h?.fin);
