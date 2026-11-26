@@ -136,7 +136,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       await page.locator('#m_cmen').fill('90');
       await page.locator('#m_mes').fill('2');
       await page.locator('#m_pag').fill('230');
-      await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+      await page.locator('button[data-f="matPay"]').evaluate((element) => {
+        const button = element as HTMLButtonElement;
+        // Simula dos eventos de clic seguidos incluso si el primer evento ya deshabilitó el botón.
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
       await expect(page.locator('#toast')).toContainText('Matrícula guardada', { timeout: 20000 });
 
       const verificado = await page.evaluate(async (d) => {
