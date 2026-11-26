@@ -523,9 +523,21 @@ const fotoBox = () =>
     : `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Elegir foto...</span>`;
 function carnet(id) {
   const a = S.alu.find((x) => x.id === id);
-  modal(
-    `<h3>${esc(a.nom + " " + a.ape)}</h3>${IMG_OK.test(a.foto || "") ? `<img src="${esc(a.foto)}" width=90 height=90 class="u-rounded-6">` : "<p class=mu>Sin foto</p>"}<p><b>${esc(a.id)}</b><br>${esc(dn(a.dep))} · CAT-${esc(a.nac.slice(0, 4))} · ${esc(sn(a.sede))}</p>${qr(carnetUrl(a))}<div class="row u-jc-center"><button data-f=print>Imprimir (PVC / papel)</button></div>`,
-  );
+  if (!a) return;
+  // Esperar a que Supabase confirme el qr_token antes de mostrar/imprimir el QR.
+  carnetUrl(a);
+  sv.then(() => {
+    if (!SAVE_OK) {
+      toast("No se pudo guardar el código QR. Inténtalo de nuevo antes de imprimir.");
+      return;
+    }
+    modal(
+      `<h3>${esc(a.nom + " " + a.ape)}</h3>${IMG_OK.test(a.foto || "") ? `<img src="${esc(a.foto)}" width=90 height=90 class="u-rounded-6">` : "<p class=mu>Sin foto</p>"}<p><b>${esc(a.id)}</b><br>${esc(dn(a.dep))} · CAT-${esc(a.nac.slice(0, 4))} · ${esc(sn(a.sede))}</p>${qr(carnetUrl(a))}<div class="row u-jc-center"><button data-f=print>Imprimir (PVC / papel)</button></div>`,
+    );
+  }).catch((e) => {
+    console.error("No se pudo confirmar el código QR:", e);
+    toast("No se pudo guardar el código QR. Inténtalo de nuevo.");
+  });
 }
 const ed = (id) => {
   V = "mat";
