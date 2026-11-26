@@ -1,7 +1,8 @@
 name: ERP Quality Checks
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Un solo flujo de pruebas por rama, aunque se disparen push y pull_request.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 on:
