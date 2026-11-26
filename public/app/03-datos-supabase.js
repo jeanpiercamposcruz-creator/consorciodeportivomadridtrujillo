@@ -1069,9 +1069,128 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         return { id: p.id, database: p, restored: recuperado };
       },
-      async cleanupPersonalContratoQA(dni) {
+      async asignarHorarioPersonalQA(dni) {
+        if (U?.rol !== "ADM") throw new Error("La asignación de prueba requiere una sesión administradora QA.");
+        await sv;
+        if (!SAVE_OK) throw new Error("Hay una escritura pendiente o fallida antes de asignar el horario.");
+        const personaResp = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) +
+          "&select=id,nombres,dni,rol,activo,precio_hora");
+        if (!personaResp.ok) throw new Error("No se pudo recuperar el personal temporal.");
+        const personas = await personaResp.json();
+        if (personas.length !== 1 || personas[0].nombres !== "QA Contrato Temporal" ||
+            personas[0].rol !== "ENT" || Number(personas[0].activo) !== 1) {
+          throw new Error("El personal temporal no está listo para recibir un horario.");
+        }
+        const persona = personas[0];
+        const horario = S.hor.find((h) =>
+          h.est !== "Inactivo" && h.sede && h.dep && h.ini && h.fin &&
+          S.sedes.some((s) => s.id === h.sede) && S.deportes.some((d) => d.id === h.dep)
+        );
+        if (!horario) throw new Error("No hay un horario activo válido para asignar al personal temporal.");
+        const existentesSede = await sb("/rest/v1/personal_sedes?personal_id=eq." +
+          encodeURIComponent(persona.id) + "&select=id");
+        const existentesHorario = await sb("/rest/v1/horario_profesores?personal_id=eq." +
+          encodeURIComponent(persona.id) + "&select=id");
+        if (!existentesSede.ok || !existentesHorario.ok) throw new Error("No se pudieron comprobar las asignaciones previas.");
+        if ((await existentesSede.json()).length || (await existentesHorario.json()).length) {
+          throw new Error("El personal temporal ya tiene asignaciones; no se modifica ninguna.");
+        }
+        const minutos = (valor) => {
+          const partes = String(valor).split(":").map(Number);
+          return partes.length >= 2 ? partes[0] * 60 + partes[1] : NaN;
+        };
+        const horas = Math.round((minutos(horario.fin) - minutos(horario.ini)) / 60 * 100) / 100;
+        if (!Number.isFinite(horas) || horas <= 0) throw new Error("La duración del horario no es válida.");
+        const sedeLinkId = crypto.randomUUID();
+        const horarioLinkId = crypto.randomUUID();
+        const asistenciaId = crypto.randomUUID();
+        const sedeLink = {
+          id: sedeLinkId, personal_id: persona.id, sede_id: horario.sede,
+          horario_resumen: "QA E2E " + horario.ini + "-" + horario.fin,
+          horas_semanales: horas,
+        };
+        const horarioLink = {
+          id: horarioLinkId, horario_id: horario.id, personal_id: persona.id,
+        };
+        let sedeInsertada = false;
+        let horarioInsertado = false;
+        try {
+          const sedeResp = await sb("/rest/v1/personal_sedes", {
+            method: "POST", body: JSON.stringify([sedeLink]),
+          });
+          if (!sedeResp.ok) throw new Error("No se pudo crear el vínculo temporal de sede: " + await sedeResp.text());
+          sedeInsertada = true;
+          const horarioResp = await sb("/rest/v1/horario_profesores", {
+            method: "POST", body: JSON.stringify([horarioLink]),
+          });
+          if (!horarioResp.ok) throw new Error("El trigger rechazó la asignación temporal de horario: " + await horarioResp.text());
+          horarioInsertado = true;
+          await pull();
+          const horarioRestaurado = S.hor.find((h) => h.id === horario.id);
+          if (!S.psedes.some((x) => x.pid === persona.id && x.sede === horario.sede) ||
+              !horarioRestaurado?.profs?.includes(persona.id)) {
+            throw new Error("El ERP no recuperó la asignación temporal de sede y horario.");
+          }
+          window.__ERP_QA_NEXT_ASISTENCIA_ID__ = asistenciaId;
+          return {
+            personalId: persona.id, sedeId: horario.sede, horarioId: horario.id,
+            grupo: horario.dep + "|" + horario.cat, fecha: today(), tarifa: Number(persona.precio_hora),
+            horasHorario: horas, sedeLinkId, horarioLinkId, asistenciaId,
+          };
+        } catch (error) {
+          if (horarioInsertado) {
+            await sb("/rest/v1/horario_profesores?id=eq." + encodeURIComponent(horarioLinkId), { method: "DELETE" });
+          }
+          if (sedeInsertada) {
+            await sb("/rest/v1/personal_sedes?id=eq." + encodeURIComponent(sedeLinkId), { method: "DELETE" });
+          }
+          await pull();
+          throw error;
+        }
+      },
+      async verificarAsistenciaPersonalQA(datos, asistio, recargar = false) {
+        if (U?.rol !== "ADM" || !datos || !String(datos.personalId).startsWith("PER-ENT-") ||
+            !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId))) {
+          throw new Error("Datos de asistencia temporal del personal inválidos.");
+        }
+        await sv;
+        if (!SAVE_OK) throw new Error("El guardado de asistencia del personal falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
+        const rutaId = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId) +
+          "&select=id,fecha,tipo,personal_id,horario_id,asistio";
+        const rutaComp = "/rest/v1/asistencias?personal_id=eq." + encodeURIComponent(datos.personalId) +
+          "&horario_id=eq." + encodeURIComponent(datos.horarioId) + "&fecha=eq." +
+          encodeURIComponent(datos.fecha) + "&tipo=eq.P&select=id";
+        const [porId, porComp] = await Promise.all([sb(rutaId), sb(rutaComp)]);
+        if (!porId.ok || !porComp.ok) throw new Error("No se pudo consultar la asistencia del personal en Supabase.");
+        const filas = await porId.json();
+        const coincidencias = await porComp.json();
+        if (filas.length !== 1 || coincidencias.length !== 1 || coincidencias[0].id !== datos.asistenciaId) {
+          throw new Error("Supabase no contiene exactamente una asistencia para el personal temporal.");
+        }
+        const fila = filas[0];
+        if (fila.personal_id !== datos.personalId || fila.horario_id !== datos.horarioId ||
+            fila.fecha !== datos.fecha || fila.tipo !== "P" || fila.asistio !== asistio) {
+          throw new Error("La asistencia del personal persistida no coincide con el estado solicitado.");
+        }
+        if (recargar) await pull();
+        const restaurada = S.asis.find((x) => x._id === datos.asistenciaId);
+        if (!restaurada || restaurada.t !== "P" || restaurada.ref !== datos.personalId ||
+            restaurada.h !== datos.horarioId || restaurada.ok !== asistio) {
+          throw new Error("El ERP no recuperó la asistencia del personal desde Supabase.");
+        }
+        return { database: fila, restored: { tipo: restaurada.t, personal: restaurada.ref, asistio: restaurada.ok } };
+      },
+      async cleanupPersonalContratoQA(dni, extras = null) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
-        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (extras && (!/^[0-9a-f-]{36}$/i.test(String(extras.sedeLinkId)) ||
+            !/^[0-9a-f-]{36}$/i.test(String(extras.horarioLinkId)) ||
+            !/^[0-9a-f-]{36}$/i.test(String(extras.asistenciaId)))) {
+          throw new Error("Los identificadores de asignación temporal no son válidos.");
+        }
+        if (extras && window.__ERP_QA_NEXT_ASISTENCIA_ID__ === extras.asistenciaId) {
+          delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
+        }
         await sv;
         const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) +
           "&select=id,nombres,dni,rol");
@@ -1085,16 +1204,41 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             throw new Error("El personal ya no coincide con el registro temporal; se protege el registro.");
           }
           const id = encodeURIComponent(p.id);
-          const dependencias = await Promise.all([
-            sb("/rest/v1/personal_sedes?personal_id=eq." + id + "&select=id"),
-            sb("/rest/v1/horario_profesores?personal_id=eq." + id + "&select=id"),
-            sb("/rest/v1/asistencias?personal_id=eq." + id + "&select=id"),
+          const [sedesResp, horariosResp, asistenciasResp, certificacionesResp] = await Promise.all([
+            sb("/rest/v1/personal_sedes?personal_id=eq." + id + "&select=id,sede_id,horario_resumen,horas_semanales"),
+            sb("/rest/v1/horario_profesores?personal_id=eq." + id + "&select=id,horario_id"),
+            sb("/rest/v1/asistencias?personal_id=eq." + id + "&select=id,fecha,tipo,personal_id,horario_id"),
             sb("/rest/v1/personal_certificaciones?personal_id=eq." + id + "&select=id"),
           ]);
-          if (dependencias.some((x) => !x.ok)) throw new Error("No se pudieron comprobar las dependencias del personal temporal.");
-          const dependenciasJson = await Promise.all(dependencias.map((x) => x.json()));
-          if (dependenciasJson.some((x) => x.length)) {
-            throw new Error("El personal temporal tiene sedes, horarios, asistencias o certificaciones; no se elimina.");
+          if (![sedesResp, horariosResp, asistenciasResp, certificacionesResp].every((x) => x.ok)) {
+            throw new Error("No se pudieron comprobar las dependencias del personal temporal.");
+          }
+          const [sedes, horarios, asistencias, certificaciones] = await Promise.all([
+            sedesResp.json(), horariosResp.json(), asistenciasResp.json(), certificacionesResp.json(),
+          ]);
+          if (extras) {
+            if (sedes.some((x) => x.id !== extras.sedeLinkId || x.sede_id !== extras.sedeId ||
+                !String(x.horario_resumen).startsWith("QA E2E ")) ||
+                horarios.some((x) => x.id !== extras.horarioLinkId || x.horario_id !== extras.horarioId) ||
+                asistencias.some((x) => x.id !== extras.asistenciaId || x.tipo !== "P" ||
+                  x.personal_id !== p.id || x.horario_id !== extras.horarioId || x.fecha !== extras.fecha) ||
+                certificaciones.length || sedes.length > 1 || horarios.length > 1 || asistencias.length > 1) {
+              throw new Error("Las asignaciones o asistencias ya no coinciden con los artefactos QA; se protegen los registros.");
+            }
+            if (asistencias.length) {
+              const borrado = await sb("/rest/v1/asistencias?id=eq." + encodeURIComponent(extras.asistenciaId), { method: "DELETE" });
+              if (!borrado.ok) throw new Error("No se pudo retirar la asistencia temporal: " + await borrado.text());
+            }
+            if (horarios.length) {
+              const borrado = await sb("/rest/v1/horario_profesores?id=eq." + encodeURIComponent(extras.horarioLinkId), { method: "DELETE" });
+              if (!borrado.ok) throw new Error("No se pudo retirar el horario temporal: " + await borrado.text());
+            }
+            if (sedes.length) {
+              const borrado = await sb("/rest/v1/personal_sedes?id=eq." + encodeURIComponent(extras.sedeLinkId), { method: "DELETE" });
+              if (!borrado.ok) throw new Error("No se pudo retirar el vínculo de sede temporal: " + await borrado.text());
+            }
+          } else if (sedes.length || horarios.length || asistencias.length || certificaciones.length) {
+            throw new Error("El personal temporal tiene dependencias no registradas por esta prueba; no se elimina.");
           }
           const borrado = await sb("/rest/v1/personal?id=eq." + id, { method: "DELETE" });
           if (!borrado.ok) throw new Error("No se pudo eliminar el contrato temporal: " + await borrado.text());
