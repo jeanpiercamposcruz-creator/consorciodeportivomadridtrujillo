@@ -444,6 +444,133 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
+  test('Persistir, recuperar y revertir asistencia y pago de campo en Supabase QA', async () => {
+    type DatosAsistenciaQA = {
+      alumnoId: string;
+      horarioId: string;
+      sedeId: string;
+      grupo: string;
+      fecha: string;
+      fee: number;
+      asistenciaId: string;
+      cajaId: string;
+    };
+    type HerramientaAsistenciaQA = {
+      prepararAsistenciaQA: () => Promise<DatosAsistenciaQA>;
+      verificarAsistenciaQA: (
+        datos: DatosAsistenciaQA,
+        asistio: boolean,
+        pagoCampo: boolean | null
+      ) => Promise<{
+        asistencia: { asistio: boolean; pago_campo: boolean | null };
+        caja: Array<{ monto: number | string }>;
+        restored: { asistio: boolean; pagoCampo: boolean | undefined; caja: number };
+      }>;
+      cleanupAsistenciaQA: (datos: DatosAsistenciaQA) => Promise<{ removed: boolean }>;
+    };
+
+    let datos: DatosAsistenciaQA | null = null;
+    try {
+      datos = await page.evaluate(async () => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está habilitada la prueba de asistencia en Supabase QA.');
+        return api.prepararAsistenciaQA();
+      });
+
+      await page.getByText('Toma de Asistencias', { exact: true }).first().click();
+      await expect(page.getByRole('heading', { name: 'Toma de Asistencias', exact: true })).toBeVisible();
+      await page.locator('select[data-ch="setA"][data-i="s"]').selectOption(datos.sedeId);
+      await page.locator('select[data-ch="setA"][data-i="g"]').selectOption(datos.grupo);
+      await page.locator('select[data-ch="setA"][data-i="h"]').selectOption(datos.horarioId);
+      await page.locator('select[data-ch="setA"][data-i="t"]').selectOption('A');
+
+      const asistio = page.locator(
+        'button[data-f="mkA"][data-i="A"][data-j="' + datos.alumnoId + '"][data-k="1"]'
+      );
+      await expect(asistio).toBeVisible();
+      await asistio.click();
+
+      let verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de asistencia QA.');
+        return api.verificarAsistenciaQA(d, true, null);
+      }, datos);
+      expect(verificado.asistencia.asistio).toBe(true);
+      expect(verificado.asistencia.pago_campo).toBeNull();
+      expect(verificado.restored.asistio).toBe(true);
+
+      await page.locator(
+        'button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="1"]'
+      ).click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación del pago QA.');
+        return api.verificarAsistenciaQA(d, true, true);
+      }, datos);
+      expect(verificado.asistencia.pago_campo).toBe(true);
+      expect(verificado.caja).toHaveLength(1);
+      expect(Number(verificado.caja[0].monto)).toBe(datos.fee);
+      expect(verificado.restored.caja).toBe(1);
+
+      await page.locator(
+        'button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="0"]'
+      ).click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de reversión QA.');
+        return api.verificarAsistenciaQA(d, true, false);
+      }, datos);
+      expect(verificado.asistencia.pago_campo).toBe(false);
+      expect(verificado.caja).toHaveLength(0);
+      expect(verificado.restored.caja).toBe(0);
+
+      await page.locator(
+        'button[data-f="mkA"][data-i="A"][data-j="' + datos.alumnoId + '"][data-k="0"]'
+      ).click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación del cambio de asistencia QA.');
+        return api.verificarAsistenciaQA(d, false, false);
+      }, datos);
+      expect(verificado.asistencia.asistio).toBe(false);
+      expect(verificado.restored.asistio).toBe(false);
+
+      await page.locator(
+        'button[data-f="mkA"][data-i="A"][data-j="' + datos.alumnoId + '"][data-k="1"]'
+      ).click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación final de asistencia QA.');
+        return api.verificarAsistenciaQA(d, true, false);
+      }, datos);
+      expect(verificado.asistencia.asistio).toBe(true);
+      expect(verificado.asistencia.pago_campo).toBe(false);
+    } finally {
+      if (datos) {
+        const limpieza = await page.evaluate(async (d) => {
+          const api = (window as unknown as {
+            __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+          }).__ERP_QA_PERSISTENCIA__;
+          if (!api) throw new Error('No está disponible la limpieza de asistencia QA.');
+          return api.cleanupAsistenciaQA(d);
+        }, datos);
+        expect(limpieza.removed).toBe(true);
+      }
+    }
+  });
+
   test('Consultar filtros de asistencia sin marcar ni registrar pagos', async () => {
     await page.getByText('Toma de Asistencias', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Toma de Asistencias', exact: true })).toBeVisible();
