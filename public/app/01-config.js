@@ -17,10 +17,16 @@ const v = (id) => {
   const e = document.getElementById(id);
   return e ? e.value.trim() : "";
 };
-/* Fecha LOCAL (Perú UTC-5). toISOString() es UTC y después de las 19:00 devolvía el día siguiente. */
+/* Fecha civil de Perú, independiente de la zona horaria del navegador o del servidor. */
 const today = () => {
-    const d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+    return p.year + "-" + p.month + "-" + p.day;
   },
   money = (n) => "S/ " + (+n || 0).toFixed(2);
 const esc = (s) =>
