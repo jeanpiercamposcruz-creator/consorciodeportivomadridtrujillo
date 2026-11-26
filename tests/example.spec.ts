@@ -1246,6 +1246,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
           const estado = eval('S') as { alu: Array<{ id: string; dni: string }> };
           const alumno = estado.alu.find((x) => x.dni === dniPrueba);
           if (!alumno) throw new Error('No se encontró el alumno QA para generar su carnet');
+          // Simular un registro histórico sin qr_token para forzar su generación y persistencia.
+          alumno.qt = '';
           const abrirCarnet = eval('carnet') as (id: string) => void;
           abrirCarnet(alumno.id);
         }, dni);
