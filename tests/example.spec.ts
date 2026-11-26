@@ -302,6 +302,119 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: 'Pagos y liquidaciones de la semana', exact: true })).toBeVisible();
   });
 
+  test('Crear, editar y recuperar contrato del personal desde Supabase QA', async () => {
+    type ContratoEsperadoQA = {
+      tipo: string;
+      inicio: string;
+      fin: string;
+      precio: number;
+      sueldo: number;
+      jornada: string;
+    };
+    type HerramientasContratoQA = {
+      prepararPersonalContratoQA: (dni: string) => Promise<{ dni: string; preparado: boolean }>;
+      verificarPersonalContratoQA: (
+        dni: string,
+        esperado: ContratoEsperadoQA
+      ) => Promise<{ id: string; database: Record<string, unknown>; restored: Record<string, unknown> }>;
+      cleanupPersonalContratoQA: (dni: string) => Promise<{ removed: boolean }>;
+    };
+
+    test.setTimeout(60000);
+    const dni = String(randomInt(10000000, 99999999));
+    const fechaInicio = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+    }).format(new Date());
+    await page.evaluate(async (d) => {
+      const api = (window as unknown as {
+        __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
+      }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No están disponibles las herramientas QA de contratos.');
+      return api.prepararPersonalContratoQA(d);
+    }, dni);
+
+    try {
+      await page.getByText('Personal y Planillas', { exact: true }).first().click();
+      await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+
+      await page.locator('#p_d').fill(dni);
+      await page.locator('#p_n').fill('QA Contrato Temporal');
+      await page.locator('#p_r').selectOption('ENT');
+      await page.locator('#p_tc').selectOption('Planilla');
+      await page.locator('#p_fi').fill(fechaInicio);
+      await page.locator('#p_ff').fill('2030-12-31');
+      await page.locator('#p_sf').fill('250.00');
+      await page.locator('#p_p').fill('32.50');
+      await page.locator('#p_j').selectOption('Tiempo parcial');
+      await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Personal guardado');
+
+      const inicial: ContratoEsperadoQA = {
+        tipo: 'Planilla',
+        inicio: fechaInicio,
+        fin: '2030-12-31',
+        precio: 32.5,
+        sueldo: 250,
+        jornada: 'Tiempo parcial',
+      };
+      const creado = await page.evaluate(async ({ d, esperado }) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de contrato QA.');
+        return api.verificarPersonalContratoQA(d, esperado);
+      }, { d: dni, esperado: inicial });
+      expect(creado.database.tipo_contrato).toBe('Planilla');
+      expect(Number(creado.database.precio_hora)).toBe(32.5);
+      expect(Number(creado.database.sueldo_fijo)).toBe(250);
+
+      await page.locator('#p_ff').fill('2031-12-31');
+      await page.locator('#p_p').fill('34.75');
+      await page.locator('#p_sf').fill('275.50');
+      await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Personal actualizado');
+
+      const actualizado: ContratoEsperadoQA = {
+        ...inicial,
+        fin: '2031-12-31',
+        precio: 34.75,
+        sueldo: 275.5,
+      };
+      const recuperado = await page.evaluate(async ({ d, esperado }) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación del contrato actualizado.');
+        return api.verificarPersonalContratoQA(d, esperado);
+      }, { d: dni, esperado: actualizado });
+      expect(recuperado.database.fecha_fin).toBe('2031-12-31');
+      expect(Number(recuperado.database.precio_hora)).toBe(34.75);
+      expect(Number(recuperado.database.sueldo_fijo)).toBe(275.5);
+
+      await page.locator('button[data-f="perTab"][data-i="c"]').click();
+      const filaContrato = page.locator('table').last().locator('tr')
+        .filter({ hasText: 'QA Contrato Temporal' }).first();
+      await expect(filaContrato).toContainText('2031-12-31');
+      await expect(filaContrato).toContainText('34.75');
+      await expect(filaContrato).toContainText('275.50');
+
+      await page.locator('button[data-f="perTab"][data-i="p"]').click();
+      const filaPago = page.locator('table').last().locator('tr')
+        .filter({ hasText: 'QA Contrato Temporal' }).first();
+      await expect(filaPago).toContainText('34.75');
+      await expect(filaPago).toContainText('275.50');
+    } finally {
+      const limpieza = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza del contrato QA.');
+        return api.cleanupPersonalContratoQA(d);
+      }, dni);
+      expect(limpieza.removed).toBe(true);
+    }
+  });
+
   test('Rechazar contrato con fecha de fin anterior al inicio sin guardar cambios', async () => {
     await page.getByText('Personal y Planillas', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
