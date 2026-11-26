@@ -1182,7 +1182,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async cleanupPersonalContratoQA(dni, extras = null) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
         if (extras && (!/^[0-9a-f-]{36}$/i.test(String(extras.sedeLinkId)) ||
             !/^[0-9a-f-]{36}$/i.test(String(extras.horarioLinkId)) ||
             !/^[0-9a-f-]{36}$/i.test(String(extras.asistenciaId)))) {
