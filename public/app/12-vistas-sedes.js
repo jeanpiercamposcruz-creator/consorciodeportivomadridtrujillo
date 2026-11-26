@@ -76,6 +76,7 @@ function addSede() {
     est,
   };
   if (d.costo === null) return toast("Costo inválido");
+  const editandoSede = Boolean(ES);
   if (ES) {
     const tgt = S.sedes.find((s) => s.id === ES);
     if (!tgt) {
@@ -87,22 +88,19 @@ function addSede() {
     Object.assign(tgt, d);
     tgt.cod = tgt.cod || ES.slice(4);
     ES = null;
-    toast("Sede actualizada");
   } else {
     if (!/^[A-Z]{3}$/.test(c)) return toast("El código debe tener 3 letras (A-Z)");
     if (S.sedes.some((s) => s.id === "SED-" + c)) return toast("Ese código ya existe");
     S.sedes.push({ id: "SED-" + c, cod: c, ...d });
-    toast("Sede guardada");
   }
-  save();
+  save(editandoSede ? "Sede actualizada" : "Sede guardada");
   R();
 }
 const sedTog = (id) => {
   const s = S.sedes.find((x) => x.id === id);
   if (!s) return;
   s.est = sedEst(s) === "Activa" ? "Inactiva" : "Activa";
-  save();
-  toast(s.est === "Activa" ? "Sede activada" : "Sede desactivada");
+  save(s.est === "Activa" ? "Sede activada" : "Sede desactivada");
   R();
 };
 function delSede(id) {
@@ -116,8 +114,7 @@ function delSede(id) {
   )
     return toast("No se puede eliminar: tiene horarios, alumnos, contratos o movimientos. Puedes desactivarla.");
   S.sedes = S.sedes.filter((s) => s.id !== id);
-  save();
-  toast("Sede eliminada");
+  save("Sede eliminada");
   R();
 }
 
@@ -171,14 +168,12 @@ function addCtr() {
     if (s) s.costo = m;
   }
   EC = null;
-  save();
-  toast("Contrato guardado");
+  save("Contrato guardado");
   R();
 }
 function delCtr(id) {
   S.contratos = S.contratos.filter((c) => c.id !== id);
-  save();
-  toast("Contrato eliminado");
+  save("Contrato eliminado");
   R();
 }
 
@@ -222,16 +217,14 @@ function addCc() {
     S.cc.push({ id: c, codigo: c, nombre: n, activo: a });
   }
   EK = null;
-  save();
-  toast("Centro de costo guardado");
+  save("Centro de costo guardado");
   R();
 }
 function delCc(id) {
   if (S.sedes.some((s) => s.cc === id))
     return toast("No se puede eliminar: hay sedes asociadas. Desactívalo o cambia la sede.");
   S.cc = S.cc.filter((c) => c.id !== id);
-  save();
-  toast("Centro de costo eliminado");
+  save("Centro de costo eliminado");
   R();
 }
 function ccAuto() {
@@ -242,8 +235,7 @@ function ccAuto() {
       S.cc.push({ id: c, codigo: c, nombre: "Sede " + s.nombre, activo: true });
       s.cc = c;
     });
-  save();
-  toast("Centros de costo creados y asignados");
+  save("Centros de costo creados y asignados");
   R();
 }
 const hsem = (p) => {
