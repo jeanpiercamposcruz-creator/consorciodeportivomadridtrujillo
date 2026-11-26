@@ -766,7 +766,7 @@ function saveKit() {
     Object.assign(existingEdit, kit);
     Object.assign(movimientos[0], { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
     KE = null;
-    toast("Venta actualizada");
+    var mensajeGuardadoKit = "Venta actualizada";
   } else {
     const qaId = window.__ERP_QA_NEXT_KIT_ID__;
     const id =
@@ -778,10 +778,13 @@ function saveKit() {
         : uid();
     S.kits.push({ _id: id, ...kit });
     S.caja.push({ f: kit.f || today(), sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + id });
-    toast("Venta registrada");
+    mensajeGuardadoKit = "Venta registrada";
   }
 
   save();
+  sv = sv.then(() => {
+    if (SAVE_OK) toast(mensajeGuardadoKit);
+  });
   KSEL = KNUM = KQ = "";
   R();
 }
@@ -818,17 +821,16 @@ function delKit(id) {
   match.est = "Anulada";
   save();
   sv = sv.then(async () => {
-    if (SAVE_OK) {
-      try {
-        await pull();
-        R();
-      } catch (e) {
-        console.error("La venta se anuló, pero no se pudo refrescar la vista de Caja.", e);
-        toast("Venta anulada. Recarga para actualizar la reversión de Caja.");
-      }
+    if (!SAVE_OK) return;
+    try {
+      await pull();
+      R();
+      toast("Venta anulada y reversión registrada en Caja");
+    } catch (e) {
+      console.error("La venta se anuló, pero no se pudo refrescar la vista de Caja.", e);
+      toast("Venta anulada. Recarga para actualizar la reversión de Caja.");
     }
   });
-  toast("Venta anulada y reversión registrada en Caja");
   R();
 }
 function cajaAuditoria(x) {
