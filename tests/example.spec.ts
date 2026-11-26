@@ -447,6 +447,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   test('Persistir, recuperar y revertir asistencia y pago de campo en Supabase QA', async () => {
     type DatosAsistenciaQA = {
       alumnoId: string;
+      alumnoDni: string;
       horarioId: string;
       sedeId: string;
       grupo: string;
@@ -460,7 +461,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       verificarAsistenciaQA: (
         datos: DatosAsistenciaQA,
         asistio: boolean,
-        pagoCampo: boolean | null
+        pagoCampo: boolean | null,
+        recargar?: boolean
       ) => Promise<{
         asistencia: { asistio: boolean; pago_campo: boolean | null };
         caja: Array<{ monto: number | string }>;
@@ -559,7 +561,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
           __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
         }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación final de asistencia QA.');
-        return api.verificarAsistenciaQA(d, true, false);
+        return api.verificarAsistenciaQA(d, true, false, true);
       }, datos);
       expect(verificado.asistencia.asistio).toBe(true);
       expect(verificado.asistencia.pago_campo).toBe(false);
