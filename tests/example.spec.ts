@@ -315,6 +315,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       personalId: string;
       sedeId: string;
       horarioId: string;
+      horarioTemporalId: string;
+      diaSemana: string;
       grupo: string;
       fecha: string;
       tarifa: number;
