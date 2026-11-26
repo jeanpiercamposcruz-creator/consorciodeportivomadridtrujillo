@@ -1848,6 +1848,73 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
   });
 
+  test('No mostrar éxito ni conservar matrícula si Supabase rechaza la persistencia', async () => {
+    const dni = String(randomInt(10_000_000, 99_999_999));
+    type HerramientaQA = {
+      prepararIdMatricula: (dni: string) => Promise<string>;
+      cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
+    };
+    try {
+      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+      await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+      await page.locator('#m_nom').fill('QA');
+      await page.locator('#m_ape').fill('Fallo Persistencia');
+      await page.locator('#m_dni').fill(dni);
+      await page.locator('#m_sex').selectOption('M');
+      await page.locator('#m_nac').fill('2014-06-15');
+      await page.locator('#m_cm').fill('50');
+      await page.locator('#m_cmen').fill('90');
+      await page.locator('#m_mes').fill('2');
+      await page.locator('#m_pag').fill('50');
+
+      const preparado = await page.evaluate(async (dniPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está habilitada la preparación de matrícula QA.');
+        return api.prepararIdMatricula(dniPrueba);
+      }, dni);
+      expect(preparado).toBe('RPC');
+
+      const rpcPath = '**/rest/v1/rpc/erp_persistir_lote';
+      let intentos = 0;
+      const bloquear = async (route: import('@playwright/test').Route) => {
+        intentos++;
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'QA500', message: 'Fallo inducido de matrícula QA' }),
+        });
+      };
+      await page.route(rpcPath, bloquear);
+      try {
+        await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+        await expect(page.locator('#toast')).toContainText('No se pudo guardar');
+        expect(intentos).toBe(1);
+        await expect(page.locator('#toast')).not.toContainText('Matrícula guardada');
+
+        const filas = await page.evaluate(async (dniPrueba) => {
+          const consultar = eval('sb') as (ruta: string) => Promise<Response>;
+          const response = await consultar('/rest/v1/alumnos?dni=eq.' + encodeURIComponent(dniPrueba) + '&select=id');
+          if (!response.ok) throw new Error('No se pudo verificar la matrícula fallida en Supabase QA.');
+          return response.json();
+        }, dni);
+        expect(filas).toHaveLength(0);
+        await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+      } finally {
+        await page.unroute(rpcPath, bloquear);
+      }
+    } finally {
+      const limpieza = await page.evaluate(async (dniPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de matrícula QA.');
+        return api.cleanupMatricula(dniPrueba);
+      }, dni);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
   test('Persistir y recuperar el ingreso de matrícula y su distribución en Caja desde Supabase QA', async () => {
     const id = 'QA-PERSIST-CAJA-' + randomUUID();
     type Tramo = { destino: string; cuota: number; monto: number };
