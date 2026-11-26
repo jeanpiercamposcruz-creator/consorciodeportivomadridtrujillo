@@ -497,7 +497,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
   Object.defineProperty(window, "__ERP_QA_PERSISTENCIA__", {
     configurable: true,
     value: Object.freeze({
-      build: "qa-day-semana-numerico-bb5145cf",
+      build: "qa-double-submit-6fc63791",
       async prepararIdMatricula(dni) {
         if (U?.rol !== "ADM") throw new Error("La preparación requiere una sesión administradora QA.");
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal QA inválido.");
