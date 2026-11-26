@@ -462,7 +462,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       const filaPagoAsistencia = page.locator('table').last().locator('tr')
         .filter({ hasText: 'QA Contrato Temporal' }).first();
       const celdasPago = await filaPagoAsistencia.locator('td').allTextContents();
-      const numero = (valor: string) => Number(valor.replace(/[^\\d.-]/g, ''));
+      const numero = (valor: string) => Number(valor.replace(/[^\d.-]/g, ''));
       const tarifa = numero(celdasPago[3] || '');
       const horas = numero(celdasPago[4] || '');
       const pago = numero(celdasPago[5] || '');
