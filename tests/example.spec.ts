@@ -56,6 +56,25 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page?.close();
   });
 
+  const cerrarDialogoResidual = async () => {
+    const dialogo = page.getByRole('dialog');
+    if (!(await dialogo.isVisible().catch(() => false))) return;
+    const cerrar = dialogo.getByRole('button', { name: 'Cerrar', exact: true });
+    if (await cerrar.isVisible().catch(() => false)) {
+      await cerrar.click();
+      await expect(dialogo).toBeHidden({ timeout: 5000 });
+    }
+  };
+
+  test.beforeEach(async () => {
+    await cerrarDialogoResidual();
+  });
+
+  test.afterEach(async () => {
+    await cerrarDialogoResidual();
+  });
+
+
   test('Probar modulo de Alumnos activos', async () => {
     await expect(page.getByText('Alumnos activos')).toBeVisible();
   });
