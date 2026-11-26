@@ -172,6 +172,7 @@ function addPer() {
     foto: IMG_OK.test(PFOTO || "") ? PFOTO : "",
     activo: +est,
   };
+  let mensajeExitoPersonal = "";
   if (EP) {
     const t = S.personal.find((p) => p.id === EP);
     if (!t) {
@@ -181,12 +182,12 @@ function addPer() {
     Object.assign(t, x);
     EP = null;
     PFOTO = "";
-    var mensajeExitoPersonal = "Personal actualizado";
+    mensajeExitoPersonal = "Personal actualizado";
   } else {
     const id = `PER-${r}-${nx("PER-" + r, 4)}`;
     S.personal.push({ id, ...x });
     EP = id;
-    var mensajeExitoPersonal = "Personal guardado: ya puedes asignarle sedes y certificaciones";
+    mensajeExitoPersonal = "Personal guardado: ya puedes asignarle sedes y certificaciones";
   }
   save(mensajeExitoPersonal);
   R();
