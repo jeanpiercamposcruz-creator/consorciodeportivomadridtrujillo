@@ -1600,6 +1600,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
           const rows = await response.json() as Array<{ qr_token: string | null }>;
           return rows[0]?.qr_token ?? null;
         }, dni);
+        if (!tokenQR) throw new Error('Supabase no persistió el token QR del alumno temporal.');
         expect(tokenQR).toMatch(/^[a-z0-9]{16}$/);
 
         // El endpoint público solo debe exponer los campos deliberados del carnet.
