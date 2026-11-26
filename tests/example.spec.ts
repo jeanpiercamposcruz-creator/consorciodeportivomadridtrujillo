@@ -470,10 +470,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     };
 
     test.setTimeout(90000);
-    const dialogo = page.locator('[role="dialog"]');
+    const dialogo = page.getByRole('dialog');
     if (await dialogo.isVisible().catch(() => false)) {
       const cerrar = dialogo.getByRole('button', { name: 'Cerrar', exact: true });
-      if (await cerrar.isVisible().catch(() => false)) await cerrar.click();
+      await expect(cerrar).toBeVisible();
+      await cerrar.click();
+      await expect(dialogo).toBeHidden();
     }
     const datos = await page.evaluate(async () => {
       const api = (window as unknown as {
