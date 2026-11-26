@@ -752,6 +752,7 @@ function saveKit() {
     est: existingEdit?.est || "Activa",
   };
 
+  let mensajeGuardadoKit = "";
   if (editKey) {
     if (!existingEdit) {
       KE = null;
@@ -766,7 +767,7 @@ function saveKit() {
     Object.assign(existingEdit, kit);
     Object.assign(movimientos[0], { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
     KE = null;
-    var mensajeGuardadoKit = "Venta actualizada";
+    mensajeGuardadoKit = "Venta actualizada";
   } else {
     const qaId = window.__ERP_QA_NEXT_KIT_ID__;
     const id =
