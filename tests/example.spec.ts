@@ -573,6 +573,19 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
     await expect(page.locator('#c_s')).toBeVisible();
     expect(await page.locator('#c_s option').count()).toBeGreaterThan(0);
+    const fechas = await page.evaluate(() => {
+      const iso = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+      };
+      const inicio = new Date();
+      inicio.setDate(inicio.getDate() + 1);
+      const fin = new Date(inicio);
+      fin.setDate(fin.getDate() + 1);
+      return { inicio: iso(inicio), fin: iso(fin) };
+    });
 
     await page.locator('#c_i').fill('');
     await page.locator('#c_f').fill('');
@@ -580,21 +593,24 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('Las fechas de inicio y fin son obligatorias');
 
-    await page.locator('#c_i').fill('2026-11-24');
-    await page.locator('#c_f').fill('2026-11-25');
+    await page.locator('#c_i').fill(fechas.inicio);
+    await page.locator('#c_f').fill(fechas.fin);
     await page.locator('#c_m').fill('0');
     await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('Monto mensual inválido');
 
     await page.locator('#c_m').fill('100');
-    await page.locator('#c_i').fill('2026-11-24');
-    await page.locator('#c_f').fill('2026-11-24');
+    await page.locator('#c_i').fill(fechas.inicio);
+    await page.locator('#c_f').fill(fechas.inicio);
     await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('La fecha de fin debe ser posterior al inicio');
     await expect(page.getByRole('heading', { name: 'Nuevo contrato de alquiler', exact: true })).toBeVisible();
 
-    await page.locator('#c_f').fill('2026-11-25');
+    await page.locator('#c_i').fill(fechas.inicio);
+    await page.locator('#c_f').fill(fechas.fin);
     await page.locator('#c_u').fill('javascript:alert(1)');
+    await expect(page.locator('#c_i')).toHaveValue(fechas.inicio);
+    await expect(page.locator('#c_f')).toHaveValue(fechas.fin);
     await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('El enlace debe empezar con http:// o https://');
     await expect(page.locator('#c_u')).toHaveValue('javascript:alert(1)');
