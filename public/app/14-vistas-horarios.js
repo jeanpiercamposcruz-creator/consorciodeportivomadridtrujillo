@@ -782,10 +782,7 @@ function saveKit() {
     mensajeGuardadoKit = "Venta registrada";
   }
 
-  save();
-  sv = sv.then(() => {
-    if (SAVE_OK) toast(mensajeGuardadoKit);
-  });
+  save(mensajeGuardadoKit);
   KSEL = KNUM = KQ = "";
   R();
 }
