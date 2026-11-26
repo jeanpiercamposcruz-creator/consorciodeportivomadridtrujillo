@@ -139,8 +139,8 @@ async function enviarPre() {
     );
     if (rutas.length) {
       try {
-        const limpieza = await sb("/storage/v1/object/documentos", {
-          method: "DELETE",
+        const limpieza = await sb("/functions/v1/preregistro-cleanup", {
+          method: "POST",
           body: JSON.stringify({ prefixes: rutas }),
         });
         if (!limpieza.ok) console.error("No se pudieron limpiar los documentos del pre-registro fallido");
