@@ -136,11 +136,13 @@ function payBtn(b) {
     cls = b.className,
     sw = b.style.width,
     sh = b.style.height,
+    disabled = b.disabled,
     small = b.classList.contains("s");
   b.style.width = w + "px";
   b.style.height = h + "px";
   void b.offsetWidth;
   b.classList.add("paybtn", "paying");
+  b.disabled = true;
   b.innerHTML = "<i class=pf></i><span class=pl>Procesando…</span>";
   b.style.width = Math.max(w, small ? 112 : 196) + "px";
   const t0 = performance.now();
@@ -151,6 +153,7 @@ function payBtn(b) {
         setTimeout(() => {
           b.classList.remove("paying");
           b.classList.add("paid");
+          b.disabled = disabled;
           b.innerHTML =
             '<svg class=pk viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class=pl>¡PAGADO!</span>';
           setTimeout(res, 800);
@@ -159,6 +162,7 @@ function payBtn(b) {
     },
     cancel() {
       b.className = cls;
+      b.disabled = disabled;
       b.style.width = sw;
       b.style.height = sh;
       b.innerHTML = html;
@@ -168,7 +172,8 @@ function payBtn(b) {
 
 /* Ejecuta la acción original (sin cambiarla), retiene el re-dibujado y anima solo si hubo un cobro real */
 function payRun(b, fn, metric, tk) {
-  if (PAYB || !b || !b.isConnected) return fn();
+  if (PAYB) return; // Un segundo cobro durante una operación activa nunca debe ejecutar fn().
+  if (!b || !b.isConnected) return fn();
   const m0 = metric(),
     R0 = R;
   let pend = false;
@@ -261,17 +266,32 @@ const campoPay = (r, b) =>
     () => ({ c: S.caja[S.caja.length - 1] }),
   );
 function matPay(b) {
+  if (PAYB) return;
   const old = ED ? S.alu.find((x) => x.id === ED) : null,
     m = monto(v("m_pag") || 0),
     d = (m || 0) - (old ? old.pag : 0);
-  return d > 0
-    ? payRun(
-        b,
-        saveAlu,
-        () => S.caja.length,
-        () => ({ c: S.caja[S.caja.length - 1] }),
-      )
-    : saveAlu();
+  if (d > 0) {
+    return payRun(
+      b,
+      saveAlu,
+      () => S.caja.length,
+      () => ({ c: S.caja[S.caja.length - 1] }),
+    );
+  }
+  // También serializar ediciones y reversiones: no todas usan la animación de cobro.
+  PAYB = 1;
+  let resultado;
+  try {
+    resultado = saveAlu();
+  } catch (e) {
+    PAYB = 0;
+    throw e;
+  }
+  return Promise.resolve(resultado)
+    .then(() => sv)
+    .finally(() => {
+      PAYB = 0;
+    });
 }
 
 function barcode(s) {
