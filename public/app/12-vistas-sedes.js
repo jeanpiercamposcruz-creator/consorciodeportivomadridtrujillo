@@ -239,8 +239,9 @@ function ccAuto() {
   R();
 }
 const hsem = (p) => {
-  const d = new Date();
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const [y, m, day] = today().split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, day));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   const w = d.toISOString().slice(0, 10);
   return S.asis
     .filter((x) => x.t === "P" && x.ref === p.id && x.ok && x.f >= w)
