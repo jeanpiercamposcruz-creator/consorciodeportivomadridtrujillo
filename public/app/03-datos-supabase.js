@@ -453,7 +453,7 @@ async function flush() {
   for (const [t, ins, upd, m] of W) SN[t.n] = m;
 }
 let SAVE_OK = true; // resultado del último guardado (lo consultan recibos y borrado de pre-registros)
-function save() {
+function save(mensajeExito = "") {
   busy++;
   sv = sv
     .then(async () => {
@@ -461,6 +461,7 @@ function save() {
         await flush();
         SAVE_OK = true;
         await ver();
+        if (mensajeExito) toast(mensajeExito);
       } catch (e) {
         SAVE_OK = false;
         if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co" && U?.rol === "ADM") {
