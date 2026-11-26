@@ -107,7 +107,7 @@ test('exige JWT y rechaza archivos fuera del patrón de pre-registro', async ({ 
       ).__ERP_CONFIG__;
       if (!config) throw new Error('No se cargó la configuración pública de Supabase');
 
-      const endpoint = config.supabaseUrl.replace(/\\/+$/, '') +
+      const endpoint = config.supabaseUrl.replace(/\/+$/, '') +
         '/functions/v1/preregistro-cleanup';
       const body = JSON.stringify({
         prefixes: ['preregistro/' + 'a'.repeat(32) + '/private.txt'],
