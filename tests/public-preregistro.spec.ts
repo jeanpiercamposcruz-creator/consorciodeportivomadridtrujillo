@@ -7,7 +7,28 @@ test.skip(!url, 'La prueba pública requiere ERP_URL del Preview QA.');
 test('limpia los documentos subidos si falla el guardado del pre-registro', async ({ browser }) => {
   const page = await browser.newPage();
   let uploadedPath = '';
-  let deletedPaths: string[] = [];
+  let uploadStatus = 0;
+
+  page.on('request', (request) => {
+    if (
+      request.method() === 'POST' &&
+      request.url().includes('/storage/v1/object/documentos/')
+    ) {
+      const pathname = new URL(request.url()).pathname;
+      uploadedPath = decodeURIComponent(
+        pathname.split('/storage/v1/object/documentos/')[1] || '',
+      );
+    }
+  });
+
+  page.on('response', (response) => {
+    if (
+      response.request().method() === 'POST' &&
+      response.url().includes('/storage/v1/object/documentos/')
+    ) {
+      uploadStatus = response.status();
+    }
+  });
 
   await page.route('**/rest/v1/catalogo_publico*', (route) =>
     route.fulfill({
@@ -19,20 +40,6 @@ test('limpia los documentos subidos si falla el guardado del pre-registro', asyn
       ]),
     }),
   );
-
-  await page.route('**/storage/v1/object/documentos/**', async (route) => {
-    if (route.request().method() !== 'POST') return route.continue();
-    const pathname = new URL(route.request().url()).pathname;
-    uploadedPath = decodeURIComponent(pathname.split('/storage/v1/object/documentos/')[1] || '');
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-  });
-
-  await page.route('**/storage/v1/object/documentos', async (route) => {
-    if (route.request().method() !== 'DELETE') return route.continue();
-    const body = route.request().postDataJSON() as { prefixes?: string[] };
-    deletedPaths = body.prefixes || [];
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-  });
 
   await page.route('**/rest/v1/preregistros*', async (route) => {
     if (route.request().method() !== 'POST') return route.continue();
@@ -64,10 +71,20 @@ test('limpia los documentos subidos si falla el guardado del pre-registro', asyn
       buffer: Buffer.from('contenido de prueba QA'),
     });
 
+    const cleanupResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/functions/v1/preregistro-cleanup') &&
+        response.request().method() === 'POST',
+      { timeout: 20000 },
+    );
+
     await page.getByRole('button', { name: 'Enviar pre-registro' }).click();
-    await expect.poll(() => deletedPaths.length).toBe(1);
-    expect(uploadedPath).toMatch(/^preregistro\/[a-z0-9]+\/dni-\d+\.jpg$/);
-    expect(deletedPaths).toEqual([uploadedPath]);
+
+    const cleanupResponse = await cleanupResponsePromise;
+    expect(uploadedPath).toMatch(/^preregistro\/[a-f0-9]{32}\/dni-\d{10,13}\.jpg$/);
+    expect(uploadStatus).toBe(200);
+    expect(cleanupResponse.status()).toBe(200);
+    expect(await cleanupResponse.json()).toEqual({ deleted: 1 });
     await expect(page.locator('#toast')).toContainText('No se pudo enviar');
   } finally {
     await page.close();
