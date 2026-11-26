@@ -1243,7 +1243,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
           request.url().includes('/rest/v1/rpc/erp_persistir_lote')
         );
         await page.evaluate((dniPrueba) => {
-          const estado = eval('S') as { alu: Array<{ id: string; dni: string }> };
+          const estado = eval('S') as { alu: Array<{ id: string; dni: string; qt?: string | null }> };
           const alumno = estado.alu.find((x) => x.dni === dniPrueba);
           if (!alumno) throw new Error('No se encontró el alumno QA para generar su carnet');
           // Simular un registro histórico sin qr_token para forzar su generación y persistencia.
