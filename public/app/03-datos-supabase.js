@@ -1034,7 +1034,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async prepararPersonalContratoQA(dni) {
         if (U?.rol !== "ADM") throw new Error("La prueba de contrato requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
         if (S.personal.some((p) => p.dni === dni)) throw new Error("El DNI temporal ya existe en el ERP.");
         const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) + "&select=id");
         if (!r.ok) throw new Error("No se pudo comprobar la unicidad del DNI de personal.");
@@ -1043,7 +1043,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async verificarPersonalContratoQA(dni, esperado) {
         if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
         await sv;
         if (!SAVE_OK) throw new Error("El guardado del contrato de personal falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
         const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) +
@@ -1071,7 +1071,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async cleanupPersonalContratoQA(dni) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
         await sv;
         const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) +
           "&select=id,nombres,dni,rol");
