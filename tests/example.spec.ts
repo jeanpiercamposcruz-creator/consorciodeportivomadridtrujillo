@@ -336,6 +336,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     try {
       await page.getByText('Personal y Planillas', { exact: true }).first().click();
       await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
+      await page.locator('button[data-f="perTab"][data-i="d"]').click();
+      await expect(page.locator('#p_d')).toBeVisible();
 
       await page.locator('#p_d').fill(dni);
       await page.locator('#p_n').fill('QA Contrato Temporal');
