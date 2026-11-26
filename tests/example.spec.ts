@@ -1226,6 +1226,49 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(resultado.restored.cuotas).toHaveLength(2);
       expect(resultado.restored.caja).toHaveLength(1);
       expect(Number(resultado.restored.caja[0].monto)).toBe(230);
+
+      // El carnet no debe aparecer hasta que Supabase confirme el qr_token.
+      const cerrarCarnet = page.getByRole('button', { name: 'Cerrar', exact: true });
+      if (await cerrarCarnet.isVisible().catch(() => false)) await cerrarCarnet.click();
+
+      let liberarRpc: (() => void) | undefined;
+      const rpcGate = new Promise<void>((resolve) => { liberarRpc = resolve; });
+      const rpcPath = '**/rest/v1/rpc/erp_persistir_lote';
+      await page.route(rpcPath, async (route) => {
+        await rpcGate;
+        await route.continue();
+      });
+      try {
+        const rpcPendiente = page.waitForRequest((request) =>
+          request.url().includes('/rest/v1/rpc/erp_persistir_lote')
+        );
+        await page.evaluate((dniPrueba) => {
+          const estado = eval('S') as { alu: Array<{ id: string; dni: string }> };
+          const alumno = estado.alu.find((x) => x.dni === dniPrueba);
+          if (!alumno) throw new Error('No se encontró el alumno QA para generar su carnet');
+          const abrirCarnet = eval('carnet') as (id: string) => void;
+          abrirCarnet(alumno.id);
+        }, dni);
+        await rpcPendiente;
+        await expect(cerrarCarnet).toBeHidden();
+        liberarRpc?.();
+        await expect(cerrarCarnet).toBeVisible({ timeout: 15000 });
+
+        const tokenQR = await page.evaluate(async (dniPrueba) => {
+          const consultar = eval('sb') as (path: string) => Promise<Response>;
+          const response = await consultar(
+            `/rest/v1/alumnos?select=qr_token&dni=eq.${encodeURIComponent(dniPrueba)}`
+          );
+          if (!response.ok) throw new Error('No se pudo verificar qr_token en Supabase QA');
+          const rows = await response.json() as Array<{ qr_token: string | null }>;
+          return rows[0]?.qr_token ?? null;
+        }, dni);
+        expect(tokenQR).toMatch(/^[a-z0-9]{16}$/);
+        await cerrarCarnet.click();
+      } finally {
+        liberarRpc?.();
+        await page.unroute(rpcPath);
+      }
     } finally {
       const limpieza = await page.evaluate(async (dniPrueba) => {
         const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
