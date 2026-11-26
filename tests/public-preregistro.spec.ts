@@ -90,3 +90,51 @@ test('limpia los documentos subidos si falla el guardado del pre-registro', asyn
     await page.close();
   }
 });
+
+
+test('exige JWT y rechaza archivos fuera del patrón de pre-registro', async ({ browser }) => {
+  const page = await browser.newPage();
+
+  try {
+    await page.goto(new URL('#prereg', url).toString(), { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Pre-registro de alumno' })).toBeVisible();
+
+    const result = await page.evaluate(async () => {
+      const config = (
+        window as unknown as {
+          __ERP_CONFIG__?: { supabaseUrl: string; supabaseKey: string };
+        }
+      ).__ERP_CONFIG__;
+      if (!config) throw new Error('No se cargó la configuración pública de Supabase');
+
+      const endpoint = config.supabaseUrl.replace(/\\/+$/, '') +
+        '/functions/v1/preregistro-cleanup';
+      const body = JSON.stringify({
+        prefixes: ['preregistro/' + 'a'.repeat(32) + '/private.txt'],
+      });
+
+      const sinJwt = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+
+      const rutaNoPermitida = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: 'Bearer ' + config.supabaseKey,
+          'Content-Type': 'application/json',
+        },
+        body,
+      });
+
+      return { sinJwt: sinJwt.status, rutaNoPermitida: rutaNoPermitida.status };
+    });
+
+    expect(result.sinJwt).toBe(401);
+    expect(result.rutaNoPermitida).toBe(400);
+  } finally {
+    await page.close();
+  }
+});
