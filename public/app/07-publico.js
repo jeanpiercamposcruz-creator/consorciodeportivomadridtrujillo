@@ -88,11 +88,11 @@ async function enviarPre() {
   }
   // Storage valida carpetas alfanuméricas; compactar el UUID antes de usarlo como ID/ruta.
   const pid = uid().replace(/-/g, ""),
-    tx = b.textContent;
+    tx = b.textContent,
+    ps = {};
   b.disabled = true;
   try {
     let foto = null;
-    const ps = {};
     if (fs.foto) {
       b.textContent = "Procesando foto...";
       foto = await fotoData(fs.foto);
@@ -133,6 +133,21 @@ async function enviarPre() {
     if (!r.ok) throw 0;
     DOM.app.innerHTML = `<main class=login><section class="card u-text-center"><img src="${LOGO}" class=lg alt="CDMT"><h3>Pre-registro enviado</h3><p>Gracias. Presenta tu DNI en la sede para confirmar la matrícula.</p></section></main>`;
   } catch (x) {
+    // Si falla el envío después de subir documentos, limpiar los objetos huérfanos.
+    const rutas = Object.values(ps).filter(
+      (p) => typeof p === "string" && /^preregistro\/[a-z0-9]+\/(dni|seguro|ficha)-\d+\.(jpg|png|pdf)$/.test(p),
+    );
+    if (rutas.length) {
+      try {
+        const limpieza = await sb("/storage/v1/object/documentos", {
+          method: "DELETE",
+          body: JSON.stringify({ prefixes: rutas }),
+        });
+        if (!limpieza.ok) console.error("No se pudieron limpiar los documentos del pre-registro fallido");
+      } catch (e) {
+        console.error("Error al limpiar documentos del pre-registro fallido:", e);
+      }
+    }
     b.disabled = false;
     b.textContent = tx;
     toast("No se pudo enviar. Revisa tus archivos e intenta de nuevo.");
