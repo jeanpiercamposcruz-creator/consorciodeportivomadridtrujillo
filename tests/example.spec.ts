@@ -850,6 +850,166 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // La validación termina antes de insertar la venta o su ingreso automático en caja.
   });
 
+  test('No mostrar éxito ni conservar una venta cuando Supabase rechaza su persistencia', async () => {
+    const id = 'QA-KIT-' + randomInt(1_000_000_000_000, 9_999_999_999_999);
+    type HerramientaKit = {
+      prepararIdKit: (id: string) => Promise<string>;
+      cleanupKit: (id: string) => Promise<{ removed: boolean }>;
+    };
+    try {
+      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+      const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
+
+      await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
+      await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+      const preparado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está habilitada la preparación de ventas QA.');
+        return api.prepararIdKit(idPrueba);
+      }, id);
+      expect(preparado).toBe(id);
+
+      await page.locator('#k_q').fill(codigoAlumno);
+      const resultado = page.locator('#k_res button').first();
+      await expect(resultado).toBeVisible();
+      await resultado.click();
+      await page.locator('#k_pr').fill('75');
+      await page.locator('#k_c').fill('35');
+
+      const rpcPath = '**/rest/v1/rpc/erp_persistir_lote';
+      let intentos = 0;
+      const bloquear = async (route: import('@playwright/test').Route) => {
+        intentos++;
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'QA500', message: 'Fallo inducido de persistencia QA' }),
+        });
+      };
+      await page.route(rpcPath, bloquear);
+      try {
+        await page.getByRole('button', { name: 'Registrar venta', exact: true }).click();
+        await expect(page.locator('#toast')).toContainText('No se pudo guardar');
+        expect(intentos).toBe(1);
+        await expect(page.locator('#toast')).not.toContainText('Venta registrada');
+
+        const estado = await page.evaluate(async (idPrueba) => {
+          const config = (window as unknown as {
+            __ERP_CONFIG__?: { supabaseUrl: string; supabaseKey: string };
+          }).__ERP_CONFIG__;
+          if (!config) throw new Error('No se cargó la configuración de Supabase QA.');
+          const base = config.supabaseUrl.replace(/\/+$/, '');
+          const headers = { apikey: config.supabaseKey, Authorization: 'Bearer ' + config.supabaseKey };
+          const consultar = async (ruta: string) => {
+            const response = await fetch(base + '/rest/v1/' + ruta, { headers });
+            if (!response.ok) throw new Error('Falló la verificación directa en Supabase QA: ' + response.status);
+            return response.json();
+          };
+          const [kits, caja] = await Promise.all([
+            consultar('kits_ventas?id=eq.' + encodeURIComponent(idPrueba) + '&select=id'),
+            consultar('caja_movimientos?origen=eq.' + encodeURIComponent('kit|' + idPrueba) + '&select=id'),
+          ]);
+          return { kits: kits.length, caja: caja.length };
+        }, id);
+        expect(estado).toEqual({ kits: 0, caja: 0 });
+      } finally {
+        await page.unroute(rpcPath, bloquear);
+      }
+    } finally {
+      const limpieza = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de la venta QA.');
+        return api.cleanupKit(idPrueba);
+      }, id);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
+  test('No confirmar la anulación de indumentaria si Supabase rechaza el guardado', async () => {
+    const id = 'QA-KIT-' + randomInt(1_000_000_000_000, 9_999_999_999_999);
+    type HerramientaKit = {
+      prepararIdKit: (id: string) => Promise<string>;
+      cleanupKit: (id: string) => Promise<{ removed: boolean }>;
+    };
+    try {
+      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+      const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
+
+      await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
+      await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
+      const preparado = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está habilitada la preparación de ventas QA.');
+        return api.prepararIdKit(idPrueba);
+      }, id);
+      expect(preparado).toBe(id);
+
+      await page.locator('#k_q').fill(codigoAlumno);
+      const resultado = page.locator('#k_res button').first();
+      await expect(resultado).toBeVisible();
+      await resultado.click();
+      await page.locator('#k_pr').fill('75');
+      await page.locator('#k_c').fill('35');
+      await page.getByRole('button', { name: 'Registrar venta', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Venta registrada');
+
+      const rpcPath = '**/rest/v1/rpc/erp_persistir_lote';
+      let intentos = 0;
+      const bloquear = async (route: import('@playwright/test').Route) => {
+        intentos++;
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'QA500', message: 'Fallo inducido de persistencia QA' }),
+        });
+      };
+      await page.route(rpcPath, bloquear);
+      try {
+        page.once('dialog', (dialog) => dialog.accept());
+        await page.locator('button[data-f="delKit"][data-i="' + id + '"]').click();
+        await expect(page.locator('#toast')).toContainText('No se pudo guardar');
+        expect(intentos).toBe(1);
+        await expect(page.locator('#toast')).not.toContainText('Venta anulada y reversión registrada en Caja');
+        await expect(page.locator('button[data-f="delKit"][data-i="' + id + '"]')).toBeVisible();
+
+        const estado = await page.evaluate(async (idPrueba) => {
+          const config = (window as unknown as {
+            __ERP_CONFIG__?: { supabaseUrl: string; supabaseKey: string };
+          }).__ERP_CONFIG__;
+          if (!config) throw new Error('No se cargó la configuración de Supabase QA.');
+          const base = config.supabaseUrl.replace(/\/+$/, '');
+          const headers = { apikey: config.supabaseKey, Authorization: 'Bearer ' + config.supabaseKey };
+          const consultar = async (ruta: string) => {
+            const response = await fetch(base + '/rest/v1/' + ruta, { headers });
+            if (!response.ok) throw new Error('Falló la verificación directa en Supabase QA: ' + response.status);
+            return response.json();
+          };
+          const [kits, ingresos, reversas] = await Promise.all([
+            consultar('kits_ventas?id=eq.' + encodeURIComponent(idPrueba) + '&select=id,estado'),
+            consultar('caja_movimientos?origen=eq.' + encodeURIComponent('kit|' + idPrueba) + '&select=id,monto'),
+            consultar('caja_movimientos?origen=eq.' + encodeURIComponent('reversion-kit|' + idPrueba) + '&select=id'),
+          ]);
+          return { kits, ingresos: ingresos.length, reversas: reversas.length };
+        }, id);
+        expect(estado.kits).toHaveLength(1);
+        expect(estado.kits[0].estado).toBe('Activa');
+        expect(estado.ingresos).toBe(1);
+        expect(estado.reversas).toBe(0);
+      } finally {
+        await page.unroute(rpcPath, bloquear);
+      }
+    } finally {
+      const limpieza = await page.evaluate(async (idPrueba) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de la venta QA.');
+        return api.cleanupKit(idPrueba);
+      }, id);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
   test('Dashboard no duplica alquiler ni planilla dentro de otros egresos', async () => {
     type HerramientaDashboard = {
       probarDashboardSinDobleConteo: () => Promise<{ deltaOtrosEgresos: number; deltaUtilidad: number }>;
