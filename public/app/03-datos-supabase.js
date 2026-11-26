@@ -1082,11 +1082,24 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("El personal temporal no está listo para recibir un horario.");
         }
         const persona = personas[0];
-        const horario = S.hor.find((h) =>
+        const plantillaHorario = S.hor.find((h) =>
           h.est !== "Inactivo" && h.sede && h.dep && h.ini && h.fin &&
           S.sedes.some((s) => s.id === h.sede) && S.deportes.some((d) => d.id === h.dep)
         );
-        if (!horario) throw new Error("No hay un horario activo válido para asignar al personal temporal.");
+        if (!plantillaHorario) throw new Error("No hay un horario base válido para la prueba.");
+        const dias = {
+          Monday: "Lunes", Tuesday: "Martes", Wednesday: "Miércoles",
+          Thursday: "Jueves", Friday: "Viernes", Saturday: "Sábado", Sunday: "Domingo",
+        };
+        const diaActual = dias[new Intl.DateTimeFormat("en-US", {
+          weekday: "long", timeZone: "America/Lima",
+        }).format(new Date())];
+        if (!diaActual) throw new Error("No se pudo determinar el día local de la prueba.");
+        const horario = {
+          id: "HOR-QA-E2E-" + crypto.randomUUID(),
+          sede: plantillaHorario.sede, dep: plantillaHorario.dep, cat: plantillaHorario.cat,
+          ini: plantillaHorario.ini, fin: plantillaHorario.fin, dia: diaActual, est: "Activo",
+        };
         const existentesSede = await sb("/rest/v1/personal_sedes?personal_id=eq." +
           encodeURIComponent(persona.id) + "&select=id");
         const existentesHorario = await sb("/rest/v1/horario_profesores?personal_id=eq." +
@@ -1112,9 +1125,20 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         const horarioLink = {
           id: horarioLinkId, horario_id: horario.id, personal_id: persona.id,
         };
+        let horarioTemporalInsertado = false;
         let sedeInsertada = false;
         let horarioInsertado = false;
         try {
+          const horarioTemporalResp = await sb("/rest/v1/horarios", {
+            method: "POST",
+            body: JSON.stringify([{
+              id: horario.id, sede_id: horario.sede, deporte_id: horario.dep,
+              categoria: horario.cat, hora_inicio: horario.ini, hora_fin: horario.fin,
+              dia_semana: horario.dia, estado: "Activo",
+            }]),
+          });
+          if (!horarioTemporalResp.ok) throw new Error("No se pudo crear el horario QA temporal: " + await horarioTemporalResp.text());
+          horarioTemporalInsertado = true;
           const sedeResp = await sb("/rest/v1/personal_sedes", {
             method: "POST", body: JSON.stringify([sedeLink]),
           });
@@ -1134,6 +1158,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           window.__ERP_QA_NEXT_ASISTENCIA_ID__ = asistenciaId;
           return {
             personalId: persona.id, sedeId: horario.sede, horarioId: horario.id,
+            horarioTemporalId: horario.id, diaSemana: horario.dia,
             grupo: horario.dep + "|" + horario.cat, fecha: today(), tarifa: Number(persona.precio_hora),
             horasHorario: horas, sedeLinkId, horarioLinkId, asistenciaId,
           };
@@ -1143,6 +1168,9 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           }
           if (sedeInsertada) {
             await sb("/rest/v1/personal_sedes?id=eq." + encodeURIComponent(sedeLinkId), { method: "DELETE" });
+          }
+          if (horarioTemporalInsertado) {
+            await sb("/rest/v1/horarios?id=eq." + encodeURIComponent(horario.id), { method: "DELETE" });
           }
           await pull();
           throw error;
@@ -1185,6 +1213,8 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
         if (extras && (!/^[0-9a-f-]{36}$/i.test(String(extras.sedeLinkId)) ||
             !/^[0-9a-f-]{36}$/i.test(String(extras.horarioLinkId)) ||
+            !/^HOR-QA-E2E-[0-9a-f-]{36}$/i.test(String(extras.horarioTemporalId)) ||
+            extras.horarioTemporalId !== extras.horarioId ||
             !/^[0-9a-f-]{36}$/i.test(String(extras.asistenciaId)))) {
           throw new Error("Los identificadores de asignación temporal no son válidos.");
         }
@@ -1236,6 +1266,23 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             if (sedes.length) {
               const borrado = await sb("/rest/v1/personal_sedes?id=eq." + encodeURIComponent(extras.sedeLinkId), { method: "DELETE" });
               if (!borrado.ok) throw new Error("No se pudo retirar el vínculo de sede temporal: " + await borrado.text());
+            }
+            const horarioQAResp = await sb("/rest/v1/horarios?id=eq." +
+              encodeURIComponent(extras.horarioTemporalId) + "&select=id,sede_id,deporte_id,categoria,dia_semana");
+            if (!horarioQAResp.ok) throw new Error("No se pudo verificar el horario QA temporal.");
+            const horariosQA = await horarioQAResp.json();
+            if (horariosQA.length > 1 || (horariosQA.length === 1 &&
+                (horariosQA[0].id !== extras.horarioTemporalId ||
+                 horariosQA[0].sede_id !== extras.sedeId ||
+                 horariosQA[0].deporte_id !== extras.grupo.split("|")[0] ||
+                 String(horariosQA[0].categoria) !== extras.grupo.split("|")[1] ||
+                 horariosQA[0].dia_semana !== extras.diaSemana))) {
+              throw new Error("El horario temporal no coincide con el creado por esta prueba; se protege.");
+            }
+            if (horariosQA.length) {
+              const borrado = await sb("/rest/v1/horarios?id=eq." +
+                encodeURIComponent(extras.horarioTemporalId), { method: "DELETE" });
+              if (!borrado.ok) throw new Error("No se pudo retirar el horario QA temporal: " + await borrado.text());
             }
           } else if (sedes.length || horarios.length || asistencias.length || certificaciones.length) {
             throw new Error("El personal temporal tiene dependencias no registradas por esta prueba; no se elimina.");
