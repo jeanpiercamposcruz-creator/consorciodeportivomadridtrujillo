@@ -100,8 +100,7 @@ function addHor() {
       nuevos.push(h);
     }
   nuevos.forEach((h) => S.hor.push({ id: "HOR-" + nx("HOR", 4), ...h, est: "Activo", profs: [...ps] }));
-  save();
-  toast(nuevos.length === 1 ? "Horario guardado" : `${nuevos.length} horarios guardados`);
+  save(nuevos.length === 1 ? "Horario guardado" : `${nuevos.length} horarios guardados`);
   R();
 }
 const horEst = (id) => {
@@ -400,9 +399,7 @@ async function saveAlu() {
     });
   }
   save();
-  adjLimpiar(id);
   const pf = falta(d);
-  toast(pf.length ? "Guardada con datos pendientes: " + pf.join(", ") : "Matrícula completa");
   if (PREID) {
     const pid = PREID;
     PREID = PRE = null;
@@ -414,12 +411,23 @@ async function saveAlu() {
       });
     }).catch(() => {});
   }
-  if (!old || FRESH === id) {
-    FRESH = id;
-    ED = id;
-    R();
-    toast("Matrícula guardada. Ya puedes generar el carnet.");
-  } else go("dir");
+  sv.then(() => {
+    if (!SAVE_OK) return;
+    adjLimpiar(id);
+    if (!old || FRESH === id) {
+      FRESH = id;
+      ED = id;
+      R();
+      toast(pf.length
+        ? "Matrícula guardada con datos pendientes: " + pf.join(", ")
+        : "Matrícula guardada. Ya puedes generar el carnet.");
+    } else {
+      go("dir");
+      toast(pf.length
+        ? "Matrícula actualizada con datos pendientes: " + pf.join(", ")
+        : "Matrícula actualizada");
+    }
+  });
 }
 const addMes = (f, n) => {
   const [y, m, d] = f.split("-").map(Number),
