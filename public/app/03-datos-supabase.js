@@ -848,40 +848,70 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async prepararAsistenciaQA() {
         if (U?.rol !== "ADM") throw new Error("La prueba de asistencia requiere una sesión administradora QA.");
+        await sv;
+        if (!SAVE_OK) throw new Error("Hay una escritura previa pendiente o fallida; no se crea el alumno temporal.");
+        const horario = S.hor.find((h) =>
+          h.est !== "Inactivo" && h.sede && h.dep && Number.isInteger(Number(h.cat)) &&
+          S.sedes.some((s) => s.id === h.sede) && S.deportes.some((d) => d.id === h.dep)
+        );
+        if (!horario) throw new Error("No hay un horario activo válido para crear el alumno temporal QA.");
         const fecha = today();
-        const candidatos = S.alu.filter((a) => a.est === "Activo" && a.hor && S.hor.some((h) =>
-          h.id === a.hor && h.est !== "Inactivo" && h.sede === a.sede
-        ));
-        for (const alumno of candidatos) {
-          const horario = S.hor.find((h) => h.id === alumno.hor && h.est !== "Inactivo");
-          if (!horario) continue;
-          if (S.asis.some((x) => x.f === fecha && x.t === "A" && x.ref === alumno.id && x.h === horario.id)) continue;
-          const ruta = "/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(alumno.id) +
-            "&horario_id=eq." + encodeURIComponent(horario.id) +
-            "&fecha=eq." + encodeURIComponent(fecha) + "&tipo=eq.A&select=id";
-          const respuesta = await sb(ruta);
-          if (!respuesta.ok) throw new Error("No se pudo comprobar que el alumno no tenga asistencia previa hoy.");
-          if ((await respuesta.json()).length) continue;
-          const origen = "campo|" + fecha + "|" + alumno.id + "|" + horario.id;
-          const cajaResp = await sb("/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent(origen) + "&select=id");
-          if (!cajaResp.ok) throw new Error("No se pudo comprobar que no exista un pago de campo previo.");
-          if ((await cajaResp.json()).length) continue;
+        const alumnoId = "QA-ATT-" + crypto.randomUUID();
+        let dni = "";
+        for (let intento = 0; intento < 5; intento++) {
+          dni = String(10000000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000000));
+          const existente = await sb("/rest/v1/alumnos?dni=eq." + encodeURIComponent(dni) + "&select=id");
+          if (!existente.ok) throw new Error("No se pudo comprobar la unicidad del DNI temporal QA.");
+          if (!(await existente.json()).length) break;
+          dni = "";
+        }
+        if (!dni) throw new Error("No se pudo reservar un DNI temporal único para la prueba QA.");
+        const alumno = {
+          id: alumnoId, nombres: "QA", apellidos: "Asistencia Temporal", dni, sexo: "M",
+          fecha_nacimiento: String(Number(horario.cat)).padStart(4, "0") + "-01-01",
+          deporte_id: horario.dep, sede_id: horario.sede, horario_id: horario.id,
+          estado: "Activo", costo_matricula: 0, costo_mensualidad: 0, meses: 0,
+          monto_pagado: 0, fecha_registro: fecha, monto_pagar_hoy: 0,
+          qr_token: null, consentimiento_ley_29733: false,
+        };
+        let insertado = false;
+        try {
+          const respuesta = await sb("/rest/v1/alumnos", {
+            method: "POST", body: JSON.stringify([alumno]),
+          });
+          if (!respuesta.ok) throw new Error("No se pudo crear el alumno temporal QA: " + await respuesta.text());
+          insertado = true;
+          await pull();
+          const recuperado = S.alu.find((a) => a.id === alumnoId);
+          if (!recuperado || recuperado.dni !== dni || recuperado.est !== "Activo" ||
+              recuperado.hor !== horario.id || recuperado.sede !== horario.sede) {
+            throw new Error("El ERP no recuperó correctamente el alumno temporal desde Supabase.");
+          }
           const asistenciaId = crypto.randomUUID();
           const cajaId = crypto.randomUUID();
           window.__ERP_QA_NEXT_ASISTENCIA_ID__ = asistenciaId;
           window.__ERP_QA_NEXT_CAJA_ID__ = cajaId;
           return {
-            alumnoId: alumno.id, horarioId: horario.id, sedeId: alumno.sede,
+            alumnoId, alumnoDni: dni, horarioId: horario.id, sedeId: horario.sede,
             grupo: horario.dep + "|" + horario.cat, fecha, fee: Number(S.fee ?? 5),
             asistenciaId, cajaId,
           };
+        } catch (error) {
+          if (insertado) {
+            const borrado = await sb("/rest/v1/alumnos?id=eq." + encodeURIComponent(alumnoId), { method: "DELETE" });
+            if (!borrado.ok) throw new Error("Falló la preparación QA y no se pudo retirar el alumno temporal: " + await borrado.text());
+          }
+          throw error;
         }
-        throw new Error("No hay alumno activo con horario sin asistencia previa hoy para la prueba QA.");
       },
-      async verificarAsistenciaQA(datos, asistio, pagoCampo) {
+      async verificarAsistenciaQA(datos, asistio, pagoCampo, recargar = false) {
         if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
-        if (!datos || !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
-            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) throw new Error("IDs temporales de asistencia inválidos.");
+        if (!datos || !String(datos.alumnoId).startsWith("QA-ATT-") ||
+            !/^\\d{8}$/.test(String(datos.alumnoDni)) ||
+            !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
+            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) {
+          throw new Error("IDs temporales de asistencia inválidos.");
+        }
         await sv;
         if (!SAVE_OK) throw new Error("El guardado de asistencia falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
         const asistenciaResp = await sb("/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId) +
@@ -912,46 +942,68 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         if (pagoCampo === true) {
           if (cajaDb.length !== 1 || cajaOrigen.length !== 1 || cajaOrigen[0].id !== datos.cajaId ||
-              cajaDb[0].origen !== "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId ||
-              cajaDb[0].detalle !== datos.alumnoId || cajaDb[0].concepto !== "Pago de campo" ||
-              cajaDb[0].tipo !== "I" || Number(cajaDb[0].monto) !== datos.fee) {
+              cajaDb[0].origen !== origen || cajaDb[0].detalle !== datos.alumnoId ||
+              cajaDb[0].concepto !== "Pago de campo" || cajaDb[0].tipo !== "I" ||
+              Number(cajaDb[0].monto) !== datos.fee) {
             throw new Error("Caja no conserva exactamente un ingreso por el pago de campo.");
           }
         } else if (cajaDb.length || cajaOrigen.length) {
           throw new Error("Caja conserva un ingreso cuando el pago de campo está marcado como pendiente.");
         }
-        await pull();
+        if (recargar) await pull();
         const restaurada = S.asis.find((x) => x._id === datos.asistenciaId);
         const cajaRestaurada = S.caja.filter((x) => x._id === datos.cajaId);
         if (!restaurada || restaurada.ok !== asistio ||
             (pagoCampo === null ? restaurada.pc !== undefined : restaurada.pc !== pagoCampo) ||
             (pagoCampo === true ? cajaRestaurada.length !== 1 : cajaRestaurada.length !== 0)) {
-          throw new Error("La recarga del ERP no recuperó el estado persistido de asistencia y Caja.");
+          throw new Error("El ERP no conserva el estado esperado de asistencia y Caja en memoria.");
         }
         return { asistencia, caja: cajaDb, restored: { asistio: restaurada.ok, pagoCampo: restaurada.pc, caja: cajaRestaurada.length } };
       },
       async cleanupAsistenciaQA(datos) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
-        if (!datos || !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
-            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) throw new Error("IDs temporales de asistencia inválidos.");
+        if (!datos || !String(datos.alumnoId).startsWith("QA-ATT-") ||
+            !/^\\d{8}$/.test(String(datos.alumnoDni)) ||
+            !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
+            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) {
+          throw new Error("IDs temporales de asistencia inválidos.");
+        }
         if (window.__ERP_QA_NEXT_ASISTENCIA_ID__ === datos.asistenciaId) delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
         if (window.__ERP_QA_NEXT_CAJA_ID__ === datos.cajaId) delete window.__ERP_QA_NEXT_CAJA_ID__;
         await sv;
         const asistenciaRuta = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId);
         const cajaRuta = "/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(datos.cajaId);
-        const asistenciaCheck = await sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id");
-        const cajaCheck = await sb(cajaRuta + "&select=id,origen,detalle,concepto,tipo");
-        if (!asistenciaCheck.ok || !cajaCheck.ok) throw new Error("No se pudo verificar la limpieza de asistencia QA.");
+        const alumnoRuta = "/rest/v1/alumnos?id=eq." + encodeURIComponent(datos.alumnoId);
+        const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias, otrasCajas] = await Promise.all([
+          sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id"),
+          sb(cajaRuta + "&select=id,origen,detalle,concepto,tipo"),
+          sb(alumnoRuta + "&select=id,nombres,apellidos,dni,horario_id,sede_id,deporte_id"),
+          sb("/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(datos.alumnoId) + "&select=id"),
+          sb("/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId) + "&select=id,origen"),
+        ]);
+        if (![asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias, otrasCajas].every((r) => r.ok)) {
+          throw new Error("No se pudo verificar la limpieza del alumno temporal QA.");
+        }
         const asistencias = await asistenciaCheck.json();
         const caja = await cajaCheck.json();
+        const alumnos = await alumnoCheck.json();
+        const asistenciasRelacionadas = await otrasAsistencias.json();
+        const cajasRelacionadas = await otrasCajas.json();
+        if (alumnos.some((a) => a.nombres !== "QA" || a.apellidos !== "Asistencia Temporal" ||
+            a.dni !== datos.alumnoDni || a.horario_id !== datos.horarioId ||
+            a.sede_id !== datos.sedeId || a.deporte_id !== datos.grupo.split("|")[0])) {
+          throw new Error("El ID de alumno ya no coincide con el registro temporal; se protege el registro.");
+        }
         if (asistencias.some((x) => x.fecha !== datos.fecha || x.tipo !== "A" ||
-            x.alumno_id !== datos.alumnoId || x.horario_id !== datos.horarioId)) {
-          throw new Error("El ID de asistencia ya no coincide con el registro temporal; se protege el registro.");
+            x.alumno_id !== datos.alumnoId || x.horario_id !== datos.horarioId) ||
+            asistenciasRelacionadas.some((x) => x.id !== datos.asistenciaId)) {
+          throw new Error("La asistencia ya no coincide con el único registro temporal; se protege el registro.");
         }
         const origen = "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId;
         if (caja.some((x) => x.origen !== origen || x.detalle !== datos.alumnoId ||
-            x.concepto !== "Pago de campo" || x.tipo !== "I")) {
-          throw new Error("El ID de Caja ya no coincide con el pago temporal; se protege el registro.");
+            x.concepto !== "Pago de campo" || x.tipo !== "I") ||
+            cajasRelacionadas.some((x) => x.id !== datos.cajaId && x.origen?.startsWith("campo|"))) {
+          throw new Error("El movimiento de Caja ya no coincide con el registro temporal; se protege el registro.");
         }
         if (asistencias.length) {
           const borrado = await sb(asistenciaRuta, { method: "DELETE" });
@@ -961,15 +1013,21 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           const borrado = await sb(cajaRuta, { method: "DELETE" });
           if (!borrado.ok) throw new Error("No se pudo eliminar el pago temporal: " + await borrado.text());
         }
-        const [asistenciaFinal, cajaFinal] = await Promise.all([
-          sb(asistenciaRuta + "&select=id"), sb(cajaRuta + "&select=id"),
+        if (alumnos.length) {
+          const borrado = await sb(alumnoRuta, { method: "DELETE" });
+          if (!borrado.ok) throw new Error("No se pudo eliminar el alumno temporal: " + await borrado.text());
+        }
+        const [asistenciaFinal, cajaFinal, alumnoFinal] = await Promise.all([
+          sb(asistenciaRuta + "&select=id"), sb(cajaRuta + "&select=id"), sb(alumnoRuta + "&select=id"),
         ]);
-        if (!asistenciaFinal.ok || !cajaFinal.ok ||
-            (await asistenciaFinal.json()).length || (await cajaFinal.json()).length) {
+        if (![asistenciaFinal, cajaFinal, alumnoFinal].every((r) => r.ok) ||
+            (await asistenciaFinal.json()).length || (await cajaFinal.json()).length ||
+            (await alumnoFinal.json()).length) {
           throw new Error("La limpieza de asistencia QA dejó registros residuales.");
         }
         await pull();
-        if (S.asis.some((x) => x._id === datos.asistenciaId) || S.caja.some((x) => x._id === datos.cajaId)) {
+        if (S.asis.some((x) => x._id === datos.asistenciaId) || S.caja.some((x) => x._id === datos.cajaId) ||
+            S.alu.some((x) => x.id === datos.alumnoId)) {
           throw new Error("El ERP todavía conserva los registros temporales de asistencia.");
         }
         return { removed: true };
