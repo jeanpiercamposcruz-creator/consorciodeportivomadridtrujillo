@@ -1608,7 +1608,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
             __ERP_CONFIG__?: { supabaseUrl: string; supabaseKey: string };
           }).__ERP_CONFIG__;
           if (!config) throw new Error('No se cargó la configuración pública de Supabase QA.');
-          const endpoint = config.supabaseUrl.replace(/\\/+$/, '');
+          const endpoint = config.supabaseUrl.replace(/\/+$/, '');
           const headers = {
             apikey: config.supabaseKey,
             Authorization: 'Bearer ' + config.supabaseKey,
