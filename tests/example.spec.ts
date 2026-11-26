@@ -99,6 +99,77 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
   });
 
+  test('Persistir matrícula, distribución de abonos y Caja en Supabase QA', async () => {
+    test.setTimeout(90000);
+    const dni = String(randomInt(10_000_000, 99_999_999));
+    type ResultadoMatriculaQA = {
+      alumno: { id: string; monto_pagado: number | string };
+      cuotas: Array<{ numero_cuota: number; monto: number | string; monto_abonado: number | string; saldo_pendiente: number | string; estado: string }>;
+      caja: { tipo: string; monto: number | string; origen: string };
+      allocation: Array<{ destino: string; cuota: number; monto: number }>;
+      restored: { pagado: number | string; cuotas: Array<{ n: number; abonado: number; saldo: number; estado: string }>; caja: Array<{ monto: number }> };
+    };
+    type HerramientaMatriculaQA = {
+      prepararIdMatricula: (dni: string) => Promise<string>;
+      verificarMatriculaCompleta: (dni: string) => Promise<ResultadoMatriculaQA>;
+      cleanupMatricula: (dni: string) => Promise<{ removed: boolean }>;
+    };
+    try {
+      const preparado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaMatriculaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está habilitada la herramienta de matrícula en Supabase QA.');
+        return api.prepararIdMatricula(d);
+      }, dni);
+      expect(preparado).toBe('RPC');
+
+      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: /Nueva matrícula/i }).click();
+      await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
+
+      const anioNacimiento = new Date().getFullYear() - 10;
+      await page.locator('#m_nom').fill('QA');
+      await page.locator('#m_ape').fill('Persistencia');
+      await page.locator('#m_dni').fill(dni);
+      await page.locator('#m_nac').fill(anioNacimiento + '-06-15');
+      await page.locator('#m_cm').fill('50');
+      await page.locator('#m_cmen').fill('90');
+      await page.locator('#m_mes').fill('2');
+      await page.locator('#m_pag').fill('230');
+      await page.getByRole('button', { name: 'Guardar matrícula', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Matrícula guardada', { timeout: 20000 });
+
+      const verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaMatriculaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de matrícula QA.');
+        return api.verificarMatriculaCompleta(d);
+      }, dni);
+      expect(Number(verificado.alumno.monto_pagado)).toBe(230);
+      expect(verificado.cuotas).toHaveLength(2);
+      expect(verificado.cuotas.every((x) =>
+        Number(x.monto) === 90 && Number(x.monto_abonado) === 90 &&
+        Number(x.saldo_pendiente) === 0 && x.estado === 'Pagada'
+      )).toBeTruthy();
+      expect(verificado.caja.tipo).toBe('I');
+      expect(Number(verificado.caja.monto)).toBe(230);
+      expect(verificado.allocation).toEqual([
+        { destino: 'Matrícula', cuota: 0, monto: 50 },
+        { destino: 'Cuota', cuota: 1, monto: 90 },
+        { destino: 'Cuota', cuota: 2, monto: 90 },
+      ]);
+      expect(Number(verificado.restored.pagado)).toBe(230);
+      expect(verificado.restored.cuotas).toHaveLength(2);
+      expect(verificado.restored.caja).toHaveLength(1);
+    } finally {
+      const limpieza = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaMatriculaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza aislada de matrícula QA.');
+        return api.cleanupMatricula(d);
+      }, dni);
+      expect(limpieza.removed).toBe(true);
+    }
+  });
+
   test('Rechazar nombres inválidos sin guardar matrícula', async () => {
     await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
