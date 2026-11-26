@@ -1090,14 +1090,18 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           S.sedes.some((s) => s.id === h.sede) && S.deportes.some((d) => d.id === h.dep)
         );
         if (!plantillaHorario) throw new Error("No hay un horario base válido para la prueba.");
+        // El ERP y la columna horarios.dia_semana usan números: lunes=1 ... domingo=7.
+        // Guardar nombres localizados aquí hacía que +h.dia fuera NaN y las horas semanales fueran 0.
         const dias = {
-          Monday: "Lunes", Tuesday: "Martes", Wednesday: "Miércoles",
-          Thursday: "Jueves", Friday: "Viernes", Saturday: "Sábado", Sunday: "Domingo",
+          Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4,
+          Friday: 5, Saturday: 6, Sunday: 7,
         };
         const diaActual = dias[new Intl.DateTimeFormat("en-US", {
           weekday: "long", timeZone: "America/Lima",
         }).format(new Date())];
-        if (!diaActual) throw new Error("No se pudo determinar el día local de la prueba.");
+        if (!Number.isInteger(diaActual) || diaActual < 1 || diaActual > 7) {
+          throw new Error("No se pudo determinar el día local numérico de la prueba.");
+        }
         const horario = {
           id: "HOR-QA-E2E-" + crypto.randomUUID(),
           sede: plantillaHorario.sede, dep: plantillaHorario.dep, cat: plantillaHorario.cat,
