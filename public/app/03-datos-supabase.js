@@ -888,10 +888,22 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           "&select=id,fecha,tipo,alumno_id,horario_id,asistio,pago_campo");
         const cajaResp = await sb("/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(datos.cajaId) +
           "&select=id,fecha,sede_id,tipo,concepto,detalle,monto,origen");
-        if (!asistenciaResp.ok || !cajaResp.ok) throw new Error("No se pudo consultar la persistencia real de asistencia y Caja.");
+        const asistenciaCompResp = await sb("/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(datos.alumnoId) +
+          "&horario_id=eq." + encodeURIComponent(datos.horarioId) + "&fecha=eq." +
+          encodeURIComponent(datos.fecha) + "&tipo=eq.A&select=id");
+        const origen = "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId;
+        const cajaOrigenResp = await sb("/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent(origen) + "&select=id");
+        if (!asistenciaResp.ok || !cajaResp.ok || !asistenciaCompResp.ok || !cajaOrigenResp.ok) {
+          throw new Error("No se pudo consultar la persistencia real de asistencia y Caja.");
+        }
         const asistenciasDb = await asistenciaResp.json();
         const cajaDb = await cajaResp.json();
-        if (asistenciasDb.length !== 1) throw new Error("Supabase no contiene exactamente la asistencia temporal.");
+        const asistenciasComp = await asistenciaCompResp.json();
+        const cajaOrigen = await cajaOrigenResp.json();
+        if (asistenciasDb.length !== 1 || asistenciasComp.length !== 1 ||
+            asistenciasComp[0].id !== datos.asistenciaId) {
+          throw new Error("Supabase no contiene exactamente una asistencia para alumno, horario y fecha.");
+        }
         const asistencia = asistenciasDb[0];
         if (asistencia.alumno_id !== datos.alumnoId || asistencia.horario_id !== datos.horarioId ||
             asistencia.fecha !== datos.fecha || asistencia.tipo !== "A" || asistencia.asistio !== asistio ||
@@ -899,12 +911,13 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("La asistencia persistida no coincide con el estado solicitado.");
         }
         if (pagoCampo === true) {
-          if (cajaDb.length !== 1 || cajaDb[0].origen !== "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId ||
+          if (cajaDb.length !== 1 || cajaOrigen.length !== 1 || cajaOrigen[0].id !== datos.cajaId ||
+              cajaDb[0].origen !== "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId ||
               cajaDb[0].detalle !== datos.alumnoId || cajaDb[0].concepto !== "Pago de campo" ||
               cajaDb[0].tipo !== "I" || Number(cajaDb[0].monto) !== datos.fee) {
             throw new Error("Caja no conserva exactamente un ingreso por el pago de campo.");
           }
-        } else if (cajaDb.length) {
+        } else if (cajaDb.length || cajaOrigen.length) {
           throw new Error("Caja conserva un ingreso cuando el pago de campo está marcado como pendiente.");
         }
         await pull();
@@ -923,6 +936,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) throw new Error("IDs temporales de asistencia inválidos.");
         if (window.__ERP_QA_NEXT_ASISTENCIA_ID__ === datos.asistenciaId) delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
         if (window.__ERP_QA_NEXT_CAJA_ID__ === datos.cajaId) delete window.__ERP_QA_NEXT_CAJA_ID__;
+        await sv;
         const asistenciaRuta = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId);
         const cajaRuta = "/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(datos.cajaId);
         const asistenciaCheck = await sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id");
