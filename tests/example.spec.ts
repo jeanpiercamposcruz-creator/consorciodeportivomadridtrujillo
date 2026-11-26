@@ -311,16 +311,37 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       sueldo: number;
       jornada: string;
     };
+    type DatosAsignacionPersonalQA = {
+      personalId: string;
+      sedeId: string;
+      horarioId: string;
+      grupo: string;
+      fecha: string;
+      tarifa: number;
+      horasHorario: number;
+      sedeLinkId: string;
+      horarioLinkId: string;
+      asistenciaId: string;
+    };
     type HerramientasContratoQA = {
       prepararPersonalContratoQA: (dni: string) => Promise<{ dni: string; preparado: boolean }>;
       verificarPersonalContratoQA: (
         dni: string,
         esperado: ContratoEsperadoQA
       ) => Promise<{ id: string; database: Record<string, unknown>; restored: Record<string, unknown> }>;
-      cleanupPersonalContratoQA: (dni: string) => Promise<{ removed: boolean }>;
+      asignarHorarioPersonalQA: (dni: string) => Promise<DatosAsignacionPersonalQA>;
+      verificarAsistenciaPersonalQA: (
+        datos: DatosAsignacionPersonalQA,
+        asistio: boolean,
+        recargar?: boolean
+      ) => Promise<{ database: Record<string, unknown>; restored: Record<string, unknown> }>;
+      cleanupPersonalContratoQA: (
+        dni: string,
+        extras?: DatosAsignacionPersonalQA | null
+      ) => Promise<{ removed: boolean }>;
     };
 
-    test.setTimeout(60000);
+    test.setTimeout(120000);
     const dni = String(randomInt(10000000, 99999999));
     const fechaInicio = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Lima',
@@ -333,6 +354,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       return api.prepararPersonalContratoQA(d);
     }, dni);
 
+    let asignacion: DatosAsignacionPersonalQA | null = null;
     try {
       await page.getByText('Personal y Planillas', { exact: true }).first().click();
       await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
@@ -405,14 +427,58 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         .filter({ hasText: 'QA Contrato Temporal' }).first();
       await expect(filaPago).toContainText('34.75');
       await expect(filaPago).toContainText('275.50');
+
+      asignacion = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la asignación QA de horario.');
+        return api.asignarHorarioPersonalQA(d);
+      }, dni);
+
+      await page.getByText('Toma de Asistencias', { exact: true }).first().click();
+      await page.locator('select[data-ch="setA"][data-i="s"]').selectOption(asignacion.sedeId);
+      await page.locator('select[data-ch="setA"][data-i="g"]').selectOption(asignacion.grupo);
+      await page.locator('select[data-ch="setA"][data-i="h"]').selectOption(asignacion.horarioId);
+      await page.locator('select[data-ch="setA"][data-i="t"]').selectOption('P');
+      const marcarAsistencia = page.locator(
+        `button[data-f="mkA"][data-i="P"][data-j="${asignacion.personalId}"][data-k="1"]`,
+      );
+      await expect(marcarAsistencia).toBeVisible();
+      await marcarAsistencia.click();
+
+      const asistenciaPersonal = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de asistencia del personal.');
+        return api.verificarAsistenciaPersonalQA(d, true, true);
+      }, asignacion);
+      expect(asistenciaPersonal.database.tipo).toBe('P');
+      expect(asistenciaPersonal.database.asistio).toBe(true);
+
+      await page.getByText('Personal y Planillas', { exact: true }).first().click();
+      await page.locator('button[data-f="perTab"][data-i="p"]').click();
+      const filaPagoAsistencia = page.locator('table').last().locator('tr')
+        .filter({ hasText: 'QA Contrato Temporal' }).first();
+      const celdasPago = await filaPagoAsistencia.locator('td').allTextContents();
+      const numero = (valor: string) => Number(valor.replace(/[^\\d.-]/g, ''));
+      const tarifa = numero(celdasPago[3] || '');
+      const horas = numero(celdasPago[4] || '');
+      const pago = numero(celdasPago[5] || '');
+      const sueldo = numero(celdasPago[6] || '');
+      expect(tarifa).toBeCloseTo(34.75, 2);
+      expect(horas).toBeGreaterThan(0);
+      expect(pago).toBeCloseTo(horas * tarifa, 2);
+      expect(sueldo).toBeCloseTo(275.5, 2);
     } finally {
-      const limpieza = await page.evaluate(async (d) => {
+      const limpieza = await page.evaluate(async ({ d, extras }) => {
         const api = (window as unknown as {
           __ERP_QA_PERSISTENCIA__?: HerramientasContratoQA;
         }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la limpieza del contrato QA.');
-        return api.cleanupPersonalContratoQA(d);
-      }, dni);
+        return api.cleanupPersonalContratoQA(d, extras);
+      }, { d: dni, extras: asignacion });
       expect(limpieza.removed).toBe(true);
     }
   });
