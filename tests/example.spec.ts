@@ -469,16 +469,20 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupAsistenciaQA: (datos: DatosAsistenciaQA) => Promise<{ removed: boolean }>;
     };
 
-    let datos: DatosAsistenciaQA | null = null;
+    test.setTimeout(90000);
+    const dialogo = page.locator('[role="dialog"]');
+    if (await dialogo.isVisible().catch(() => false)) {
+      const cerrar = dialogo.getByRole('button', { name: 'Cerrar', exact: true });
+      if (await cerrar.isVisible().catch(() => false)) await cerrar.click();
+    }
+    const datos = await page.evaluate(async () => {
+      const api = (window as unknown as {
+        __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+      }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No está habilitada la prueba de asistencia en Supabase QA.');
+      return api.prepararAsistenciaQA();
+    });
     try {
-      datos = await page.evaluate(async () => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
-        if (!api) throw new Error('No está habilitada la prueba de asistencia en Supabase QA.');
-        return api.prepararAsistenciaQA();
-      });
-
       await page.getByText('Toma de Asistencias', { exact: true }).first().click();
       await expect(page.getByRole('heading', { name: 'Toma de Asistencias', exact: true })).toBeVisible();
       await page.locator('select[data-ch="setA"][data-i="s"]').selectOption(datos.sedeId);
@@ -558,16 +562,14 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(verificado.asistencia.asistio).toBe(true);
       expect(verificado.asistencia.pago_campo).toBe(false);
     } finally {
-      if (datos) {
-        const limpieza = await page.evaluate(async (d) => {
-          const api = (window as unknown as {
-            __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-          }).__ERP_QA_PERSISTENCIA__;
-          if (!api) throw new Error('No está disponible la limpieza de asistencia QA.');
-          return api.cleanupAsistenciaQA(d);
-        }, datos);
-        expect(limpieza.removed).toBe(true);
-      }
+      const limpieza = await page.evaluate(async (d) => {
+        const api = (window as unknown as {
+          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+        }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza de asistencia QA.');
+        return api.cleanupAsistenciaQA(d);
+      }, datos);
+      expect(limpieza.removed).toBe(true);
     }
   });
 
