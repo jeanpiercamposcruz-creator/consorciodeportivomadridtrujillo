@@ -86,7 +86,8 @@ async function enviarPre() {
         k === "foto" ? "La foto debe ser JPG o PNG" : "Los documentos deben ser JPG, PNG o PDF",
       );
   }
-  const pid = uid(),
+  // Storage valida carpetas alfanuméricas; compactar el UUID antes de usarlo como ID/ruta.
+  const pid = uid().replace(/-/g, ""),
     tx = b.textContent;
   b.disabled = true;
   try {
