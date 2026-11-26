@@ -1032,6 +1032,79 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         return { removed: true };
       },
+      async prepararPersonalContratoQA(dni) {
+        if (U?.rol !== "ADM") throw new Error("La prueba de contrato requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        if (S.personal.some((p) => p.dni === dni)) throw new Error("El DNI temporal ya existe en el ERP.");
+        const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) + "&select=id");
+        if (!r.ok) throw new Error("No se pudo comprobar la unicidad del DNI de personal.");
+        if ((await r.json()).length) throw new Error("El DNI temporal ya existe en Supabase QA.");
+        return { dni, preparado: true };
+      },
+      async verificarPersonalContratoQA(dni, esperado) {
+        if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        await sv;
+        if (!SAVE_OK) throw new Error("El guardado del contrato de personal falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
+        const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) +
+          "&select=id,nombres,dni,rol,tipo_contrato,fecha_inicio,fecha_fin,precio_hora,sueldo_fijo,jornada,activo");
+        if (!r.ok) throw new Error("No se pudo leer el contrato persistido: " + await r.text());
+        const rows = await r.json();
+        if (rows.length !== 1) throw new Error("Supabase no contiene exactamente un registro para el contrato temporal.");
+        const p = rows[0];
+        if (p.nombres !== "QA Contrato Temporal" || p.dni !== dni || p.rol !== "ENT" ||
+            p.tipo_contrato !== esperado.tipo || p.fecha_inicio !== esperado.inicio ||
+            p.fecha_fin !== esperado.fin || Number(p.precio_hora) !== esperado.precio ||
+            Number(p.sueldo_fijo) !== esperado.sueldo || p.jornada !== esperado.jornada ||
+            Number(p.activo) !== 1) {
+          throw new Error("Los campos del contrato persistidos no coinciden con los valores enviados.");
+        }
+        await pull();
+        const recuperado = S.personal.find((x) => x.id === p.id);
+        if (!recuperado || recuperado.nom !== "QA Contrato Temporal" || recuperado.tc !== esperado.tipo ||
+            recuperado.fi !== esperado.inicio || recuperado.ff !== esperado.fin ||
+            Number(recuperado.precio) !== esperado.precio || Number(recuperado.sf) !== esperado.sueldo ||
+            recuperado.jor !== esperado.jornada || Number(recuperado.activo) !== 1) {
+          throw new Error("El ERP no recuperó los campos del contrato después de recargar Supabase.");
+        }
+        return { id: p.id, database: p, restored: recuperado };
+      },
+      async cleanupPersonalContratoQA(dni) {
+        if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de personal inválido.");
+        await sv;
+        const r = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) +
+          "&select=id,nombres,dni,rol");
+        if (!r.ok) throw new Error("No se pudo comprobar la limpieza del personal temporal.");
+        const rows = await r.json();
+        if (rows.length > 1) throw new Error("Hay más de un registro con el DNI temporal; no se elimina nada.");
+        if (rows.length) {
+          const p = rows[0];
+          if (p.nombres !== "QA Contrato Temporal" || p.dni !== dni ||
+              p.rol !== "ENT" || !String(p.id).startsWith("PER-ENT-")) {
+            throw new Error("El personal ya no coincide con el registro temporal; se protege el registro.");
+          }
+          const id = encodeURIComponent(p.id);
+          const dependencias = await Promise.all([
+            sb("/rest/v1/personal_sedes?personal_id=eq." + id + "&select=id"),
+            sb("/rest/v1/horario_profesores?personal_id=eq." + id + "&select=id"),
+            sb("/rest/v1/asistencias?personal_id=eq." + id + "&select=id"),
+            sb("/rest/v1/personal_certificaciones?personal_id=eq." + id + "&select=id"),
+          ]);
+          if (dependencias.some((x) => !x.ok)) throw new Error("No se pudieron comprobar las dependencias del personal temporal.");
+          const dependenciasJson = await Promise.all(dependencias.map((x) => x.json()));
+          if (dependenciasJson.some((x) => x.length)) {
+            throw new Error("El personal temporal tiene sedes, horarios, asistencias o certificaciones; no se elimina.");
+          }
+          const borrado = await sb("/rest/v1/personal?id=eq." + id, { method: "DELETE" });
+          if (!borrado.ok) throw new Error("No se pudo eliminar el contrato temporal: " + await borrado.text());
+        }
+        const final = await sb("/rest/v1/personal?dni=eq." + encodeURIComponent(dni) + "&select=id");
+        if (!final.ok || (await final.json()).length) throw new Error("El contrato temporal sigue en Supabase.");
+        await pull();
+        if (S.personal.some((x) => x.dni === dni)) throw new Error("El ERP todavía conserva el personal temporal.");
+        return { removed: true };
+      },
       async roundTripCuota(id) {
         if (U?.rol !== "ADM") throw new Error("La prueba de persistencia requiere una sesión administradora QA.");
         if (!/^QA-PERSIST-CUOTA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("Identificador temporal QA inválido.");
