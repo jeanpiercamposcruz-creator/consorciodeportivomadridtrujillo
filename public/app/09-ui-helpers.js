@@ -15,8 +15,14 @@ const catOk = (y) => y >= Y - 17 && y <= Y - 5;
 const sn = (id) => (S.sedes.find((x) => x.id === id) || {}).nombre || "-",
   dn = (id) => (S.deportes.find((x) => x.id === id) || {}).nombre || "-";
 const hrs = (h) => {
-  const t = (x) => +x.slice(0, 2) + x.slice(3) / 60;
-  return Math.max(0, t(h.fin) - t(h.ini));
+  const minutos = (valor) => {
+    const m = /^(\\d{1,2}):(\\d{2})(?::\\d{2}(?:\\.\\d+)?)?$/.exec(String(valor || ""));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+  };
+  const inicio = minutos(h?.ini), fin = minutos(h?.fin);
+  return Number.isFinite(inicio) && Number.isFinite(fin)
+    ? Math.max(0, (fin - inicio) / 60)
+    : 0;
 };
 const hl = (h) =>
   `${esc(sn(h.sede))} · ${esc(dn(h.dep))} ${esc(h.cat)} · ${DIAS[h.dia] ? DIAS[h.dia] + " " : ""}${esc(h.ini)}-${esc(h.fin)}`;
