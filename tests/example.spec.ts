@@ -1601,6 +1601,55 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
           return rows[0]?.qr_token ?? null;
         }, dni);
         expect(tokenQR).toMatch(/^[a-z0-9]{16}$/);
+
+        // El endpoint público solo debe exponer los campos deliberados del carnet.
+        const accesoPublico = await page.evaluate(async (tokenValido) => {
+          const config = (window as unknown as {
+            __ERP_CONFIG__?: { supabaseUrl: string; supabaseKey: string };
+          }).__ERP_CONFIG__;
+          if (!config) throw new Error('No se cargó la configuración pública de Supabase QA.');
+          const endpoint = config.supabaseUrl.replace(/\\/+$/, '');
+          const headers = {
+            apikey: config.supabaseKey,
+            Authorization: 'Bearer ' + config.supabaseKey,
+            'Content-Type': 'application/json',
+          };
+          const consultarCarnet = async (t: string) => {
+            const response = await fetch(endpoint + '/rest/v1/rpc/carnet_publico', {
+              method: 'POST', headers, body: JSON.stringify({ t }),
+            });
+            return { status: response.status, rows: await response.json() };
+          };
+          const tokenInexistente = Array.from(
+            crypto.getRandomValues(new Uint8Array(16)),
+            (b) => (b % 36).toString(36),
+          ).join('');
+          const [valido, invalido, malformado, directorio] = await Promise.all([
+            consultarCarnet(tokenValido),
+            consultarCarnet(tokenInexistente),
+            consultarCarnet('token-corto'),
+            fetch(endpoint + '/rest/v1/alumnos?select=id,nombres&limit=1', {
+              headers: { apikey: config.supabaseKey, Authorization: 'Bearer ' + config.supabaseKey },
+            }).then(async (response) => ({ status: response.status, rows: await response.json().catch(() => null) })),
+          ]);
+          return { valido, invalido, malformado, directorio };
+        }, tokenQR);
+        expect(accesoPublico.valido.status).toBe(200);
+        expect(accesoPublico.valido.rows).toHaveLength(1);
+        expect(accesoPublico.valido.rows[0]).toMatchObject({
+          nombres: 'QA',
+          apellidos: 'Persistencia',
+          estado: 'Activo',
+        });
+        expect(Object.keys(accesoPublico.valido.rows[0]).sort()).toEqual([
+          'apellidos', 'categoria', 'codigo', 'deporte', 'estado', 'foto', 'nombres', 'sede',
+        ]);
+        expect(accesoPublico.invalido.status).toBe(200);
+        expect(accesoPublico.invalido.rows).toEqual([]);
+        expect(accesoPublico.malformado.status).toBe(200);
+        expect(accesoPublico.malformado.rows).toEqual([]);
+        expect([401, 403]).toContain(accesoPublico.directorio.status);
+
         await cerrarCarnet.click();
       } finally {
         liberarRpc?.();
