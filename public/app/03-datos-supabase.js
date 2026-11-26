@@ -1283,7 +1283,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
                  horariosQA[0].sede_id !== extras.sedeId ||
                  horariosQA[0].deporte_id !== extras.grupo.split("|")[0] ||
                  String(horariosQA[0].categoria) !== extras.grupo.split("|")[1] ||
-                 horariosQA[0].dia_semana !== extras.diaSemana))) {
+                 String(horariosQA[0].dia_semana) !== String(extras.diaSemana)))) {
               throw new Error("El horario temporal no coincide con el creado por esta prueba; se protege.");
             }
             if (horariosQA.length) {
