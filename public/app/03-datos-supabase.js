@@ -907,7 +907,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       async verificarAsistenciaQA(datos, asistio, pagoCampo, recargar = false) {
         if (U?.rol !== "ADM") throw new Error("La verificación requiere una sesión administradora QA.");
         if (!datos || !String(datos.alumnoId).startsWith("QA-ATT-") ||
-            !/^\\d{8}$/.test(String(datos.alumnoDni)) ||
+            !/^\d{8}$/.test(String(datos.alumnoDni)) ||
             !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
             !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) {
           throw new Error("IDs temporales de asistencia inválidos.");
@@ -963,7 +963,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       async cleanupAsistenciaQA(datos) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
         if (!datos || !String(datos.alumnoId).startsWith("QA-ATT-") ||
-            !/^\\d{8}$/.test(String(datos.alumnoDni)) ||
+            !/^\d{8}$/.test(String(datos.alumnoDni)) ||
             !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
             !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) {
           throw new Error("IDs temporales de asistencia inválidos.");
