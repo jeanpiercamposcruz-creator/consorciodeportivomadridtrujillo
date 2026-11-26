@@ -467,19 +467,21 @@ function save() {
           window.__ERP_QA_LAST_SAVE_ERROR__ = String(e);
         }
         console.error(e);
-        if (e === "dup" || String(e).startsWith("dup:")) {
-          toast(
-            "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro.",
-          );
-          try {
-            await pull();
-          } catch (_) {}
-          try {
-            R();
-          } catch (x) {
-            console.error(x);
-          }
-        } else toast("No se pudo guardar: revisa la conexión o tus permisos");
+        const duplicado = e === "dup" || String(e).startsWith("dup:");
+        toast(
+          duplicado
+            ? "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro."
+            : "No se pudo guardar: revisa la conexión o tus permisos",
+        );
+        // El lote RPC es atómico: si falla, recuperamos el estado confirmado
+        // por Supabase para no dejar cambios optimistas que nunca se persistieron.
+        try {
+          await pull();
+          R();
+        } catch (errorRecarga) {
+          console.error("No se pudo restaurar el estado confirmado después del fallo de guardado.", errorRecarga);
+          toast("No se pudo guardar ni actualizar los datos. Recarga antes de continuar.");
+        }
       } finally {
         busy--; // siempre, pase lo que pase
       }
