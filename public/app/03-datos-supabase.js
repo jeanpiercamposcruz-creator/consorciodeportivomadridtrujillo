@@ -1171,6 +1171,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             !/^\d{4}-\d{2}-\d{2}$/.test(String(datos.fecha)) ||
             !String(datos.horarioId || "") || !String(datos.sedeId || "") ||
             !/^.+\|\d+$/.test(String(datos.grupo)) ||
+            !Number.isFinite(Number(datos.fee)) || Number(datos.fee) < 0 ||
             !Number.isFinite(Number(datos.feeOriginal)) || Number(datos.feeOriginal) < 0) {
           throw new Error("IDs temporales de asistencia o tarifa original inválidos.");
         }
@@ -1255,6 +1256,23 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("El fixture temporal tiene más de un alumno o asistencia; se protege la información.");
         }
         const asistencia = asistencias[0] || null;
+        const tarifaActual = Number(S.fee ?? 5);
+        const tarifaEsperada = Number(datos.fee);
+        const tarifaOriginal = Number(datos.feeOriginal);
+        if (tarifaActual !== tarifaEsperada && tarifaActual !== tarifaOriginal) {
+          throw new Error("La tarifa de campo cambió fuera de la prueba; se conserva el valor actual y se aborta la limpieza.");
+        }
+        if (tarifaActual !== tarifaOriginal) {
+          S.fee = tarifaOriginal;
+          save();
+          await sv;
+          if (!SAVE_OK) throw new Error("No se pudo restaurar la tarifa original de campo en QA.");
+          await pull();
+        }
+        if (Number(S.fee ?? 5) !== tarifaOriginal) {
+          throw new Error("La tarifa de campo no volvió a su valor original después de la prueba.");
+        }
+
         const activos = ingresos.filter((ingreso) =>
           !reversiones.some((reversa) => reversa.origen === "reversion-campo:" + ingreso.id)
         );
@@ -1324,16 +1342,6 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             S.caja.some((x) => x.d === datos.alumnoId && x.f === datos.fecha) ||
             S.alu.some((x) => x.id === datos.alumnoId)) {
           throw new Error("El ERP todavía conserva los registros temporales de asistencia.");
-        }
-        if (Number(S.fee ?? 5) !== Number(datos.feeOriginal)) {
-          S.fee = Number(datos.feeOriginal);
-          save();
-          await sv;
-          if (!SAVE_OK) throw new Error("No se pudo restaurar la tarifa original de campo en QA.");
-          await pull();
-        }
-        if (Number(S.fee ?? 5) !== Number(datos.feeOriginal)) {
-          throw new Error("La tarifa de campo no volvió a su valor original después de la prueba.");
         }
         return { removed: true, feeRestored: Number(S.fee ?? 5) };
       },
