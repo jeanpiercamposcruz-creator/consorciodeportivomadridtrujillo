@@ -1143,14 +1143,14 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
   test('Dashboard excluye asistencias futuras del cálculo de planilla', async () => {
     type DiagnosticoDashboardQA = {
-      probarAsistenciaFuturaQA: () => { fecha: string; antes: number; despues: number; diferencia: number };
+      probarAsistenciaFuturaQA: () => { hoy: string; fecha: string; antes: number; despues: number; diferencia: number };
     };
     const resultado = await page.evaluate(() => {
       const api = (window as unknown as { __ERP_QA_DASHBOARD__?: DiagnosticoDashboardQA }).__ERP_QA_DASHBOARD__;
       if (!api) throw new Error('No está habilitada la prueba de cálculo del dashboard QA.');
       return api.probarAsistenciaFuturaQA();
     });
-    expect(resultado.fecha > new Date().toISOString().slice(0, 10)).toBeTruthy();
+    expect(resultado.fecha > resultado.hoy).toBeTruthy();
     expect(resultado.diferencia).toBeCloseTo(0, 2);
   });
 
