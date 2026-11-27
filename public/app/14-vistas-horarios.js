@@ -723,7 +723,10 @@ function mkP(r, pc) {
   });
 
   if (pc) {
-    const actual = activos.find((p) => p._id === x.pcId) || activos[0];
+    if (activos.length > 1) {
+      return toast("Se detectaron varios ingresos activos para esta asistencia. Marca «Debe» para revertirlos antes de volver a cobrar.");
+    }
+    const actual = activos[0];
     if (actual) {
       if (x.pc === true && x.pcId === actual._id) return;
       x.pc = true;
@@ -750,12 +753,16 @@ function mkP(r, pc) {
       }
     }
   } else {
-    const pagoActivo = activos.find((p) => !x.pcId || p._id === x.pcId) || activos[0];
     x.pc = false;
     x.pcId = null;
-    if (pagoActivo) {
-      const reversado = S.caja.some((c) => c.k === `reversion-campo:${pagoActivo._id}`);
-      if (!reversado) {
+    // Revertir todo saldo activo, incluso si una incidencia histórica dejó
+    // más de un ingreso o una reversión parcial para la misma asistencia.
+    for (const pagoActivo of activos) {
+      const yaRevertido = S.caja
+        .filter((c) => c.t === "E" && c.k === `reversion-campo:${pagoActivo._id}`)
+        .reduce((total, c) => total + (+c.m || 0), 0);
+      const pendiente = Math.round(((+pagoActivo.m || 0) - yaRevertido) * 100) / 100;
+      if (pendiente > 0.009) {
         S.caja.push({
           _id: uid(),
           f: today(),
@@ -763,7 +770,7 @@ function mkP(r, pc) {
           t: "E",
           c: "Reversión de pago de campo",
           d: r,
-          m: pagoActivo.m,
+          m: pendiente,
           k: `reversion-campo:${pagoActivo._id}`,
         });
       }
