@@ -167,6 +167,7 @@ async function enviarPre() {
           body: JSON.stringify({ prefixes: rutas }),
         });
         if (!limpieza.ok) console.error("No se pudieron limpiar los documentos del pre-registro fallido");
+        await limpieza.text().catch(() => "");
       } catch (e) {
         console.error("Error al limpiar documentos del pre-registro fallido:", e);
       }
