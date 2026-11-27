@@ -31,6 +31,9 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     page.on('requestfailed', (r) =>
       diagnosticos.push('request: ' + r.url() + ' -> ' + (r.failure()?.errorText || 'falló'))
     );
+    page.on('response', (r) => {
+      if (r.status() >= 500) diagnosticos.push('response: HTTP ' + r.status() + ' ' + r.url());
+    });
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => {
       const app = document.querySelector('#app');
@@ -47,25 +50,29 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
     const dashboard = page.getByText('Alumnos activos');
     let ultimoAviso = '';
-    for (let intento = 1; intento <= 3; intento++) {
+    for (let intento = 1; intento <= 4; intento++) {
+      const inicioDiagnostico = diagnosticos.length;
       await page.locator('#lu').fill(usuario);
       await page.locator('#lp').fill(password);
       await page.getByRole('button', { name: /Iniciar sesión/i }).click();
       try {
-        await expect(dashboard).toBeVisible({ timeout: 18000 });
+        await expect(dashboard).toBeVisible({ timeout: 12000 });
         return;
       } catch (error) {
         ultimoAviso = await page.locator('#toast').innerText().catch(() => '');
-        const transitorio = /problema temporal de conexión|no se pudo conectar|no se pudo leer la base de datos|error 50[234]/i.test(ultimoAviso);
-        if (!transitorio || intento === 3) {
+        const nuevosDiagnosticos = diagnosticos.slice(inicioDiagnostico);
+        const respuestaTransitoria = nuevosDiagnosticos.some((d) => /response: HTTP 50[234]/i.test(d));
+        const transitorio = respuestaTransitoria ||
+          /problema temporal de conexión|no se pudo conectar|no se pudo leer la base de datos|error 50[234]/i.test(ultimoAviso);
+        if (!transitorio || intento === 4) {
           throw new Error('El acceso QA no llegó al dashboard. Intento ' + intento +
-            '/3. Aviso: ' + ultimoAviso + '. Diagnóstico: ' + diagnosticos.join(' | ') +
+            '/4. Aviso: ' + ultimoAviso + '. Diagnóstico: ' + nuevosDiagnosticos.join(' | ') +
             '. Error: ' + String(error));
         }
-        await page.waitForTimeout(1500 * intento);
+        await page.waitForTimeout(2000 * intento);
       }
     }
-    throw new Error('El acceso QA no llegó al dashboard tras 3 intentos. Último aviso: ' + ultimoAviso);
+    throw new Error('El acceso QA no llegó al dashboard tras 4 intentos. Último aviso: ' + ultimoAviso);
   });
 
   test.afterAll(async () => {
