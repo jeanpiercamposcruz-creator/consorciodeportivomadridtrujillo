@@ -42,3 +42,5 @@ CREATE TRIGGER trg_validar_sede_reversion_matricula
 BEFORE INSERT ON public.caja_movimientos
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_validar_sede_reversion_matricula();
+
+REVOKE ALL ON FUNCTION public.fn_validar_sede_reversion_matricula() FROM PUBLIC, anon, authenticated;
