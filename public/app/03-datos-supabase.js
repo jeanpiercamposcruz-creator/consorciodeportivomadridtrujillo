@@ -287,6 +287,7 @@ const TB = [
           horario_id: x.h || null,
           asistio: x.ok === undefined ? null : x.ok,
           pago_campo: x.pc === undefined ? null : x.pc,
+          pago_campo_movimiento_id: x.pcId || null,
         };
       }),
     load: (d) => {
@@ -298,6 +299,7 @@ const TB = [
         h: r.horario_id || "",
         ok: r.asistio === null ? undefined : r.asistio,
         pc: r.pago_campo === null ? undefined : r.pago_campo,
+        pcId: r.pago_campo_movimiento_id || null,
       }));
     },
   },
