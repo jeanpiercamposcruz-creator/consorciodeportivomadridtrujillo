@@ -1277,6 +1277,10 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
 
   test('Bloquear el doble clic al registrar un egreso manual de Caja', async () => {
+    type HerramientaCajaQA = {
+      verificarEgresoCajaQA: (detalle: string) => Promise<number>;
+      cleanupEgresoCajaQA: (detalle: string) => Promise<{ removed: boolean; count: number }>;
+    };
     const detalle = 'QA-DOBLE-CAJA-' + randomUUID();
     await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
     await page.locator('#c_t').selectOption('E');
@@ -1291,31 +1295,17 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       await registrar.click();
 
       await expect.poll(async () => page.evaluate(async (marcador) => {
-        const consultar = eval('sb') as (ruta: string) => Promise<Response>;
-        const r = await consultar('/rest/v1/caja_movimientos?detalle=eq.' +
-          encodeURIComponent(marcador) + '&select=id');
-        if (!r.ok) throw new Error('No se pudo verificar el egreso QA.');
-        return (await r.json()).length;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaCajaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación autenticada de Caja QA.');
+        return api.verificarEgresoCajaQA(marcador);
       }, detalle), { timeout: 15000 }).toBe(1);
     } finally {
-      await page.evaluate(async (marcador) => {
-        const consultar = eval('sb') as (ruta: string, init?: RequestInit) => Promise<Response>;
-        const ruta = '/rest/v1/caja_movimientos?detalle=eq.' + encodeURIComponent(marcador);
-        const lectura = await consultar(ruta + '&select=id,tipo,concepto,monto');
-        if (!lectura.ok) throw new Error('No se pudo comprobar la limpieza del egreso QA.');
-        const filas = await lectura.json() as Array<{ id: string; tipo: string; concepto: string; monto: number | string }>;
-        if (filas.some((x) => x.tipo !== 'E' || x.concepto !== 'Otros' || Number(x.monto) !== 1.23)) {
-          throw new Error('El egreso QA no coincide exactamente; no se elimina.');
-        }
-        for (const fila of filas) {
-          const borrado = await consultar('/rest/v1/caja_movimientos?id=eq.' + encodeURIComponent(fila.id), { method: 'DELETE' });
-          if (!borrado.ok) throw new Error('No se pudo retirar el egreso temporal QA.');
-        }
-        const recargar = eval('pull') as () => Promise<void>;
-        await recargar();
-        const final = await consultar(ruta + '&select=id');
-        if (!final.ok || (await final.json()).length) throw new Error('Quedó un egreso temporal QA.');
+      const limpieza = await page.evaluate(async (marcador) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaCajaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la limpieza autenticada de Caja QA.');
+        return api.cleanupEgresoCajaQA(marcador);
       }, detalle);
+      expect(limpieza.removed).toBeTruthy();
     }
   });
 
