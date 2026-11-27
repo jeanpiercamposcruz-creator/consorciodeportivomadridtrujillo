@@ -29,6 +29,12 @@ BEGIN
   END IF;
 
   v_fecha := v_partes[2]::date;
+  IF NEW.fecha IS DISTINCT FROM v_fecha
+     OR NEW.detalle IS DISTINCT FROM v_partes[3] THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'El ingreso de campo debe coincidir con la fecha y el alumno de su origen.';
+  END IF;
   v_base := 'campo|' || v_fecha::text || '|' || v_partes[3] || '|' || v_partes[4];
 
   -- El bloqueo de la fila de asistencia serializa intentos concurrentes.
