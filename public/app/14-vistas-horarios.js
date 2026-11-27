@@ -639,7 +639,7 @@ VW.asis = () => {
       S.asis.find((x) => x.f === today() && x.t === t && x.ref === r && x.h === AS.h) || {};
   const row = (t, r, n) => {
     const c = rec(t, r);
-    return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">Pagó</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
+    return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">${Number(S.fee ?? 5) === 0 ? "Sin costo" : "Pagó"}</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
   };
   let list = "";
   if (H && AS.t === "A")
@@ -676,7 +676,7 @@ VW.asis = () => {
       ["P", "Personal"],
     ],
     "Elige",
-  )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0.01 step=0.01 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>Al marcar "Pagó" se registra un ingreso en la caja de la sede. Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
+  )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0 step=0.01 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>${Number(S.fee ?? 5) === 0 ? 'Al marcar "Sin costo" se liquida la asistencia sin crear un movimiento de Caja.' : 'Al marcar "Pagó" se registra un ingreso en la caja de la sede.'} Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
 };
 const setA = (k, x) => {
   AS[k] = x;
@@ -934,6 +934,13 @@ function cajaAuditoria(x) {
         return "Abono de matrícula (detalle no disponible)";
       }
     }
+  }
+  if (origen.startsWith("reversion-campo:")) {
+    const id = origen.slice("reversion-campo:".length),
+      ingreso = S.caja.find((m) => m._id === id);
+    return ingreso
+      ? `Reversión vinculada al pago de campo del ${ingreso.f} por ${money(ingreso.m)}`
+      : `Reversión vinculada al pago de campo ${id}`;
   }
   if (origen.startsWith("reversion-kit|")) {
     const id = origen.slice("reversion-kit|".length);
