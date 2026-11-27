@@ -1559,17 +1559,16 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async probarBloqueoClienteAntiguoQA() {
         if (U?.rol !== "ADM") throw new Error("La prueba de snapshot requiere una sesión administradora QA.");
-        await sv;
-        const alumno = S.alu.find((x) => x?.id);
-        if (!alumno) throw new Error("No hay una matrícula disponible para probar el bloqueo de clientes antiguos.");
+        // El RPC debe rechazar el payload por ausencia del snapshot antes de
+        // buscar/bloquear una fila; se usa un ID inexistente para no tocar datos.
         const respuesta = await sb("/rest/v1/rpc/erp_persistir_lote", {
           method: "POST",
-          timeout: 30000,
+          timeout: 10000,
           body: JSON.stringify({
             p_payload: [{
               name: "alumnos",
               insert: [],
-              update: [{ id: alumno.id }],
+              update: [{ id: "QA-CLIENTE-ANTIGUO-TEST" }],
               delete: [],
             }],
           }),
