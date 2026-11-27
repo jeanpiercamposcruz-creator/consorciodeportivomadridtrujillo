@@ -397,64 +397,64 @@ async function pull() {
   if (PULLING) return PULLING;
   const tarea = (async () => {
     const aj = await all("ajustes");
-  if (!aj.length && U.rol === "ADM") {
-    let old = null;
-    try {
-      old = (await (await sb("/rest/v1/erp_state?id=eq.1&select=data")).json())[0].data;
-    } catch (e) {}
-    S = old && old.sedes ? old : seed();
-    S.cuotas = S.cuotas || [];
-    ["cc", "contratos", "psedes", "pcert"].forEach((k) => (S[k] = S[k] || []));
+    if (!aj.length && U.rol === "ADM") {
+      let old = null;
+      try {
+        old = (await (await sb("/rest/v1/erp_state?id=eq.1&select=data")).json())[0].data;
+      } catch (e) {}
+      S = old && old.sedes ? old : seed();
+      S.cuotas = S.cuotas || [];
+      ["cc", "contratos", "psedes", "pcert"].forEach((k) => (S[k] = S[k] || []));
+      SN = {};
+      await flush();
+      await ver();
+      return;
+    }
+    // Limitar la concurrencia de lecturas evita agotar el pool de PostgREST
+    // (PGRST003/PGRST002) durante el inicio. Las tablas opcionales solo se omiten
+    // si realmente no existen; errores de conexión no se convierten en arrays vacíos.
+    const entradas = [];
+    // Mantener un máximo bajo de peticiones simultáneas por sesión para
+    // proteger el pool compartido de PostgREST en los arranques y recargas.
+    const concurrenciaLectura = 1;
+    for (let i = 0; i < TB.length; i += concurrenciaLectura) {
+      const lote = TB.slice(i, i + concurrenciaLectura);
+      const resultado = await Promise.all(lote.map(async (t) => [
+        t.n,
+        t.n === "ajustes"
+          ? aj
+          : t.read
+            ? await t.read()
+            : t.opt
+              ? await all(t.n).catch((e) => {
+                  if (e?.status === 404 && /PGRST205|not found|does not exist/i.test(e.message)) return [];
+                  throw e;
+                })
+              : await all(t.n),
+      ]));
+      entradas.push(...resultado);
+    }
+    const raw = Object.fromEntries(entradas);
+    // 2) reemplazar el estado de golpe, sin ningún await en medio
+    S = {
+      sedes: [],
+      deportes: [],
+      personal: [],
+      hor: [],
+      alu: [],
+      asis: [],
+      kits: [],
+      caja: [],
+      cuotas: [],
+      cc: [],
+      contratos: [],
+      psedes: [],
+      pcert: [],
+      c: {},
+    };
+    for (const t of TB) t.load(raw[t.n]);
     SN = {};
-    await flush();
-    await ver();
-    return;
-  }
-  // Limitar la concurrencia de lecturas evita agotar el pool de PostgREST
-  // (PGRST003/PGRST002) durante el inicio. Las tablas opcionales solo se omiten
-  // si realmente no existen; errores de conexión no se convierten en arrays vacíos.
-  const entradas = [];
-  // Mantener un máximo bajo de peticiones simultáneas por sesión para
-  // proteger el pool compartido de PostgREST en los arranques y recargas.
-  const concurrenciaLectura = 1;
-  for (let i = 0; i < TB.length; i += concurrenciaLectura) {
-    const lote = TB.slice(i, i + concurrenciaLectura);
-    const resultado = await Promise.all(lote.map(async (t) => [
-      t.n,
-      t.n === "ajustes"
-        ? aj
-        : t.read
-          ? await t.read()
-          : t.opt
-            ? await all(t.n).catch((e) => {
-                if (e?.status === 404 && /PGRST205|not found|does not exist/i.test(e.message)) return [];
-                throw e;
-              })
-            : await all(t.n),
-    ]));
-    entradas.push(...resultado);
-  }
-  const raw = Object.fromEntries(entradas);
-  // 2) reemplazar el estado de golpe, sin ningún await en medio
-  S = {
-    sedes: [],
-    deportes: [],
-    personal: [],
-    hor: [],
-    alu: [],
-    asis: [],
-    kits: [],
-    caja: [],
-    cuotas: [],
-    cc: [],
-    contratos: [],
-    psedes: [],
-    pcert: [],
-    c: {},
-  };
-  for (const t of TB) t.load(raw[t.n]);
-  SN = {};
-  TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
+    TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
     await ver();
   })();
   PULLING = tarea;
