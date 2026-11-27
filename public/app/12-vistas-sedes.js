@@ -238,6 +238,35 @@ function ccAuto() {
   save("Centros de costo creados y asignados");
   R();
 }
+
+if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabase.co") {
+  Object.defineProperty(window, "__ERP_QA_PERSONAL__", {
+    configurable: true,
+    value: Object.freeze({
+      probarHorasFuturasQA() {
+        if (typeof U === "undefined" || U?.rol !== "ADM") {
+          throw new Error("La prueba de horas semanales requiere una sesión administradora QA.");
+        }
+        const p = S.personal.find((x) => Number(x.activo) === 1 && Number(x.precio) > 0);
+        const h = S.hor.find((x) => hrs(x) > 0);
+        if (!p || !h) throw new Error("No hay personal con tarifa y horario válido para la prueba QA.");
+        const hoy = today();
+        const [y, m, d] = hoy.split("-").map(Number);
+        const fecha = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+        const original = S.asis;
+        const antes = hsem(p);
+        try {
+          S.asis = [...original, { t: "P", ref: p.id, ok: true, f: fecha, h: h.id }];
+          const despues = hsem(p);
+          return { hoy, fecha, diferencia: despues - antes };
+        } finally {
+          S.asis = original;
+        }
+      },
+    }),
+  });
+}
+
 const hsem = (p) => {
   const hoy = today();
   const [y, m, day] = hoy.split("-").map(Number);
