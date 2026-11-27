@@ -1141,6 +1141,32 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
   });
 
+  test('Personal excluye asistencias futuras de las horas semanales', async () => {
+    type DiagnosticoPersonalQA = {
+      probarHorasFuturasQA: () => { hoy: string; fecha: string; diferencia: number };
+    };
+    const resultado = await page.evaluate(() => {
+      const api = (window as unknown as { __ERP_QA_PERSONAL__?: DiagnosticoPersonalQA }).__ERP_QA_PERSONAL__;
+      if (!api) throw new Error('No está habilitada la prueba de horas semanales QA.');
+      return api.probarHorasFuturasQA();
+    });
+    expect(resultado.fecha > resultado.hoy).toBeTruthy();
+    expect(resultado.diferencia).toBeCloseTo(0, 2);
+  });
+
+  test('Dashboard gerencial excluye asistencias futuras de planilla', async () => {
+    type DiagnosticoGerencialQA = {
+      probarPlanillaFuturaQA: () => { hoy: string; fecha: string; diferencia: number };
+    };
+    const resultado = await page.evaluate(() => {
+      const api = (window as unknown as { __ERP_QA_GERENCIAL__?: DiagnosticoGerencialQA }).__ERP_QA_GERENCIAL__;
+      if (!api) throw new Error('No está habilitada la prueba gerencial QA.');
+      return api.probarPlanillaFuturaQA();
+    });
+    expect(resultado.fecha > resultado.hoy).toBeTruthy();
+    expect(resultado.diferencia).toBeCloseTo(0, 2);
+  });
+
   test('Dashboard excluye asistencias futuras del cálculo de planilla', async () => {
     type DiagnosticoDashboardQA = {
       probarAsistenciaFuturaQA: () => { hoy: string; fecha: string; antes: number; despues: number; diferencia: number };
