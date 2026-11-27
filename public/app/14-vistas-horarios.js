@@ -756,27 +756,33 @@ function mkP(r, pc) {
       }
     }
   } else {
-    x.pc = false;
-    x.pcId = null;
-    // Revertir todo saldo activo, incluso si una incidencia histórica dejó
-    // más de un ingreso o una reversión parcial para la misma asistencia.
-    for (const pagoActivo of activos) {
+    // El ledger admite una sola reversión por ingreso de campo. Si encuentra
+    // una reversión parcial heredada, no crea otra ni desvincula la asistencia:
+    // requiere revisión controlada para no perder trazabilidad.
+    const reversasParciales = activos.filter((pagoActivo) => {
       const yaRevertido = S.caja
         .filter((c) => c.t === "E" && c.k === `reversion-campo:${pagoActivo._id}`)
         .reduce((total, c) => total + (+c.m || 0), 0);
       const pendiente = Math.round(((+pagoActivo.m || 0) - yaRevertido) * 100) / 100;
-      if (pendiente > 0.009) {
-        S.caja.push({
-          _id: uid(),
-          f: today(),
-          sede: pagoActivo.sede,
-          t: "E",
-          c: "Reversión de pago de campo",
-          d: r,
-          m: pendiente,
-          k: `reversion-campo:${pagoActivo._id}`,
-        });
-      }
+      return yaRevertido > 0.009 && pendiente > 0.009;
+    });
+    if (reversasParciales.length) {
+      return toast("Existe una reversión parcial de campo. Se requiere revisión administrativa antes de cambiar el estado del pago.");
+    }
+
+    x.pc = false;
+    x.pcId = null;
+    for (const pagoActivo of activos) {
+      S.caja.push({
+        _id: uid(),
+        f: today(),
+        sede: pagoActivo.sede,
+        t: "E",
+        c: "Reversión de pago de campo",
+        d: r,
+        m: Math.round((+pagoActivo.m || 0) * 100) / 100,
+        k: `reversion-campo:${pagoActivo._id}`,
+      });
     }
   }
 
