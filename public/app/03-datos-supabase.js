@@ -109,10 +109,6 @@ async function auth(body, q) {
   } catch (e) {}
 }
 async function sess() {
-  if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
-    const diag = window.__ERP_QA_SESSION_DIAG__ || (window.__ERP_QA_SESSION_DIAG__ = []);
-    diag.push({ caller: new Error().stack || "" });
-  }
   const uid = UID;
   if (!uid) throw new Error("No existe una sesión autenticada para validar.");
   if (SESSION_VALIDATED_UID === uid && U) return;
