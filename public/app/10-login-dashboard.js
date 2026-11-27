@@ -113,7 +113,8 @@ const uMes = (m) => {
     // Una venta anulada no debe seguir restando su costo de confección a la utilidad.
     kc = S.kits.filter((k) => k.est !== "Anulada" && k.f.startsWith(m)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
-      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(m))
+      // Una asistencia futura no es un servicio realizado ni un gasto devengado.
+      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(m) && x.f <= today())
       .reduce((t, x) => {
         const h = S.hor.find((h) => h.id === x.h),
           p = S.personal.find((p) => p.id === x.ref);
@@ -221,4 +222,33 @@ function home() {
     .join(
       "",
     )}</div>`;
+}
+
+// Diagnóstico de regresión: solo se publica en el proyecto QA y no persiste cambios.
+if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabase.co") {
+  Object.defineProperty(window, "__ERP_QA_DASHBOARD__", {
+    configurable: true,
+    value: Object.freeze({
+      probarAsistenciaFuturaQA() {
+        if (typeof U === "undefined" || U?.rol !== "ADM") {
+          throw new Error("La prueba del dashboard requiere una sesión administradora QA.");
+        }
+        const p = S.personal.find((x) => Number(x.activo) === 1 && Number(x.precio) > 0);
+        const h = S.hor.find((x) => x.est !== "Inactivo" && hrs(x) > 0);
+        if (!p || !h) throw new Error("No hay personal con tarifa y horario válido para la prueba QA.");
+        const [y, m, d] = today().split("-").map(Number);
+        const fecha = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+        const mes = fecha.slice(0, 7);
+        const original = S.asis;
+        const antes = uMes(mes).u;
+        try {
+          S.asis = [...original, { t: "P", ref: p.id, ok: true, f: fecha, h: h.id }];
+          const despues = uMes(mes).u;
+          return { fecha, antes, despues, diferencia: despues - antes };
+        } finally {
+          S.asis = original;
+        }
+      },
+    }),
+  });
 }
