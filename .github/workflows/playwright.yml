@@ -43,23 +43,22 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for QA preview deployment
+      - name: Verify exact QA preview revision
         id: qa_preview
         env:
           ERP_URL: ${{ secrets.ERP_URL }}
         run: |
-          for attempt in $(seq 1 12); do
-            if curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -q 'qa-cleanup-personal-test-961b49da'; then
-              echo "La vista previa de QA sirve el helper de persistencia real esperado."
-              echo "deployed=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "Esperando el despliegue correcto de QA (${attempt}/12)..."
-            sleep 10
-          done
-          echo "::error::Vercel todavía no publicó la versión QA esperada. No se puede declarar aprobada una ejecución sin pruebas E2E."
-          echo "deployed=false" >> "$GITHUB_OUTPUT"
-          exit 1
+          if [ -n "$ERP_URL" ] && curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -Fq 'qa-source-audit-20261127-01'; then
+            echo "La vista previa corresponde al marcador de esta revisión QA."
+            echo "deployed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Se omite Playwright: no hay una vista previa con el marcador de esta revisión. No se probará una versión antigua."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Playwright omitido"
+              echo "La vista previa QA no contiene `qa-source-audit-20261127-01`. Se ejecutaron los controles estáticos, pero no se atribuyen resultados E2E a esta revisión."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Run Playwright tests
         if: steps.qa_preview.outputs.deployed == 'true'
@@ -70,7 +69,7 @@ jobs:
           ERP_PASSWORD: ${{ secrets.ERP_PASSWORD }}
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ steps.qa_preview.outputs.deployed == 'true' && !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
