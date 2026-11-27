@@ -767,7 +767,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
-  test('Persistir, recuperar y revertir asistencia y pago de campo en Supabase QA', async () => {
+  test('Persistir, recuperar, revertir y volver a pagar asistencia de campo en Supabase QA', async () => {
     type DatosAsistenciaQA = {
       alumnoId: string;
       alumnoDni: string;
@@ -776,8 +776,16 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       grupo: string;
       fecha: string;
       fee: number;
+      feeOriginal: number;
       asistenciaId: string;
       cajaId: string;
+    };
+    type ResultadoAsistenciaQA = {
+      asistencia: { asistio: boolean; pago_campo: boolean | null; pago_campo_movimiento_id: string | null };
+      caja: Array<{ id: string; monto: number | string; origen: string }>;
+      reversion: Array<{ id: string; monto: number | string; origen: string }>;
+      currentCajaId: string | null;
+      restored: { asistio: boolean; pagoCampo: boolean | undefined; caja: number; currentCajaId: string | null };
     };
     type HerramientaAsistenciaQA = {
       prepararAsistenciaQA: () => Promise<DatosAsistenciaQA>;
@@ -786,15 +794,11 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         asistio: boolean,
         pagoCampo: boolean | null,
         recargar?: boolean
-      ) => Promise<{
-        asistencia: { asistio: boolean; pago_campo: boolean | null };
-        caja: Array<{ monto: number | string }>;
-        restored: { asistio: boolean; pagoCampo: boolean | undefined; caja: number };
-      }>;
-      cleanupAsistenciaQA: (datos: DatosAsistenciaQA) => Promise<{ removed: boolean }>;
+      ) => Promise<ResultadoAsistenciaQA>;
+      cleanupAsistenciaQA: (datos: DatosAsistenciaQA) => Promise<{ removed: boolean; feeRestored: number }>;
     };
 
-    test.setTimeout(90000);
+    test.setTimeout(120000);
     const dialogo = page.getByRole('dialog');
     if (await dialogo.isVisible().catch(() => false)) {
       const cerrar = dialogo.getByRole('button', { name: 'Cerrar', exact: true });
@@ -820,75 +824,119 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       const asistio = page.locator(
         'button[data-f="mkA"][data-i="A"][data-j="' + datos.alumnoId + '"][data-k="1"]'
       );
+      const pago = page.locator('button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="1"]');
+      const debe = page.locator('button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="0"]');
+      const tarifaCampo = page.locator('input[data-ch="setFee"]');
+
       await expect(asistio).toBeVisible();
       await asistio.click();
-
       let verificado = await page.evaluate(async (d) => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación de asistencia QA.');
         return api.verificarAsistenciaQA(d, true, null);
       }, datos);
       expect(verificado.asistencia.asistio).toBe(true);
       expect(verificado.asistencia.pago_campo).toBeNull();
-      expect(verificado.restored.asistio).toBe(true);
 
-      const tarifaCampo = page.locator('input[data-ch="setFee"]');
-      await tarifaCampo.fill('0');
-      await tarifaCampo.press('Tab');
-      await expect(page.locator('#toast')).toContainText('El pago de campo debe ser mayor que cero');
-      await expect(tarifaCampo).toHaveValue(String(datos.fee));
-
-      await page.locator(
-        'button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="1"]'
-      ).click();
+      // Primero se prueba la tarifa cero: liquida la asistencia sin inventar un ingreso de Caja.
+      if (datos.fee !== 0) {
+        await tarifaCampo.fill('0');
+        await tarifaCampo.press('Tab');
+      }
+      datos.fee = 0;
+      await expect(pago).toHaveText('Sin costo');
+      await pago.click();
       verificado = await page.evaluate(async (d) => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación del estado sin costo.');
+        return api.verificarAsistenciaQA(d, true, true);
+      }, datos);
+      expect(verificado.caja).toHaveLength(0);
+      expect(verificado.reversion).toHaveLength(0);
+      expect(verificado.currentCajaId).toBeNull();
+
+      await debe.click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación del estado pendiente.');
+        return api.verificarAsistenciaQA(d, true, false);
+      }, datos);
+      expect(verificado.caja).toHaveLength(0);
+
+      // Se configura una tarifa temporal positiva para probar ingreso, reversión y re-pago reales.
+      await tarifaCampo.fill('5');
+      await tarifaCampo.press('Tab');
+      datos.fee = 5;
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de la tarifa temporal.');
+        return api.verificarAsistenciaQA(d, true, false, true);
+      }, datos);
+      expect(verificado.caja).toHaveLength(0);
+
+      await tarifaCampo.fill('-1');
+      await tarifaCampo.press('Tab');
+      await expect(page.locator('#toast')).toContainText('importe válido no negativo');
+      await expect(tarifaCampo).toHaveValue('5');
+
+      await pago.click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación del pago QA.');
         return api.verificarAsistenciaQA(d, true, true);
       }, datos);
-      expect(verificado.asistencia.pago_campo).toBe(true);
       expect(verificado.caja).toHaveLength(1);
-      expect(Number(verificado.caja[0].monto)).toBe(datos.fee);
-      expect(verificado.restored.caja).toBe(1);
+      expect(verificado.reversion).toHaveLength(0);
+      expect(verificado.currentCajaId).toBe(datos.cajaId);
+      expect(Number(verificado.caja[0].monto)).toBe(5);
 
-      await page.locator(
-        'button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="0"]'
-      ).click();
+      await debe.click();
       verificado = await page.evaluate(async (d) => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación de reversión QA.');
         return api.verificarAsistenciaQA(d, true, false);
       }, datos);
-      expect(verificado.asistencia.pago_campo).toBe(false);
-      expect(verificado.caja).toHaveLength(0);
-      expect(verificado.restored.caja).toBe(0);
+      expect(verificado.caja).toHaveLength(1);
+      expect(verificado.reversion).toHaveLength(1);
+      expect(verificado.reversion[0].origen).toBe('reversion-campo:' + datos.cajaId);
+      expect(Number(verificado.reversion[0].monto)).toBe(5);
+      expect(verificado.currentCajaId).toBeNull();
+
+      // Un nuevo pago crea otro ingreso y conserva el primero junto con su reversión.
+      await pago.click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación del re-pago QA.');
+        return api.verificarAsistenciaQA(d, true, true);
+      }, datos);
+      expect(verificado.caja).toHaveLength(2);
+      expect(verificado.reversion).toHaveLength(1);
+      expect(verificado.currentCajaId).not.toBe(datos.cajaId);
+      expect(verificado.restored.caja).toBe(3);
+
+      await debe.click();
+      verificado = await page.evaluate(async (d) => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible la verificación de la segunda reversión QA.');
+        return api.verificarAsistenciaQA(d, true, false);
+      }, datos);
+      expect(verificado.caja).toHaveLength(2);
+      expect(verificado.reversion).toHaveLength(2);
+      expect(verificado.restored.caja).toBe(4);
 
       await page.locator(
         'button[data-f="mkA"][data-i="A"][data-j="' + datos.alumnoId + '"][data-k="0"]'
       ).click();
       verificado = await page.evaluate(async (d) => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación del cambio de asistencia QA.');
         return api.verificarAsistenciaQA(d, false, false);
       }, datos);
       expect(verificado.asistencia.asistio).toBe(false);
-      expect(verificado.restored.asistio).toBe(false);
 
-      await page.locator(
-        'button[data-f="mkA"][data-i="A"][data-j="' + datos.alumnoId + '"][data-k="1"]'
-      ).click();
+      await asistio.click();
       verificado = await page.evaluate(async (d) => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la verificación final de asistencia QA.');
         return api.verificarAsistenciaQA(d, true, false, true);
       }, datos);
@@ -896,13 +944,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(verificado.asistencia.pago_campo).toBe(false);
     } finally {
       const limpieza = await page.evaluate(async (d) => {
-        const api = (window as unknown as {
-          __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
-        }).__ERP_QA_PERSISTENCIA__;
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la limpieza de asistencia QA.');
         return api.cleanupAsistenciaQA(d);
       }, datos);
       expect(limpieza.removed).toBe(true);
+      expect(limpieza.feeRestored).toBe(datos.feeOriginal);
     }
   });
 
