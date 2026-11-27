@@ -537,7 +537,10 @@ async function flush() {
     method: "POST",
     body: JSON.stringify({ p_payload: payload }),
   });
-  if (r.status === 409) throw "dup";
+  if (r.status === 409) {
+    await r.text().catch(() => "");
+    throw "dup";
+  }
   if (!r.ok) {
     const detalle = await r.text();
     if (/23505|duplicate key/i.test(detalle)) throw "dup: HTTP " + r.status + " " + detalle;
