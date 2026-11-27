@@ -19,7 +19,7 @@ let TK = null,
   busy = 0,
   sv = Promise.resolve();
 
-let REFRESHING = null;
+let REFRESHING = null, PULLING = null;
 
 async function sb(path, o = {}, retry = 1, transientRetry = 2, transientAttempt = 0) {
   const method = String(o.method || "GET").toUpperCase();
@@ -394,7 +394,9 @@ async function ver() {
   } catch (e) {}
 }
 async function pull() {
-  const aj = await all("ajustes");
+  if (PULLING) return PULLING;
+  const tarea = (async () => {
+    const aj = await all("ajustes");
   if (!aj.length && U.rol === "ADM") {
     let old = null;
     try {
@@ -414,7 +416,7 @@ async function pull() {
   const entradas = [];
   // Mantener un máximo bajo de peticiones simultáneas por sesión para
   // proteger el pool compartido de PostgREST en los arranques y recargas.
-  const concurrenciaLectura = 2;
+  const concurrenciaLectura = 1;
   for (let i = 0; i < TB.length; i += concurrenciaLectura) {
     const lote = TB.slice(i, i + concurrenciaLectura);
     const resultado = await Promise.all(lote.map(async (t) => [
@@ -453,7 +455,14 @@ async function pull() {
   for (const t of TB) t.load(raw[t.n]);
   SN = {};
   TB.forEach((t) => (SN[t.n] = new Map(t.rows().map((r) => [r.id, JSON.stringify(r)]))));
-  await ver();
+    await ver();
+  })();
+  PULLING = tarea;
+  try {
+    return await tarea;
+  } finally {
+    if (PULLING === tarea) PULLING = null;
+  }
 }
 async function flush() {
   const W = [],
