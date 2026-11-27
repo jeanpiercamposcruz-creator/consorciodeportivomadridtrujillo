@@ -546,6 +546,9 @@ async function flush() {
     if (/23505|duplicate key/i.test(detalle)) throw "dup: HTTP " + r.status + " " + detalle;
     throw detalle;
   }
+  // Consumir también la respuesta exitosa del RPC: PostgREST mantiene la
+  // transacción asociada a la respuesta hasta completar el intercambio HTTP.
+  await r.text().catch(() => "");
 
   // Solo se actualiza el snapshot local después de confirmar el lote completo.
   for (const [t, ins, upd, m] of W) SN[t.n] = m;
@@ -1883,6 +1886,7 @@ async function subirArch(f, carpeta, tipo) {
     await r.text().catch(() => "");
     throw "subida";
   }
+  await r.text().catch(() => "");
   return path;
 }
 async function verDoc(path) {

@@ -127,6 +127,7 @@ async function preDel(id) {
     await r.text().catch(() => "");
     return toast("No se pudo eliminar");
   }
+  await r.text().catch(() => "");
   if (q) preBorrarArch(q);
   PR = PR.filter((x) => x.id !== id);
   PRN = PR.length;

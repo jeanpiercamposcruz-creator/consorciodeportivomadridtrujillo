@@ -153,6 +153,7 @@ async function enviarPre() {
       await r.text().catch(() => "");
       throw new Error("No se pudo enviar el pre-registro.");
     }
+    await r.text().catch(() => "");
     DOM.app.innerHTML = `<main class=login><section class="card u-text-center"><img src="${LOGO}" class=lg alt="CDMT"><h3>Pre-registro enviado</h3><p>Gracias. Presenta tu DNI en la sede para confirmar la matrícula.</p></section></main>`;
   } catch (x) {
     // Si falla el envío después de subir documentos, limpiar los objetos huérfanos.
