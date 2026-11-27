@@ -2236,7 +2236,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(Number(filas[0].monto)).toBe(230);
     } finally {
       const limpieza = await page.evaluate(async (idPrueba) => {
-        const api = apiQA();
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está disponible la limpieza aislada de Caja QA.');
         return api.cleanupCaja(idPrueba);
       }, id);
