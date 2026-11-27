@@ -886,29 +886,70 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
         if (window.__ERP_QA_NEXT_KIT_ID__ === id) delete window.__ERP_QA_NEXT_KIT_ID__;
         await sv;
+        if (!SAVE_OK) throw new Error("Hay una escritura pendiente o fallida; no se inicia la limpieza de la venta QA.");
         await pull();
+
+        const ventaRuta = "/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id);
+        const leer = async (ruta, etiqueta) => {
+          const respuesta = await sb(ruta);
+          if (!respuesta.ok) throw new Error("No se pudo verificar " + etiqueta + ": " + await respuesta.text());
+          return respuesta.json();
+        };
+        let ventas = await leer(ventaRuta + "&select=id,alumno_id,sede_id,precio_publico,estado", "la venta QA");
+        const ingresoRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id);
+        const reversaRuta = "/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("reversion-kit|" + id);
+        let [ingresos, reversiones] = await Promise.all([
+          leer(ingresoRuta + "&select=id,tipo,concepto,detalle,sede_id,monto,origen", "el ingreso de Caja QA"),
+          leer(reversaRuta + "&select=id,tipo,concepto,detalle,sede_id,monto,origen", "la reversión de Caja QA"),
+        ]);
+        if (ventas.length > 1) throw new Error("Hay más de una venta con el ID QA; se protege la información.");
+        if (!ventas.length) {
+          if (ingresos.length || reversiones.length) throw new Error("Quedaron movimientos de Caja sin su venta QA; no se eliminan.");
+          return { removed: true };
+        }
+
+        let venta = ventas[0];
+        if (venta.estado !== "Anulada") {
+          const anulacion = await sb(ventaRuta, {
+            method: "PATCH",
+            body: JSON.stringify({ estado: "Anulada" }),
+          });
+          if (!anulacion.ok) throw new Error("No se pudo anular de forma auditada la venta QA: " + await anulacion.text());
+          await pull();
+          ventas = await leer(ventaRuta + "&select=id,alumno_id,sede_id,precio_publico,estado", "la venta QA anulada");
+          if (ventas.length !== 1 || ventas[0].estado !== "Anulada") {
+            throw new Error("La venta QA no quedó anulada; se conserva el ledger.");
+          }
+          venta = ventas[0];
+          [ingresos, reversiones] = await Promise.all([
+            leer(ingresoRuta + "&select=id,tipo,concepto,detalle,sede_id,monto,origen", "el ingreso de Caja QA"),
+            leer(reversaRuta + "&select=id,tipo,concepto,detalle,sede_id,monto,origen", "la reversión de Caja QA"),
+          ]);
+        }
+
+        const coincide = (movimiento, tipo, concepto) =>
+          movimiento.tipo === tipo &&
+          movimiento.concepto === concepto &&
+          movimiento.detalle === venta.alumno_id &&
+          movimiento.sede_id === venta.sede_id &&
+          Math.abs(Number(movimiento.monto) - Number(venta.precio_publico)) < 0.01;
+        if (ingresos.length !== 1 || !coincide(ingresos[0], "I", "Indumentaria") ||
+            ingresos[0].origen !== "kit|" + id ||
+            reversiones.length !== 1 || !coincide(reversiones[0], "E", "Reversión de indumentaria") ||
+            reversiones[0].origen !== "reversion-kit|" + id) {
+          throw new Error("El ledger de Caja no coincide exactamente con la venta QA anulada; se conserva todo.");
+        }
+
+        // El lote es atómico y borra primero Caja (orden inverso de TB) y
+        // después la venta. Los triggers exigen que siga marcada Anulada.
         S.kits = S.kits.filter((x) => x._id !== id);
         S.caja = S.caja.filter((x) => x.k !== "kit|" + id && x.k !== "reversion-kit|" + id);
         save();
         await sv;
-        // Si el guardado normal falla, la limpieza continúa por REST para no dejar residuos QA.
-        const borrar = async (tabla, filtro) => {
-          const ruta = "/rest/v1/" + tabla + "?" + filtro;
-          let r = await sb(ruta + "&select=id");
-          if (!r.ok) throw new Error("No se pudo verificar la limpieza de " + tabla + ".");
-          let filas = await r.json();
-          if (filas.length) {
-            r = await sb(ruta, { method: "DELETE" });
-            if (!r.ok) throw new Error("No se pudo limpiar " + tabla + ": " + await r.text());
-          }
-          r = await sb(ruta + "&select=id");
-          if (!r.ok || (await r.json()).length) throw new Error("Quedaron residuos QA en " + tabla + ".");
-        };
-        await borrar("caja_movimientos", "origen=eq." + encodeURIComponent("kit|" + id));
-        await borrar("caja_movimientos", "origen=eq." + encodeURIComponent("reversion-kit|" + id));
-        await borrar("kits_ventas", "id=eq." + encodeURIComponent(id));
+        if (!SAVE_OK) throw new Error("No se pudo completar la limpieza transaccional de la venta QA.");
         await pull();
-        if (S.kits.some((x) => x._id === id) || S.caja.some((x) => x.k === "kit|" + id || x.k === "reversion-kit|" + id)) {
+        if (S.kits.some((x) => x._id === id) ||
+            S.caja.some((x) => x.k === "kit|" + id || x.k === "reversion-kit|" + id)) {
           throw new Error("El ERP aún conserva datos de la venta temporal QA.");
         }
         return { removed: true };
