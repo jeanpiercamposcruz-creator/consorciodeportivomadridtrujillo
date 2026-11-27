@@ -591,21 +591,27 @@ function save(mensajeExito = "") {
         console.error(e);
         const duplicado = e === "dup" || String(e).startsWith("dup:");
         const conflicto = /40001|La matrícula fue modificada en otra sesión/.test(String(e));
+        const poolUnavailable = /PGRST003|PGRST002/.test(String(e));
         toast(
           duplicado
             ? "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro."
             : conflicto
               ? "La matrícula cambió en otra sesión. Se recargaron los datos; revisa los importes y vuelve a intentarlo."
-              : "No se pudo guardar: revisa la conexión o tus permisos",
+              : poolUnavailable
+                ? "Supabase no pudo obtener una conexión. El guardado no se confirmó; conserva los cambios en pantalla y reintenta cuando el servicio se recupere."
+                : "No se pudo guardar: revisa la conexión o tus permisos",
         );
-        // El lote RPC es atómico: si falla, recuperamos el estado confirmado
-        // por Supabase para no dejar cambios optimistas que nunca se persistieron.
-        try {
-          await pull();
-          R();
-        } catch (errorRecarga) {
-          console.error("No se pudo restaurar el estado confirmado después del fallo de guardado.", errorRecarga);
-          toast("No se pudo guardar ni actualizar los datos. Recarga antes de continuar.");
+        // PGRST002/PGRST003 fallan antes de ejecutar la RPC. No disparamos
+        // otra lectura contra el mismo pool saturado ni descartamos los cambios
+        // optimistas; SN conserva el último lote confirmado para reintentar.
+        if (!poolUnavailable) {
+          try {
+            await pull();
+            R();
+          } catch (errorRecarga) {
+            console.error("No se pudo restaurar el estado confirmado después del fallo de guardado.", errorRecarga);
+            toast("No se pudo guardar ni actualizar los datos. Recarga antes de continuar.");
+          }
         }
       } finally {
         busy--; // siempre, pase lo que pase
