@@ -666,7 +666,7 @@ VW.asis = () => {
       ["P", "Personal"],
     ],
     "Elige",
-  )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>Al marcar "Pagó" se registra un ingreso en la caja de la sede. Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
+  )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0.01 step=0.01 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>Al marcar "Pagó" se registra un ingreso en la caja de la sede. Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
 };
 const setA = (k, x) => {
   AS[k] = x;
@@ -682,6 +682,9 @@ function mkA(t, r, ok) {
   R();
 }
 function mkP(r, pc) {
+  const fee = monto(S.fee ?? 5);
+  if (pc && (fee === null || fee <= 0))
+    return toast("Configura un pago de campo mayor que cero antes de marcar Pagó.");
   let x = S.asis.find((x) => x.f === today() && x.t === "A" && x.ref === r && x.h === AS.h);
   if (!x) {
     x = { f: today(), t: "A", ref: r, h: AS.h };
@@ -692,7 +695,7 @@ function mkP(r, pc) {
   S.caja = S.caja.filter((c) => c.k !== k);
   if (pc) {
     const a = S.alu.find((a) => a.id === r);
-    S.caja.push({ f: today(), sede: a.sede, t: "I", c: "Pago de campo", d: r, m: S.fee ?? 5, k });
+    S.caja.push({ f: today(), sede: a.sede, t: "I", c: "Pago de campo", d: r, m: fee, k });
   }
   save();
   R();
