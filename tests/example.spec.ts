@@ -52,6 +52,10 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.locator('#lu').fill(usuario);
     await page.locator('#lp').fill(password);
     await page.getByRole('button', { name: /Iniciar sesión/i }).click();
+    // doLogin2 captura ambas credenciales de forma síncrona antes del primer
+    // await; limpiarlas evita que los traces/reportes de CI las adjunten.
+    await page.locator('#lu').fill('');
+    await page.locator('#lp').fill('');
     try {
       await expect(dashboard).toBeVisible({ timeout: 20000 });
     } catch (error) {
