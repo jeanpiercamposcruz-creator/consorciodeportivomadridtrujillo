@@ -42,7 +42,9 @@ async function sb(path, o = {}, retry = 1, transientRetry = 2, transientAttempt 
   } catch (e) {
     clearTimeout(to);
     if (retryable && transientRetry > 0) {
-      await new Promise((resolve) => setTimeout(resolve, Math.min(16000, 500 * 2 ** transientAttempt)));
+      const espera = Math.min(16000, 500 * 2 ** transientAttempt);
+      // Jitter evita que varias pestañas/clientes vuelvan a saturar el pool a la vez.
+      await new Promise((resolve) => setTimeout(resolve, Math.round(espera * (0.75 + Math.random() * 0.5))));
       return sb(path, o, retry, transientRetry - 1, transientAttempt + 1);
     }
     throw e;
@@ -53,7 +55,8 @@ async function sb(path, o = {}, retry = 1, transientRetry = 2, transientAttempt 
   // PostgREST puede devolver PGRST002/503 transitorios cuando su pool no
   // consigue una conexión. Reintentar solo lecturas evita duplicar escrituras.
   if (retryable && [502, 503, 504].includes(r.status) && transientRetry > 0) {
-    await new Promise((resolve) => setTimeout(resolve, Math.min(16000, 500 * 2 ** transientAttempt)));
+    const espera = Math.min(16000, 500 * 2 ** transientAttempt);
+    await new Promise((resolve) => setTimeout(resolve, Math.round(espera * (0.75 + Math.random() * 0.5))));
     return sb(path, o, retry, transientRetry - 1, transientAttempt + 1);
   }
 
@@ -407,7 +410,9 @@ async function pull() {
   // (PGRST003/PGRST002) durante el inicio. Las tablas opcionales solo se omiten
   // si realmente no existen; errores de conexión no se convierten en arrays vacíos.
   const entradas = [];
-  const concurrenciaLectura = 4;
+  // Mantener un máximo bajo de peticiones simultáneas por sesión para
+  // proteger el pool compartido de PostgREST en los arranques y recargas.
+  const concurrenciaLectura = 2;
   for (let i = 0; i < TB.length; i += concurrenciaLectura) {
     const lote = TB.slice(i, i + concurrenciaLectura);
     const resultado = await Promise.all(lote.map(async (t) => [
