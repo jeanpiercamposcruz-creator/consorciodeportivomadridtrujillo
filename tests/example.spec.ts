@@ -1048,6 +1048,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const id = 'QA-KIT-' + randomInt(1_000_000_000_000, 9_999_999_999_999);
     type HerramientaKit = {
       prepararIdKit: (id: string) => Promise<string>;
+      verificarAusenciaKit: (id: string) => Promise<{ kits: number; caja: number }>;
       cleanupKit: (id: string) => Promise<{ removed: boolean }>;
     };
     try {
@@ -1089,22 +1090,9 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         await expect(page.locator('#toast')).not.toContainText('Venta registrada');
 
         const estado = await page.evaluate(async (idPrueba) => {
-          const config = (window as unknown as {
-            __ERP_CONFIG__?: { supabaseUrl: string; supabaseKey: string };
-          }).__ERP_CONFIG__;
-          if (!config) throw new Error('No se cargó la configuración de Supabase QA.');
-          const base = config.supabaseUrl.replace(/\/+$/, '');
-          const headers = { apikey: config.supabaseKey, Authorization: 'Bearer ' + config.supabaseKey };
-          const consultar = async (ruta: string) => {
-            const response = await fetch(base + '/rest/v1/' + ruta, { headers });
-            if (!response.ok) throw new Error('Falló la verificación directa en Supabase QA: ' + response.status);
-            return response.json();
-          };
-          const [kits, caja] = await Promise.all([
-            consultar('kits_ventas?id=eq.' + encodeURIComponent(idPrueba) + '&select=id'),
-            consultar('caja_movimientos?origen=eq.' + encodeURIComponent('kit|' + idPrueba) + '&select=id'),
-          ]);
-          return { kits: kits.length, caja: caja.length };
+          const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
+          if (!api) throw new Error('No está habilitada la verificación autenticada de ventas QA.');
+          return api.verificarAusenciaKit(idPrueba);
         }, id);
         expect(estado).toEqual({ kits: 0, caja: 0 });
       } finally {
