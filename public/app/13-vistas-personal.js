@@ -150,11 +150,26 @@ function addPer() {
   if (!["ENT", "ADM", "REC"].includes(r)) return toast("Rol inválido");
   if (pr === null || sf === null) return toast("Tarifa o sueldo fijo inválido");
   if ((tc && !PTIPOS.includes(tc)) || (jor && !PJOR.includes(jor))) return toast("Contrato o jornada inválidos");
-  if (!tc || !fi) return toast("Tipo de contrato y fecha de inicio son obligatorios");
+  if (!["1", "0"].includes(est)) return toast("Estado inválido");
+  const anterior = EP ? S.personal.find((p) => p.id === EP) : null;
+  if (EP && !anterior) return toast("El personal ya no existe. Recarga e inténtalo de nuevo.");
+  const contratoModificado = !anterior ||
+    tc !== (anterior.tc || "") ||
+    fi !== (anterior.fi || "") ||
+    ff !== (anterior.ff || "") ||
+    pr !== (+anterior.precio || 0) ||
+    sf !== (+anterior.sf || 0) ||
+    jor !== (anterior.jor || "");
+  const reactivando = !!anterior && est === "1" && Number(anterior.activo) !== 1;
+  const validarContrato = contratoModificado || reactivando;
+  // Los registros antiguos incompletos pueden editarse en campos ajenos al contrato.
+  // Cualquier contrato nuevo, cambio contractual o reactivación sí exige datos completos.
+  if (validarContrato && (!tc || !fi))
+    return toast("Tipo de contrato y fecha de inicio son obligatorios");
   if ((fi && !fechaOk(fi)) || (ff && !fechaOk(ff))) return toast("Fecha inválida");
   if (fi && ff && ff < fi) return toast("La fecha de fin no puede ser anterior al inicio");
-  if (est === "1" && ff && ff < today()) return toast("No puedes guardar o activar un contrato con fecha de fin vencida");
-  if (!["1", "0"].includes(est)) return toast("Estado inválido");
+  if (validarContrato && est === "1" && ff && ff < today())
+    return toast("No puedes guardar o activar un contrato con fecha de fin vencida");
   if (S.personal.some((p) => p.dni === d && p.id !== EP)) return toast("Ese DNI ya está registrado");
   const x = {
     nom: n,
@@ -175,11 +190,7 @@ function addPer() {
   };
   let mensajeExitoPersonal = "";
   if (EP) {
-    const t = S.personal.find((p) => p.id === EP);
-    if (!t) {
-      EP = null;
-      return toast("El personal ya no existe. Recarga e inténtalo de nuevo.");
-    }
+    const t = anterior;
     Object.assign(t, x);
     EP = null;
     PFOTO = "";
