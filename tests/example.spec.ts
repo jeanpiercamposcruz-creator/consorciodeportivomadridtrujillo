@@ -2105,16 +2105,50 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
   test('Rechazar actualizaciones de alumnos desde clientes sin snapshot financiero', async () => {
     test.setTimeout(120000);
-    type HerramientaSnapshotQA = {
-      probarBloqueoClienteAntiguoQA: () => Promise<{ status: number; detalle: string }>;
+    type ContextoSnapshotQA = {
+      obtenerContextoRpcQA: () => { url: string; apikey: string; accessToken: string };
     };
-    const resultado = await page.evaluate(async () => {
-      const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaSnapshotQA }).__ERP_QA_PERSISTENCIA__;
+    const contexto = await page.evaluate(() => {
+      const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: ContextoSnapshotQA }).__ERP_QA_PERSISTENCIA__;
       if (!api) throw new Error('No está habilitada la prueba de snapshot financiero QA.');
-      return api.probarBloqueoClienteAntiguoQA();
+      return api.obtenerContextoRpcQA();
     });
-    expect(resultado.status).toBeGreaterThanOrEqual(400);
-    expect(resultado.detalle).toMatch(/40001|desactualizada|snapshot/i);
+    const payload = {
+      p_payload: [{
+        name: 'alumnos',
+        insert: [],
+        update: [{ id: 'QA-CLIENTE-ANTIGUO-TEST' }],
+        delete: [],
+      }],
+    };
+    let respuesta: import('@playwright/test').APIResponse | null = null;
+    let ultimoError: unknown = null;
+    // Usar APIRequestContext evita el AbortController/CORS del navegador.
+    // La función SQL es rápida; el payload es no mutante y se puede reintentar.
+    for (let intento = 1; intento <= 3; intento++) {
+      try {
+        respuesta = await page.request.post(
+          contexto.url + '/rest/v1/rpc/erp_persistir_lote',
+          {
+            data: payload,
+            timeout: 15000,
+            headers: {
+              apikey: contexto.apikey,
+              Authorization: 'Bearer ' + contexto.accessToken,
+              Prefer: 'return=minimal',
+            },
+          },
+        );
+        break;
+      } catch (error) {
+        ultimoError = error;
+        if (intento === 3) break;
+        await new Promise((resolve) => setTimeout(resolve, 250 * intento));
+      }
+    }
+    if (!respuesta) throw new Error('La RPC de snapshot no respondió tras 3 intentos: ' + String(ultimoError));
+    expect(respuesta.status()).toBe(409);
+    expect(await respuesta.text()).toMatch(/40001|desactualizada|snapshot/i);
   });
 
   test('Persistir y recuperar el ingreso de matrícula y su distribución en Caja desde Supabase QA', async () => {
