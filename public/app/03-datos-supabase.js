@@ -1557,42 +1557,13 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         if (!respuesta.ok) throw new Error("No se pudo comprobar la matrícula fallida en Supabase QA.");
         return (await respuesta.json()).length;
       },
-      async probarBloqueoClienteAntiguoQA() {
-        if (U?.rol !== "ADM") throw new Error("La prueba de snapshot requiere una sesión administradora QA.");
-        // Payload idempotente y sin escrituras: el RPC debe rechazarlo por
-        // ausencia del snapshot financiero antes de buscar o bloquear filas.
-        const body = JSON.stringify({
-          p_payload: [{
-            name: "alumnos",
-            insert: [],
-            update: [{ id: "QA-CLIENTE-ANTIGUO-TEST" }],
-            delete: [],
-          }],
-        });
-        let ultimoError = null;
-        // La estadística de PostgreSQL mostró una ejecución media de ~10 ms
-        // (máximo <85 ms). Si la llamada se aborta, es un fallo transitorio
-        // de transporte/API y no lentitud de la función SQL. Reintentar solo
-        // este payload sin efectos secundarios evita falsos negativos de red.
-        for (let intento = 1; intento <= 3; intento++) {
-          try {
-            const respuesta = await sb("/rest/v1/rpc/erp_persistir_lote", {
-              method: "POST",
-              timeout: 15000,
-              body,
-            });
-            const detalle = await respuesta.text();
-            return { status: respuesta.status, detalle };
-          } catch (error) {
-            ultimoError = error;
-            const abortado = error instanceof Error && error.name === "AbortError";
-            const red = error instanceof TypeError || (error instanceof Error && /network|fetch/i.test(error.message));
-            if ((!abortado && !red) || intento === 3) break;
-            await new Promise((resolve) => setTimeout(resolve, 250 * intento));
-          }
+      obtenerContextoRpcQA() {
+        if (U?.rol !== "ADM" || !TK) {
+          throw new Error("La prueba de snapshot requiere una sesión administradora QA activa.");
         }
-        throw new Error("La prueba de snapshot no obtuvo respuesta HTTP tras 3 intentos no mutantes: " +
-          String(ultimoError));
+        // Solo expone el token de sesión del administrador QA al runner E2E;
+        // nunca devuelve ni utiliza service_role.
+        return { url: SB, apikey: KEY, accessToken: TK };
       },
       async roundTripCaja(id) {
         if (U?.rol !== "ADM") throw new Error("La prueba de Caja requiere una sesión administradora QA.");
