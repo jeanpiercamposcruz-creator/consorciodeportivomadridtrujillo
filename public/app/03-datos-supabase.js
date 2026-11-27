@@ -1045,7 +1045,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         const cajaRuta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId) +
           "&fecha=eq." + encodeURIComponent(datos.fecha);
         const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias] = await Promise.all([
-          sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id"),
+          sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id,pago_campo,pago_campo_movimiento_id"),
           sb(cajaRuta + "&select=id,fecha,sede_id,tipo,concepto,detalle,monto,origen"),
           sb(alumnoRuta + "&select=id,nombres,apellidos,dni,horario_id,sede_id,deporte_id"),
           sb("/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(datos.alumnoId) + "&select=id"),
@@ -1084,6 +1084,50 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           throw new Error("Los movimientos de Caja ya no coinciden con el ledger temporal; se protegen.");
         }
 
+        if (alumnos.length > 1 || asistencias.length > 1) {
+          throw new Error("El fixture temporal tiene más de un alumno o asistencia; se protege la información.");
+        }
+        const asistencia = asistencias[0] || null;
+        const activos = ingresos.filter((ingreso) =>
+          !reversiones.some((reversa) => reversa.origen === "reversion-campo:" + ingreso.id)
+        );
+        if (activos.length && (!asistencia || asistencia.pago_campo !== true)) {
+          throw new Error("Hay un ingreso de campo activo sin una asistencia temporal marcada como pagada; se aborta la limpieza.");
+        }
+        if (asistencia && asistencia.pago_campo_movimiento_id &&
+            !ingresos.some((ingreso) => ingreso.id === asistencia.pago_campo_movimiento_id)) {
+          throw new Error("La asistencia apunta a un ingreso ajeno al fixture QA; se protege el registro.");
+        }
+        // Si una prueba falló después de cobrar, primero compensamos el ingreso
+        // temporal y desvinculamos la asistencia; así el trigger de integridad
+        // permite borrarla sin dejar un pago de campo huérfano.
+        for (const ingreso of activos) {
+          const compensacion = {
+            id: crypto.randomUUID(),
+            fecha: today(),
+            sede_id: ingreso.sede_id,
+            tipo: "E",
+            concepto: "Reversión de pago de campo",
+            detalle: datos.alumnoId,
+            monto: Number(ingreso.monto),
+            origen: "reversion-campo:" + ingreso.id,
+          };
+          const creada = await sb("/rest/v1/caja_movimientos", {
+            method: "POST",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify(compensacion),
+          });
+          if (!creada.ok) throw new Error("No se pudo compensar el pago temporal antes de limpiar: " + await creada.text());
+          reversiones.push(compensacion);
+        }
+        if (asistencia && (asistencia.pago_campo === true || asistencia.pago_campo_movimiento_id)) {
+          const desvinculada = await sb(asistenciaRuta, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ pago_campo: false, pago_campo_movimiento_id: null }),
+          });
+          if (!desvinculada.ok) throw new Error("No se pudo desvincular el pago temporal antes de limpiar: " + await desvinculada.text());
+        }
         if (asistencias.length) {
           const borrado = await sb(asistenciaRuta, { method: "DELETE" });
           if (!borrado.ok) throw new Error("No se pudo eliminar la asistencia temporal: " + await borrado.text());
