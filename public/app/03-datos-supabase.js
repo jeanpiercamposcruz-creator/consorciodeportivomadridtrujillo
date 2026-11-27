@@ -1563,7 +1563,9 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         // buscar/bloquear una fila; se usa un ID inexistente para no tocar datos.
         const respuesta = await sb("/rest/v1/rpc/erp_persistir_lote", {
           method: "POST",
-          timeout: 10000,
+          // Esta prueba valida el rechazo transaccional del RPC en Supabase QA.
+          // No debe confundirse una respuesta lenta del backend con un rechazo correcto.
+          timeout: 30000,
           body: JSON.stringify({
             p_payload: [{
               name: "alumnos",
