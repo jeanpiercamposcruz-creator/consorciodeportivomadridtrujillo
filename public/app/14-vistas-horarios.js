@@ -313,6 +313,9 @@ async function saveAlu() {
     mp: ["Efectivo", "Transferencia", "Yape/Plin"].includes(v("m_mp")) ? v("m_mp") : "Efectivo",
     hoy: monto(v("m_hoy") || 0) ?? 0,
   });
+  const totalContrato = Math.round(((+d.cm || 0) + (+d.cmen || 0) * (+d.mes || 0)) * 100) / 100;
+  if ((+d.pag || 0) > totalContrato + 0.009)
+    return toast("El monto pagado no puede superar el total de matrícula y mensualidades contratadas.");
   if (d.dni && S.alu.some((x) => x.dni === d.dni && x.id !== ED))
     return toast("Ese DNI ya está registrado");
   let id = old ? old.id : "";
