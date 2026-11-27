@@ -1021,6 +1021,37 @@ function addCaja(s) {
 let GR = "anio";
 const MFULL = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const WARN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>';
+
+if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabase.co") {
+  Object.defineProperty(window, "__ERP_QA_GERENCIAL__", {
+    configurable: true,
+    value: Object.freeze({
+      probarPlanillaFuturaQA() {
+        if (typeof U === "undefined" || U?.rol !== "ADM") {
+          throw new Error("La prueba gerencial requiere una sesión administradora QA.");
+        }
+        const p = S.personal.find((x) => Number(x.activo) === 1 && Number(x.precio) > 0);
+        const h = S.hor.find((x) => x.sede && hrs(x) > 0);
+        const s = h && S.sedes.find((x) => x.id === h.sede);
+        if (!p || !h || !s) throw new Error("No hay personal, horario y sede válidos para la prueba QA.");
+        const hoy = today();
+        const [y, m, d] = hoy.split("-").map(Number);
+        const fecha = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+        const mes = fecha.slice(0, 7);
+        const original = S.asis;
+        const antes = gerRow(s, mes).pl;
+        try {
+          S.asis = [...original, { t: "P", ref: p.id, ok: true, f: fecha, h: h.id }];
+          const despues = gerRow(s, mes).pl;
+          return { hoy, fecha, diferencia: despues - antes };
+        } finally {
+          S.asis = original;
+        }
+      },
+    }),
+  });
+}
+
 function gerRow(s, ym) {
   const mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(ym)),
     ing = mc.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
