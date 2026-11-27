@@ -18,6 +18,11 @@ jobs:
   quality:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    # La aplicación local se compila exclusivamente contra el proyecto Supabase QA.
+    # La clave anon es publicable; nunca se utiliza la service_role.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://yiredilknlwbzwvwlqyx.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpcmVkaWxrbmx3Ynp3dndscXl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0NjEyMTUsImV4cCI6MjExMDAzNzIxNX0.txFDAeE6Vl2s4J1JTVQFF0IU20QRqu2132r7yQlMLPo'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -109,33 +114,45 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify exact QA preview revision
-        id: qa_preview
-        env:
-          ERP_URL: ${{ secrets.ERP_URL }}
+      - name: Build local QA application
+        run: npm run build
+
+      - name: Start local QA application and verify source revision
+        id: local_qa
         run: |
-          if [ -n "$ERP_URL" ] && curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -Fq 'qa-source-audit-20261127-03'; then
-            echo "La vista previa corresponde al marcador de esta revisión QA."
-            echo "deployed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Se omite Playwright: no hay una vista previa con el marcador de esta revisión. No se probará una versión antigua."
-            echo "deployed=false" >> "$GITHUB_OUTPUT"
-            {
-              echo "### Playwright omitido"
-              echo 'La vista previa QA no contiene qa-source-audit-20261127-03. Se ejecutaron los controles estáticos, pero no se atribuyen resultados E2E a esta revisión.'
-            } >> "$GITHUB_STEP_SUMMARY"
+          nohup npm run start -- --hostname 127.0.0.1 --port 3000 >/tmp/erp-next.log 2>&1 &
+          echo $! >/tmp/erp-next.pid
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          if ! curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
+            cat /tmp/erp-next.log
+            echo "::error::No inició el servidor local de QA."
+            exit 1
           fi
+          if ! curl --fail --silent http://127.0.0.1:3000/app/03-datos-supabase.js | grep -Fq 'qa-source-audit-20261127-03'; then
+            echo "::error::El servidor local no contiene el marcador de esta revisión QA."
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Playwright local habilitado"
+            echo 'La interfaz se compiló desde el commit actual y se conecta exclusivamente a Supabase QA. No se utiliza Vercel.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run Playwright tests
-        if: steps.qa_preview.outputs.deployed == 'true'
+        if: steps.local_qa.outputs.ready == 'true'
         run: npx playwright test
         env:
-          ERP_URL: ${{ secrets.ERP_URL }}
+          ERP_URL: http://127.0.0.1:3000
           ERP_USER: ${{ secrets.ERP_USER }}
           ERP_PASSWORD: ${{ secrets.ERP_PASSWORD }}
 
       - name: Upload Playwright report
-        if: ${{ steps.qa_preview.outputs.deployed == 'true' && !cancelled() }}
+        if: ${{ steps.local_qa.outputs.ready == 'true' && !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
