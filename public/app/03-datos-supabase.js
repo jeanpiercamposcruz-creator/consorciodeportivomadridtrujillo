@@ -1583,6 +1583,44 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         await pull();
         return { removed: true };
       },
+      async verificarEgresoCajaQA(detalle) {
+        if (U?.rol !== "ADM") throw new Error("La verificación de Caja requiere una sesión administradora QA.");
+        if (!/^QA-DOBLE-CAJA-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(String(detalle))) {
+          throw new Error("Marcador de egreso QA inválido.");
+        }
+        await sv;
+        const ruta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(detalle);
+        const respuesta = await sb(ruta + "&select=id,tipo,concepto,monto");
+        if (!respuesta.ok) throw new Error("No se pudo verificar el egreso QA: " + await respuesta.text());
+        const filas = await respuesta.json();
+        if (filas.some((x) => x.tipo !== "E" || x.concepto !== "Otros" || Number(x.monto) !== 1.23)) {
+          throw new Error("El egreso QA no coincide con el marcador y los importes esperados.");
+        }
+        return filas.length;
+      },
+      async cleanupEgresoCajaQA(detalle) {
+        if (U?.rol !== "ADM") throw new Error("La limpieza de Caja requiere una sesión administradora QA.");
+        if (!/^QA-DOBLE-CAJA-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(String(detalle))) {
+          throw new Error("Marcador de egreso QA inválido.");
+        }
+        await sv;
+        const ruta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(detalle);
+        let respuesta = await sb(ruta + "&select=id,tipo,concepto,monto");
+        if (!respuesta.ok) throw new Error("No se pudo verificar la limpieza del egreso QA.");
+        let filas = await respuesta.json();
+        if (filas.some((x) => x.tipo !== "E" || x.concepto !== "Otros" || Number(x.monto) !== 1.23)) {
+          throw new Error("El egreso QA no coincide exactamente; no se elimina.");
+        }
+        for (const fila of filas) {
+          const borrado = await sb("/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(fila.id), { method: "DELETE" });
+          if (!borrado.ok) throw new Error("No se pudo retirar el egreso temporal QA: " + await borrado.text());
+        }
+        respuesta = await sb(ruta + "&select=id");
+        if (!respuesta.ok || (await respuesta.json()).length) throw new Error("Quedó un egreso temporal QA en Supabase.");
+        await pull();
+        if (S.caja.some((x) => x.d === detalle)) throw new Error("El ERP aún conserva el egreso temporal QA.");
+        return { removed: true, count: filas.length };
+      },
       async cleanupCuota(id) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
         if (!/^QA-PERSIST-CUOTA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
