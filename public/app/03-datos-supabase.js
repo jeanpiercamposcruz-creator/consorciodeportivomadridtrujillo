@@ -853,6 +853,26 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           },
         };
       },
+      async verificarAusenciaKit(id) {
+        if (U?.rol !== "ADM") throw new Error("La verificación de venta QA requiere una sesión administradora.");
+        if (!/^QA-KIT-\\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
+        // Esperar la recuperación local tras el fallo inducido antes de consultar la BD.
+        await sv;
+        const [kitResp, cajaResp] = await Promise.all([
+          sb("/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) + "&select=id"),
+          sb("/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id) + "&select=id"),
+        ]);
+        if (!kitResp.ok || !cajaResp.ok) {
+          throw new Error("No se pudo comprobar la ausencia de la venta rechazada en Supabase QA.");
+        }
+        const [kitsDb, cajaDb] = await Promise.all([kitResp.json(), cajaResp.json()]);
+        if (kitsDb.length || cajaDb.length ||
+            S.kits.some((x) => x._id === id) ||
+            S.caja.some((x) => x.k === "kit|" + id)) {
+          throw new Error("La venta rechazada dejó registros en memoria o en Supabase QA.");
+        }
+        return { kits: kitsDb.length, caja: cajaDb.length };
+      },
       async cleanupKit(id) {
         if (U?.rol !== "ADM") throw new Error("La limpieza de venta QA requiere una sesión administradora.");
         if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
