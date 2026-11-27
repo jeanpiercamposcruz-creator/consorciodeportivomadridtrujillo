@@ -14,6 +14,7 @@ function eye() {
 async function doLogin() {
   const b = $("#lb"),
     l = $("#ball");
+  if (BOOTING) return toast("Se está comprobando la sesión anterior. Espera un momento.");
   if (b.disabled) return;
   b.disabled = true;
   b.textContent = "Verificando...";
