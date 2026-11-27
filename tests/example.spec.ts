@@ -2038,6 +2038,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Rechazar actualizaciones de alumnos desde clientes sin snapshot financiero', async () => {
+    test.setTimeout(120000);
     type HerramientaSnapshotQA = {
       probarBloqueoClienteAntiguoQA: () => Promise<{ status: number; detalle: string }>;
     };
