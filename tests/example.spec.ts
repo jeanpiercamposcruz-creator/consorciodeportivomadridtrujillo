@@ -1285,6 +1285,49 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
 
+  test('Bloquear el doble clic al registrar un egreso manual de Caja', async () => {
+    const detalle = 'QA-DOBLE-CAJA-' + randomUUID();
+    await page.getByText('Caja Chica y Finanzas', { exact: true }).first().click();
+    await page.locator('#c_t').selectOption('E');
+    await page.locator('#c_c').selectOption('Otros');
+    await page.locator('#c_d').fill(detalle);
+    await page.locator('#c_m').fill('1.23');
+
+    try {
+      const registrar = page.getByRole('button', { name: 'Registrar movimiento', exact: true });
+      await registrar.click();
+      await expect(registrar).toBeVisible();
+      await registrar.click();
+
+      await expect.poll(async () => page.evaluate(async (marcador) => {
+        const consultar = eval('sb') as (ruta: string) => Promise<Response>;
+        const r = await consultar('/rest/v1/caja_movimientos?detalle=eq.' +
+          encodeURIComponent(marcador) + '&select=id');
+        if (!r.ok) throw new Error('No se pudo verificar el egreso QA.');
+        return (await r.json()).length;
+      }, detalle), { timeout: 15000 }).toBe(1);
+    } finally {
+      await page.evaluate(async (marcador) => {
+        const consultar = eval('sb') as (ruta: string, init?: RequestInit) => Promise<Response>;
+        const ruta = '/rest/v1/caja_movimientos?detalle=eq.' + encodeURIComponent(marcador);
+        const lectura = await consultar(ruta + '&select=id,tipo,concepto,monto');
+        if (!lectura.ok) throw new Error('No se pudo comprobar la limpieza del egreso QA.');
+        const filas = await lectura.json() as Array<{ id: string; tipo: string; concepto: string; monto: number | string }>;
+        if (filas.some((x) => x.tipo !== 'E' || x.concepto !== 'Otros' || Number(x.monto) !== 1.23)) {
+          throw new Error('El egreso QA no coincide exactamente; no se elimina.');
+        }
+        for (const fila of filas) {
+          const borrado = await consultar('/rest/v1/caja_movimientos?id=eq.' + encodeURIComponent(fila.id), { method: 'DELETE' });
+          if (!borrado.ok) throw new Error('No se pudo retirar el egreso temporal QA.');
+        }
+        const recargar = eval('pull') as () => Promise<void>;
+        await recargar();
+        const final = await consultar(ruta + '&select=id');
+        if (!final.ok || (await final.json()).length) throw new Error('Quedó un egreso temporal QA.');
+      }, detalle);
+    }
+  });
+
   test('Consultar dashboard gerencial y cambiar periodo sin modificar datos', async () => {
     await page.getByText('Dashboard Gerencial', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Dashboard Gerencial', exact: true })).toBeVisible();
