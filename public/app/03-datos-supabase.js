@@ -422,7 +422,15 @@ async function flush() {
     update: t.n === "alumnos"
       ? upd.map((r) => ({
           ...r,
-          __expected_monto_pagado: JSON.parse(SN[t.n]?.get(r.id) || "{}").monto_pagado ?? null,
+          __expected_finanzas: (() => {
+            const previo = JSON.parse(SN[t.n]?.get(r.id) || "{}");
+            return {
+              monto_pagado: previo.monto_pagado ?? null,
+              costo_matricula: previo.costo_matricula ?? null,
+              costo_mensualidad: previo.costo_mensualidad ?? null,
+              meses: previo.meses ?? null,
+            };
+          })(),
         }))
       : upd,
     delete: delByTable.get(t.n) || [],
