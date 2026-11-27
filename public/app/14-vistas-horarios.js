@@ -924,7 +924,12 @@ function gerRow(s, ym) {
   return { s, ing, eg, kc, pl, al: +s.costo, u: ing - eg - kc - pl - s.costo };
 }
 const gerIni = () =>
-  ([...S.caja.map((x) => x.f), ...S.alu.map((a) => a.fecha)].filter(Boolean).sort()[0] || today()).slice(0, 7);
+  ([
+    ...S.caja.map((x) => x.f),
+    ...S.alu.map((a) => a.fecha),
+    ...S.asis.map((x) => x.f),
+    ...S.kits.map((k) => k.f),
+  ].filter(Boolean).sort()[0] || today()).slice(0, 7);
 const gerU = (s, ym, ini) => (ym < ini ? 0 : gerRow(s, ym).u);
 const gerNet = (ym, ini) => S.sedes.reduce((t, s) => t + gerU(s, ym, ini), 0);
 const lastMonths = (ym, n) => {
@@ -997,7 +1002,14 @@ VW.ger = () => {
     parcial = GM === hoyYm,
     ini = gerIni(),
     yrs = [
-      ...new Set([+hoyYm.slice(0, 4), +yy, ...S.alu.map((a) => +(a.fecha || "").slice(0, 4)).filter(Boolean)]),
+      ...new Set([
+        +hoyYm.slice(0, 4),
+        +yy,
+        ...S.alu.map((a) => +(a.fecha || "").slice(0, 4)).filter(Boolean),
+        ...S.caja.map((x) => +(x.f || "").slice(0, 4)).filter(Boolean),
+        ...S.asis.map((x) => +(x.f || "").slice(0, 4)).filter(Boolean),
+        ...S.kits.map((k) => +(k.f || "").slice(0, 4)).filter(Boolean),
+      ]),
     ].sort(),
     rows = S.sedes.map((s) => ({ ...gerRow(s, GM), tr: lastMonths(GM, 6).map((m) => gerU(s, m, ini)) })),
     mx = Math.max(1, ...rows.map((r) => Math.abs(r.u))),
