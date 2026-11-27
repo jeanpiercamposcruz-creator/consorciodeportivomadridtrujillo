@@ -156,8 +156,8 @@ const ON_CHANGE = {
   restaurar: (el) => restaurar(el),
   setFee: (el) => {
     const fee = monto(el.value);
-    if (fee === null || fee <= 0) {
-      toast("El pago de campo debe ser mayor que cero y tener hasta dos decimales.");
+    if (fee === null) {
+      toast("El pago de campo debe ser un importe válido no negativo, con máximo dos decimales.");
       el.value = String(S.fee ?? 5);
       return;
     }
