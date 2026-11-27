@@ -28,8 +28,12 @@ async function doLogin() {
 async function doLogin2() {
   if (KEY.startsWith("PEGA"))
     return toast("Falta pegar la clave pública de Supabase en el archivo");
+  // Capturar la contraseña y retirarla inmediatamente del DOM para que
+  // no permanezca visible en pantalla ni en snapshots/traces tras el intento.
+  const credenciales = { email: v("lu").toLowerCase(), password: $("#lp").value };
+  $("#lp").value = "";
   try {
-    await auth({ email: v("lu").toLowerCase(), password: $("#lp").value }, "password");
+    await auth(credenciales, "password");
   } catch (e) {
     console.error("login", e);
     return toast(
