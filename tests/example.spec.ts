@@ -800,12 +800,15 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
     test.setTimeout(120000);
     const dialogo = page.getByRole('dialog');
-    if (await dialogo.isVisible().catch(() => false)) {
-      const cerrar = dialogo.getByRole('button', { name: 'Cerrar', exact: true });
-      await expect(cerrar).toBeVisible();
-      await cerrar.click();
-      await expect(dialogo).toBeHidden();
-    }
+    const cerrarComprobante = async () => {
+      if (await dialogo.isVisible().catch(() => false)) {
+        const cerrar = dialogo.getByRole('button', { name: 'Cerrar', exact: true });
+        await expect(cerrar).toBeVisible();
+        await cerrar.click();
+        await expect(dialogo).toBeHidden();
+      }
+    };
+    await cerrarComprobante();
     const datos = await page.evaluate(async () => {
       const api = (window as unknown as {
         __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
@@ -889,6 +892,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(verificado.reversion).toHaveLength(0);
       expect(verificado.currentCajaId).toBe(datos.cajaId);
       expect(Number(verificado.caja[0].monto)).toBe(5);
+      // El pago abre el comprobante modal; cerrarlo antes de interactuar con la tabla.
+      await cerrarComprobante();
 
       await debe.click();
       verificado = await page.evaluate(async (d) => {
@@ -913,6 +918,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(verificado.reversion).toHaveLength(1);
       expect(verificado.currentCajaId).not.toBe(datos.cajaId);
       expect(verificado.restored.caja).toBe(3);
+      await cerrarComprobante();
 
       await debe.click();
       verificado = await page.evaluate(async (d) => {
