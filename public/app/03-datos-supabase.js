@@ -1157,11 +1157,14 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async cleanupAsistenciaQA(datos) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
-        if (!datos || !String(datos.alumnoId).startsWith("QA-ATT-") ||
+        if (!datos || !/^QA-ATT-[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(datos.alumnoId)) ||
             !/^\d{8}$/.test(String(datos.alumnoDni)) ||
-            !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
-            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId)) ||
-            !Number.isFinite(Number(datos.feeOriginal))) {
+            !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(datos.asistenciaId)) ||
+            !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(datos.cajaId)) ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(String(datos.fecha)) ||
+            !String(datos.horarioId || "") || !String(datos.sedeId || "") ||
+            !/^.+\|\d+$/.test(String(datos.grupo)) ||
+            !Number.isFinite(Number(datos.feeOriginal)) || Number(datos.feeOriginal) < 0) {
           throw new Error("IDs temporales de asistencia o tarifa original inválidos.");
         }
         if (window.__ERP_QA_NEXT_ASISTENCIA_ID__ === datos.asistenciaId) delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
@@ -1184,13 +1187,17 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         // Buscar todos los movimientos del fixture: una reversión de limpieza
         // puede tener fecha posterior a la asistencia original.
         const cajaRuta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId);
-        const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias] = await Promise.all([
+        const cuotasRuta = "/rest/v1/cronograma_cuotas?alumno_id=eq." + encodeURIComponent(datos.alumnoId);
+        const ventasRuta = "/rest/v1/kits_ventas?alumno_id=eq." + encodeURIComponent(datos.alumnoId);
+        const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias, cuotasCheck, ventasCheck] = await Promise.all([
           sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id,pago_campo,pago_campo_movimiento_id"),
           sb(cajaRuta + "&select=id,fecha,sede_id,tipo,concepto,detalle,monto,origen"),
-          sb(alumnoRuta + "&select=id,nombres,apellidos,dni,horario_id,sede_id,deporte_id"),
+          sb(alumnoRuta + "&select=id,nombres,apellidos,dni,horario_id,sede_id,deporte_id,fecha_nacimiento,estado,costo_matricula,costo_mensualidad,meses,monto_pagado"),
           sb("/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(datos.alumnoId) + "&select=id"),
+          sb(cuotasRuta + "&select=id"),
+          sb(ventasRuta + "&select=id"),
         ]);
-        if (![asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias].every((r) => r.ok)) {
+        if (![asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias, cuotasCheck, ventasCheck].every((r) => r.ok)) {
           throw new Error("No se pudo verificar la limpieza del alumno temporal QA.");
         }
 
@@ -1198,10 +1205,19 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         const cajas = await cajaCheck.json();
         const alumnos = await alumnoCheck.json();
         const asistenciasRelacionadas = await otrasAsistencias.json();
+        const cuotasRelacionadas = await cuotasCheck.json();
+        const ventasRelacionadas = await ventasCheck.json();
+        const nacimientoEsperado = String(Number(datos.grupo.split("|")[1])).padStart(4, "0") + "-01-01";
         if (alumnos.some((a) => a.nombres !== "QA" || a.apellidos !== "Asistencia Temporal" ||
             a.dni !== datos.alumnoDni || a.horario_id !== datos.horarioId ||
-            a.sede_id !== datos.sedeId || a.deporte_id !== datos.grupo.split("|")[0])) {
-          throw new Error("El ID de alumno ya no coincide con el registro temporal; se protege el registro.");
+            a.sede_id !== datos.sedeId || a.deporte_id !== datos.grupo.split("|")[0] ||
+            a.fecha_nacimiento !== nacimientoEsperado || a.estado !== "Activo" ||
+            Number(a.costo_matricula) !== 0 || Number(a.costo_mensualidad) !== 0 ||
+            Number(a.meses) !== 0 || Number(a.monto_pagado) !== 0)) {
+          throw new Error("El ID de alumno ya no coincide con el fixture QA intacto; se protege el registro.");
+        }
+        if (cuotasRelacionadas.length || ventasRelacionadas.length) {
+          throw new Error("El alumno QA tiene cuotas o ventas relacionadas; se aborta para no borrar información financiera.");
         }
         if (asistencias.some((x) => x.fecha !== datos.fecha || x.tipo !== "A" ||
             x.alumno_id !== datos.alumnoId || x.horario_id !== datos.horarioId) ||
@@ -1216,12 +1232,16 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           String(x.origen || "").startsWith("reversion-campo:"));
         if (cajas.some((x) => !ingresos.includes(x) && !reversiones.includes(x)) ||
             ingresos.some((x) => x.detalle !== datos.alumnoId || x.sede_id !== datos.sedeId ||
+              x.fecha !== datos.fecha ||
               (String(x.origen).split("|").length === 5 && String(x.origen).split("|")[4] !== x.id)) ||
             reversiones.some((x) => {
               const original = ingresos.find((i) => x.origen === "reversion-campo:" + i.id);
-              return !original || Number(x.monto) !== Number(original.monto) || x.detalle !== datos.alumnoId;
+              const reversionesDelIngreso = reversiones.filter((r) => r.origen === x.origen);
+              return !original || reversionesDelIngreso.length !== 1 ||
+                Number(x.monto) !== Number(original.monto) ||
+                x.detalle !== datos.alumnoId || x.sede_id !== original.sede_id;
             })) {
-          throw new Error("Los movimientos de Caja ya no coinciden con el ledger temporal; se protegen.");
+          throw new Error("Los movimientos de Caja ya no coinciden exactamente con el ledger temporal; se protegen.");
         }
 
         if (alumnos.length > 1 || asistencias.length > 1) {
