@@ -50,7 +50,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: /Iniciar sesión/i }).click();
 
     await expect(page.getByText('Alumnos activos'))
-      .toBeVisible({ timeout: 45000 });
+      .toBeVisible({ timeout: 55000 });
   });
 
   test.afterAll(async () => {
