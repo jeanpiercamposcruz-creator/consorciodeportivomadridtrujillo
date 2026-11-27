@@ -937,6 +937,13 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) {
           throw new Error("IDs temporales de asistencia inválidos.");
         }
+        // No verificar el estado intermedio mientras payRun aún mantiene bloqueadas
+        // las acciones de cobro/reversión y termina la animación de confirmación.
+        const limitePago = Date.now() + 10000;
+        while (PAYB && Date.now() < limitePago) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        if (PAYB) throw new Error("La operación de pago de campo no liberó su bloqueo en 10 segundos.");
         await sv;
         if (!SAVE_OK) throw new Error("El guardado de asistencia falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
 
