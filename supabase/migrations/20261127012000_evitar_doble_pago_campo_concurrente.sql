@@ -60,7 +60,7 @@ BEGIN
    WHERE c.id IS DISTINCT FROM NEW.id
      AND c.tipo = 'I'
      AND c.concepto = 'Pago de campo'
-     AND c.origen LIKE v_base || '|%'
+     AND (c.origen = v_base OR c.origen LIKE v_base || '|%')
      AND round(
        c.monto - coalesce((
          SELECT sum(r.monto)
