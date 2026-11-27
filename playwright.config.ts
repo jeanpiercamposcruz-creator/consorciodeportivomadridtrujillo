@@ -41,10 +41,12 @@ export default defineConfig({
   forbidOnly: true,
   retries: 0,
   workers: 1,
-  reporter: 'html',
+  // Los reportes HTML/traces pueden incluir datos personales o tokens de sesión.
+  // En CI conservamos únicamente el resultado textual de las pruebas.
+  reporter: 'list',
 
   use: {
-    trace: 'retain-on-failure',
+    trace: 'off',
   },
 
   projects: [
