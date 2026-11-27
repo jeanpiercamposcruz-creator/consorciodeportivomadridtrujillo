@@ -2203,16 +2203,15 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupCaja: (id: string) => Promise<{ removed: boolean }>;
       obtenerContextoRpcQA: () => Contexto;
     };
-    const apiQA = () => (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
     try {
       await page.evaluate(async (idPrueba) => {
-        const api = apiQA();
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está habilitada la preparación de Caja QA.');
         return api.roundTripCaja(idPrueba);
       }, id);
 
       const contexto = await page.evaluate(() => {
-        const api = apiQA();
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
         if (!api) throw new Error('No está habilitado el contexto de sesión QA.');
         return api.obtenerContextoRpcQA();
       });
