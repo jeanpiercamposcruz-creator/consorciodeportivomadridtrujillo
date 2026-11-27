@@ -71,11 +71,17 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   const irDirectorio = async () => {
     const encabezado = page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true });
     if (!(await encabezado.isVisible().catch(() => false))) {
-      const acceso = page.locator(
-        'button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]'
-      ).first();
-      await expect(acceso).toBeVisible({ timeout: 10000 });
-      await acceso.click();
+      // En un formulario el acceso lateral puede estar deshabilitado; prioriza
+      // el botón visible de cancelar/salir y usa el menú solo si está habilitado.
+      const salir = page.locator('button[data-i="dir"][data-f="go"]:visible').first();
+      if (await salir.isVisible().catch(() => false) && await salir.isEnabled()) {
+        await salir.click();
+      } else {
+        const acceso = page.locator('button[data-i="dir"][data-f="nav"]:visible').first();
+        await expect(acceso).toBeVisible({ timeout: 10000 });
+        await expect(acceso).toBeEnabled({ timeout: 10000 });
+        await acceso.click();
+      }
     }
     await expect(encabezado).toBeVisible({ timeout: 10000 });
   };
