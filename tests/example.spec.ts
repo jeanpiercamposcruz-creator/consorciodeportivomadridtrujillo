@@ -49,30 +49,16 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
 
     const dashboard = page.getByText('Alumnos activos');
-    let ultimoAviso = '';
-    for (let intento = 1; intento <= 4; intento++) {
-      const inicioDiagnostico = diagnosticos.length;
-      await page.locator('#lu').fill(usuario);
-      await page.locator('#lp').fill(password);
-      await page.getByRole('button', { name: /Iniciar sesión/i }).click();
-      try {
-        await expect(dashboard).toBeVisible({ timeout: 12000 });
-        return;
-      } catch (error) {
-        ultimoAviso = await page.locator('#toast').innerText().catch(() => '');
-        const nuevosDiagnosticos = diagnosticos.slice(inicioDiagnostico);
-        const respuestaTransitoria = nuevosDiagnosticos.some((d) => /response: HTTP 50[234]/i.test(d));
-        const transitorio = respuestaTransitoria ||
-          /problema temporal de conexión|no se pudo conectar|no se pudo leer la base de datos|error 50[234]/i.test(ultimoAviso);
-        if (!transitorio || intento === 4) {
-          throw new Error('El acceso QA no llegó al dashboard. Intento ' + intento +
-            '/4. Aviso: ' + ultimoAviso + '. Diagnóstico: ' + nuevosDiagnosticos.join(' | ') +
-            '. Error: ' + String(error));
-        }
-        await page.waitForTimeout(2000 * intento);
-      }
+    await page.locator('#lu').fill(usuario);
+    await page.locator('#lp').fill(password);
+    await page.getByRole('button', { name: /Iniciar sesión/i }).click();
+    try {
+      await expect(dashboard).toBeVisible({ timeout: 20000 });
+    } catch (error) {
+      const aviso = await page.locator('#toast').innerText().catch(() => '');
+      throw new Error('El acceso QA no llegó al dashboard en una única sesión de prueba. Aviso: ' +
+        aviso + '. Diagnóstico: ' + diagnosticos.join(' | ') + '. Error: ' + String(error));
     }
-    throw new Error('El acceso QA no llegó al dashboard tras 4 intentos. Último aviso: ' + ultimoAviso);
   });
 
   test.afterAll(async () => {
