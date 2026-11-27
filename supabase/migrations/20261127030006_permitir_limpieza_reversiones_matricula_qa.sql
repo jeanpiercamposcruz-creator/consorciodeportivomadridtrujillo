@@ -25,7 +25,19 @@ BEGIN
     -- durante limpieza controlada por un administrador.
     IF OLD.origen LIKE 'reversion:%'
        AND OLD.concepto = 'Reversión de pago de matrícula'
-       AND OLD.detalle ~ '^[0-9]{6}
+       AND OLD.detalle ~ '^[0-9]{6}$'
+       AND public.rol_actual() = 'ADM'
+       AND EXISTS (
+         SELECT 1 FROM public.alumnos a
+         WHERE a.id=OLD.detalle
+           AND a.nombres='QA'
+           AND a.apellidos='Persistencia'
+           AND a.dni ~ '^[0-9]{8}$'
+       ) THEN
+      RETURN OLD;
+    END IF;
+
+    -- La excepción QA requiere sesión administradora, un alumno temporal
     -- con marcas exactas y un movimiento del ledger de campo de ese alumno.
     IF OLD.detalle LIKE 'QA-ATT-%'
        AND public.rol_actual() = 'ADM'
