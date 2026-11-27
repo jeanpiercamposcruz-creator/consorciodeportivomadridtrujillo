@@ -619,7 +619,14 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.locator('#toast')).toContainText('Tarifa o sueldo fijo inválido');
     await expect(page.locator('#p_p')).toHaveValue('-1');
 
-    // Cancelar descarta la tarifa inválida; no se actualiza el contrato existente.
+    for (const importe of ['100000', '1.234']) {
+      await page.locator('#p_p').fill(importe);
+      await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Tarifa o sueldo fijo inválido');
+      await expect(page.locator('#p_p')).toHaveValue(importe);
+    }
+
+    // Cancelar descarta los valores inválidos; no se actualiza el contrato existente.
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
   });
