@@ -85,7 +85,7 @@ async function restaurar(inp) {
   busy--;
   R();
 }
-let idle;
+let idle, BOOTING = false;
 const rIdle = () => {
   clearTimeout(idle);
   if (U) idle = setTimeout(out, 30 * 60 * 1000);
@@ -94,6 +94,8 @@ async function boot() {
   const h = location.hash;
   if (/^#c=[a-z0-9]{16}$/.test(h)) return pubCarnet(h.slice(3));
   if (h === "#prereg") return pubPre();
+  if (BOOTING) return;
+  BOOTING = true;
   try {
     RT = sessionStorage.getItem("cdmt_rt");
     if (RT && !KEY.startsWith("PEGA")) {
@@ -103,8 +105,10 @@ async function boot() {
     }
   } catch (e) {
     U = null;
+  } finally {
+    BOOTING = false;
+    R();
   }
-  R();
 }
 setInterval(async () => {
   if (!U || document.hidden || V === "mat" || busy) return;
@@ -117,4 +121,4 @@ setInterval(async () => {
       R();
     }
   } catch (e) {}
-}, 20000);
+}, 30000 + Math.floor(Math.random() * 10000));
