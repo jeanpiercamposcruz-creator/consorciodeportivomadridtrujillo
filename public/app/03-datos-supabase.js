@@ -1640,15 +1640,29 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       async cleanupCaja(id) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
         if (!/^QA-PERSIST-CAJA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("La limpieza solo acepta IDs temporales QA.");
+        const aplicacion = [
+          { destino: "Matrícula", cuota: 0, monto: 50 },
+          { destino: "Cuota", cuota: 1, monto: 90 },
+          { destino: "Cuota", cuota: 2, monto: 90 },
+        ];
+        const origenEsperado = "matricula:QA-ABONO|aplicacion:" + encodeURIComponent(JSON.stringify(aplicacion));
         S.caja = S.caja.filter((x) => x._id !== id);
         save();
         await sv;
-        if (!SAVE_OK) throw new Error("No se pudo guardar la limpieza del movimiento temporal.");
+
         const ruta = "/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(id);
-        let verificacion = await sb(ruta + "&select=id");
+        let verificacion = await sb(ruta + "&select=id,tipo,concepto,detalle,monto,origen");
         if (!verificacion.ok) throw new Error("No se pudo verificar la limpieza: " + await verificacion.text());
         let filas = await verificacion.json();
+        if (filas.length > 1 || filas.some((x) =>
+          x.tipo !== "I" || x.concepto !== "Matrícula / mensualidad" ||
+          x.detalle !== "QA-ABONO" || Number(x.monto) !== 230 ||
+          x.origen !== origenEsperado
+        )) {
+          throw new Error("El movimiento no coincide exactamente con el fixture QA autorizado; no se elimina.");
+        }
         if (filas.length) {
+          // Fallback directo solo después de validar todos los campos del fixture.
           const borrado = await sb(ruta, { method: "DELETE" });
           if (!borrado.ok) throw new Error("No se pudo eliminar el movimiento temporal QA: " + await borrado.text());
         }
