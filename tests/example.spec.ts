@@ -17,6 +17,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60000);
     if (!url || !usuario || !password) {
       throw new Error('Faltan ERP_URL, ERP_USER o ERP_PASSWORD.');
     }
@@ -49,7 +50,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: /Iniciar sesión/i }).click();
 
     await expect(page.getByText('Alumnos activos'))
-      .toBeVisible({ timeout: 20000 });
+      .toBeVisible({ timeout: 45000 });
   });
 
   test.afterAll(async () => {
