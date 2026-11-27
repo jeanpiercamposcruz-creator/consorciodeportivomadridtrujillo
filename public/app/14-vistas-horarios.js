@@ -743,6 +743,8 @@ function saveKit() {
 
   if (!RX.fecha.test(v("k_f")) || (v("k_e") && !RX.fecha.test(v("k_e"))))
     return toast("Fechas inválidas");
+  if (v("k_e") && v("k_e") < v("k_f"))
+    return toast("La fecha de entrega no puede ser anterior a la fecha del pedido");
 
   const kit = {
     code: `KIT-${a.dep.slice(4)}-${v("k_t")}`,
