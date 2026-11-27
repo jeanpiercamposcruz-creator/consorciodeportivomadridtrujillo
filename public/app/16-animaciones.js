@@ -286,7 +286,10 @@ const cajaPay = (s, b) => {
     });
 };
 const campoPay = (r, b) => {
-  if (PAYB) return;
+  if (PAYB) {
+    toast("Espera a que termine el registro de pago anterior.");
+    return;
+  }
   if (Number(S.fee ?? 5) === 0) {
     // Sin costo también es una transición persistida: bloquear acciones paralelas.
     PAYB = 1;
@@ -313,7 +316,10 @@ const campoPay = (r, b) => {
   );
 };
 const campoDebe = (r) => {
-  if (PAYB) return;
+  if (PAYB) {
+    toast("Espera a que termine el registro anterior antes de cambiar el pago.");
+    return;
+  }
   // Marcar "Debe" revierte un ingreso y debe serializarse igual que un cobro.
   PAYB = 1;
   let resultado;
