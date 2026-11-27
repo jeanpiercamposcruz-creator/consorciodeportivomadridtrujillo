@@ -1060,13 +1060,18 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         if (window.__ERP_QA_NEXT_ASISTENCIA_ID__ === datos.asistenciaId) delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
         if (window.__ERP_QA_NEXT_CAJA_ID__ === datos.cajaId) delete window.__ERP_QA_NEXT_CAJA_ID__;
-        // La limpieza no puede quedarse bloqueada detrás de una cola defectuosa.
-        // Si una RPC tardía sigue pendiente, las FK y triggers impiden que recree
-        // registros huérfanos después de retirar el fixture exacto.
-        await Promise.race([
-          sv,
-          new Promise((resolve) => setTimeout(resolve, 10000)),
+        // Nunca limpiar mientras una escritura anterior siga pendiente:
+        // hacerlo podría competir con una RPC tardía y dejar residuos.
+        const guardadoTermino = await Promise.race([
+          sv.then(() => true),
+          new Promise((resolve) => setTimeout(() => resolve(false), 10000)),
         ]);
+        if (!guardadoTermino) {
+          throw new Error("La cola de persistencia sigue activa; se pospone la limpieza para no competir con una escritura.");
+        }
+        if (!SAVE_OK) {
+          throw new Error("La última escritura falló; se conserva el fixture QA para una limpieza segura.");
+        }
 
         const asistenciaRuta = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId);
         const alumnoRuta = "/rest/v1/alumnos?id=eq." + encodeURIComponent(datos.alumnoId);
