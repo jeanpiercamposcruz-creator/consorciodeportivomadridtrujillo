@@ -150,7 +150,7 @@ function addPer() {
   if (!["ENT", "ADM", "REC"].includes(r)) return toast("Rol inválido");
   if (pr === null || sf === null) return toast("Tarifa o sueldo fijo inválido");
   if ((tc && !PTIPOS.includes(tc)) || (jor && !PJOR.includes(jor))) return toast("Contrato o jornada inválidos");
-  if (!EP && (!tc || !fi)) return toast("Tipo de contrato y fecha de inicio son obligatorios");
+  if (!tc || !fi) return toast("Tipo de contrato y fecha de inicio son obligatorios");
   if ((fi && !fechaOk(fi)) || (ff && !fechaOk(ff))) return toast("Fecha inválida");
   if (fi && ff && ff < fi) return toast("La fecha de fin no puede ser anterior al inicio");
   if (!["1", "0"].includes(est)) return toast("Estado inválido");
