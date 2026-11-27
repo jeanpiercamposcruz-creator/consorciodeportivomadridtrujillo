@@ -251,7 +251,32 @@ function payRun(b, fn, metric, tk) {
   return r;
 }
 
-const kitPay = () => saveKit();
+const kitPay = () => {
+  if (PAYB) {
+    toast("Espera a que termine la operación financiera anterior.");
+    return;
+  }
+  const anterior = sv;
+  PAYB = 1;
+  try {
+    saveKit();
+  } catch (e) {
+    PAYB = 0;
+    throw e;
+  }
+  // Si la validación detuvo saveKit(), no se generó una nueva escritura.
+  if (sv === anterior) {
+    PAYB = 0;
+    return;
+  }
+  return sv
+    .then(() => {
+      if (!SAVE_OK) throw new Error("no guardado");
+    })
+    .finally(() => {
+      PAYB = 0;
+    });
+};
 const cajaPay = (s, b) => {
   if (v("c_t") === "I") {
     return payRun(
