@@ -1814,6 +1814,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     type HerramientaQA = {
       prepararIdMatricula: (dni: string) => Promise<string>;
       verificarMatriculaCompleta: (dni: string) => Promise<Resultado>;
+      forzarGeneracionCarnetQA: (dni: string) => Promise<{ id: string }>;
+      consultarTokenCarnetQA: (dni: string) => Promise<string | null>;
       cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
     };
     try {
@@ -1881,14 +1883,10 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         const rpcPendiente = page.waitForRequest((request) =>
           request.url().includes('/rest/v1/rpc/erp_persistir_lote')
         );
-        await page.evaluate((dniPrueba) => {
-          const estado = eval('S') as { alu: Array<{ id: string; dni: string; qt?: string | null }> };
-          const alumno = estado.alu.find((x) => x.dni === dniPrueba);
-          if (!alumno) throw new Error('No se encontró el alumno QA para generar su carnet');
-          // Simular un registro histórico sin qr_token para forzar su generación y persistencia.
-          alumno.qt = '';
-          const abrirCarnet = eval('carnet') as (id: string) => void;
-          abrirCarnet(alumno.id);
+        await page.evaluate(async (dniPrueba) => {
+          const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+          if (!api) throw new Error('No está habilitada la prueba autenticada de carnet QA.');
+          return api.forzarGeneracionCarnetQA(dniPrueba);
         }, dni);
         await rpcPendiente;
         await expect(cerrarCarnet).toBeHidden();
@@ -1896,13 +1894,9 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         await expect(cerrarCarnet).toBeVisible({ timeout: 15000 });
 
         const tokenQR = await page.evaluate(async (dniPrueba) => {
-          const consultar = eval('sb') as (path: string) => Promise<Response>;
-          const response = await consultar(
-            `/rest/v1/alumnos?select=qr_token&dni=eq.${encodeURIComponent(dniPrueba)}`
-          );
-          if (!response.ok) throw new Error('No se pudo verificar qr_token en Supabase QA');
-          const rows = await response.json() as Array<{ qr_token: string | null }>;
-          return rows[0]?.qr_token ?? null;
+          const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+          if (!api) throw new Error('No está habilitada la consulta autenticada de carnet QA.');
+          return api.consultarTokenCarnetQA(dniPrueba);
         }, dni);
         if (!tokenQR) throw new Error('Supabase no persistió el token QR del alumno temporal.');
         expect(tokenQR).toMatch(/^[a-z0-9]{16}$/);
