@@ -21,7 +21,7 @@ let TK = null,
 
 let REFRESHING = null, PULLING = null;
 
-async function sb(path, o = {}, retry = 1, transientRetry = 2, transientAttempt = 0) {
+async function sb(path, o = {}, retry = 1, transientRetry = 1, transientAttempt = 0) {
   const method = String(o.method || "GET").toUpperCase();
   const retryable = method === "GET" || method === "HEAD";
   const ctl = new AbortController();
@@ -107,9 +107,9 @@ async function auth(body, q) {
 async function sess() {
   // El pool de PostgREST puede tardar en recuperar conexiones. La lectura
   // del perfil es idempotente y admite reintentos escalonados.
-  // Tres reintentos bastan para fallos breves; no mantener ni multiplicar
-  // sesiones cuando PostgREST informa que su pool está indisponible.
-  const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`, {}, 1, 3);
+  // Un solo reintento evita amplificar la saturación del pool compartido;
+  // si sigue indisponible, se libera el intento y se permite reintentar el login.
+  const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`, {}, 1, 1);
   if (!r.ok) {
     const error = new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
     error.status = r.status;
