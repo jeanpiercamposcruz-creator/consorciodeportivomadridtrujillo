@@ -352,7 +352,12 @@ async function all(n) {
 }
 async function ver() {
   try {
-    VER = (await (await sb("/rest/v1/erp_meta?id=eq.1&select=ver")).json())[0].ver;
+    // La lectura de versión solo sincroniza el sondeo entre pestañas;
+    // nunca debe dejar una escritura de negocio esperando indefinidamente.
+    const r = await sb("/rest/v1/erp_meta?id=eq.1&select=ver", { timeout: 5000 });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (rows[0] && Number.isFinite(Number(rows[0].ver))) VER = Number(rows[0].ver);
   } catch (e) {}
 }
 async function pull() {
