@@ -61,8 +61,10 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       await expect(dashboard).toBeVisible({ timeout: 20000 });
     } catch (error) {
       const aviso = await page.locator('#toast').innerText().catch(() => '');
-      throw new Error('El acceso QA no llegó al dashboard en una única sesión de prueba. Aviso: ' +
-        aviso + '. Diagnóstico: ' + diagnosticos.join(' | ') + '. Error: ' + String(error));
+      await expect(page.getByRole('button', { name: /Iniciar sesión/i })).toBeEnabled({ timeout: 5000 });
+      throw new Error('El acceso QA no llegó al dashboard en una única sesión de prueba. ' +
+        'El formulario recuperó el estado de login. Aviso: ' + aviso +
+        '. Diagnóstico: ' + diagnosticos.join(' | ') + '. Error: ' + String(error));
     }
   });
 
