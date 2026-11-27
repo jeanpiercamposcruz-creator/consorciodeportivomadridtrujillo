@@ -2195,6 +2195,56 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
   });
 
+  test('Bloquear modificaciones directas de movimientos ya registrados en Caja', async () => {
+    const id = 'QA-PERSIST-CAJA-' + randomUUID();
+    type Contexto = { url: string; apikey: string; accessToken: string };
+    type HerramientaQA = {
+      roundTripCaja: (id: string) => Promise<unknown>;
+      cleanupCaja: (id: string) => Promise<{ removed: boolean }>;
+      obtenerContextoRpcQA: () => Contexto;
+    };
+    const apiQA = () => (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+    try {
+      await page.evaluate(async (idPrueba) => {
+        const api = apiQA();
+        if (!api) throw new Error('No está habilitada la preparación de Caja QA.');
+        return api.roundTripCaja(idPrueba);
+      }, id);
+
+      const contexto = await page.evaluate(() => {
+        const api = apiQA();
+        if (!api) throw new Error('No está habilitado el contexto de sesión QA.');
+        return api.obtenerContextoRpcQA();
+      });
+      const ruta = contexto.url + '/rest/v1/caja_movimientos?id=eq.' + encodeURIComponent(id);
+      const headers = {
+        apikey: contexto.apikey,
+        Authorization: 'Bearer ' + contexto.accessToken,
+        Prefer: 'return=minimal',
+      };
+      const respuesta = await page.request.patch(ruta, {
+        data: { monto: 231 },
+        timeout: 15000,
+        headers,
+      });
+      expect(respuesta.status()).toBe(409);
+      expect(await respuesta.text()).toMatch(/23514|inmutables|reversión/i);
+
+      const verificacion = await page.request.get(ruta + '&select=id,monto', { headers, timeout: 15000 });
+      expect(verificacion.status()).toBe(200);
+      const filas = await verificacion.json();
+      expect(filas).toHaveLength(1);
+      expect(Number(filas[0].monto)).toBe(230);
+    } finally {
+      const limpieza = await page.evaluate(async (idPrueba) => {
+        const api = apiQA();
+        if (!api) throw new Error('No está disponible la limpieza aislada de Caja QA.');
+        return api.cleanupCaja(idPrueba);
+      }, id);
+      expect(limpieza.removed).toBeTruthy();
+    }
+  });
+
   test('Persistir y recuperar monto_abonado y saldo_pendiente mediante el ERP y Supabase QA', async () => {
     const id = 'QA-PERSIST-CUOTA-' + randomUUID();
     type Resultado = {
