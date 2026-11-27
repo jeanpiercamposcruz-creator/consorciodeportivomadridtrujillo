@@ -20,6 +20,7 @@ let TK = null,
   sv = Promise.resolve();
 
 let REFRESHING = null, PULLING = null, PULL_PENDING = false;
+let SESSION_VALIDATION = null, SESSION_VALIDATION_UID = null, SESSION_VALIDATED_UID = null;
 
 async function sb(path, o = {}, retry = 1, transientRetry = 1, transientAttempt = 0) {
   const method = String(o.method || "GET").toUpperCase();
@@ -108,21 +109,40 @@ async function auth(body, q) {
   } catch (e) {}
 }
 async function sess() {
-  // El pool de PostgREST puede tardar en recuperar conexiones. La lectura
-  // del perfil es idempotente y admite reintentos escalonados.
-  // Un solo reintento evita amplificar la saturación del pool compartido;
-  // si sigue indisponible, se libera el intento y se permite reintentar el login.
-  const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`, {}, 1, 1);
-  if (!r.ok) {
-    await r.text().catch(() => "");
-    const error = new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
-    error.status = r.status;
-    throw error;
+  const uid = UID;
+  if (!uid) throw new Error("No existe una sesión autenticada para validar.");
+  if (SESSION_VALIDATED_UID === uid && U) return;
+  if (SESSION_VALIDATION && SESSION_VALIDATION_UID === uid) return SESSION_VALIDATION;
+
+  // Validación single-flight: boot() y el formulario no deben duplicar
+  // consultas al perfil si coinciden durante una restauración de sesión.
+  // Sin reintento automático: ante 503 se libera la sesión parcial y el
+  // usuario puede reintentar después, sin multiplicar la presión del pool.
+  const tarea = (async () => {
+    const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${uid}`, {}, 1, 0);
+    if (!r.ok) {
+      await r.text().catch(() => "");
+      const error = new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
+      error.status = r.status;
+      throw error;
+    }
+    const j = await r.json();
+    if (!j.length || j[0].rol !== "ADM") throw "rol";
+    U = { id: "ADMIN", nom: EM, rol: "ADM" };
+    V = "home";
+    SESSION_VALIDATED_UID = uid;
+  })();
+
+  SESSION_VALIDATION = tarea;
+  SESSION_VALIDATION_UID = uid;
+  try {
+    return await tarea;
+  } finally {
+    if (SESSION_VALIDATION === tarea) {
+      SESSION_VALIDATION = null;
+      SESSION_VALIDATION_UID = null;
+    }
   }
-  const j = await r.json();
-  if (!j.length || j[0].rol !== "ADM") throw "rol";
-  U = { id: "ADMIN", nom: EM, rol: "ADM" };
-  V = "home";
 }
 const uid = () => crypto.randomUUID();
 const G = (n, a, c) => ({
