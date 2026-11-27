@@ -260,6 +260,13 @@ const togP = (id) => {
   const p = S.personal.find((x) => x.id === id);
   if (!p) return;
   if (p === U) return toast("No puedes desactivarte");
+  if (!p.activo) {
+    if (!PTIPOS.includes(p.tc) || !p.fi || !fechaOk(p.fi))
+      return toast("No puedes activar personal sin tipo de contrato y fecha de inicio válidos");
+    if (p.ff && (!fechaOk(p.ff) || p.ff < today()))
+      return toast("No puedes activar personal con un contrato vencido o con fecha de fin inválida");
+    if (p.ff && p.ff < p.fi) return toast("La fecha de fin no puede ser anterior al inicio");
+  }
   p.activo = p.activo ? 0 : 1;
   save();
   R();
