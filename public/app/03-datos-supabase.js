@@ -855,7 +855,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async verificarAusenciaKit(id) {
         if (U?.rol !== "ADM") throw new Error("La verificación de venta QA requiere una sesión administradora.");
-        if (!/^QA-KIT-\\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
+        if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
         // Esperar la recuperación local tras el fallo inducido antes de consultar la BD.
         await sv;
         const [kitResp, cajaResp] = await Promise.all([
