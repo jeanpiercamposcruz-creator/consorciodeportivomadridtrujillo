@@ -239,11 +239,12 @@ function ccAuto() {
   R();
 }
 const hsem = (p) => {
-  const [y, m, day] = today().split("-").map(Number);
+  const hoy = today();
+  const [y, m, day] = hoy.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1, day));
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   const w = d.toISOString().slice(0, 10);
   return S.asis
-    .filter((x) => x.t === "P" && x.ref === p.id && x.ok && x.f >= w)
+    .filter((x) => x.t === "P" && x.ref === p.id && x.ok && x.f >= w && x.f <= hoy)
     .reduce((t, x) => t + hrs(S.hor.find((h) => h.id === x.h) || { ini: "0:00", fin: "0:00" }), 0);
 };
