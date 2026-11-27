@@ -236,7 +236,8 @@ if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabas
         const p = S.personal.find((x) => Number(x.activo) === 1 && Number(x.precio) > 0);
         const h = S.hor.find((x) => x.est !== "Inactivo" && hrs(x) > 0);
         if (!p || !h) throw new Error("No hay personal con tarifa y horario válido para la prueba QA.");
-        const [y, m, d] = today().split("-").map(Number);
+        const hoy = today();
+        const [y, m, d] = hoy.split("-").map(Number);
         const fecha = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
         const mes = fecha.slice(0, 7);
         const original = S.asis;
@@ -244,7 +245,7 @@ if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabas
         try {
           S.asis = [...original, { t: "P", ref: p.id, ok: true, f: fecha, h: h.id }];
           const despues = uMes(mes).u;
-          return { fecha, antes, despues, diferencia: despues - antes };
+          return { hoy, fecha, antes, despues, diferencia: despues - antes };
         } finally {
           S.asis = original;
         }
