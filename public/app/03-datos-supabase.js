@@ -853,23 +853,6 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           },
         };
       },
-      async consultarKitPersistido(id) {
-        if (U?.rol !== "ADM") throw new Error("La consulta de venta QA requiere una sesión administradora.");
-        if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
-        await sv;
-        const [kitResp, cajaResp, reversaResp] = await Promise.all([
-          sb("/rest/v1/kits_ventas?id=eq." + encodeURIComponent(id) + "&select=id,estado"),
-          sb("/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("kit|" + id) + "&select=id,monto"),
-          sb("/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent("reversion-kit|" + id) + "&select=id"),
-        ]);
-        if (!kitResp.ok || !cajaResp.ok || !reversaResp.ok) {
-          throw new Error("No se pudo consultar la venta y su ledger en Supabase QA.");
-        }
-        const [kits, ingresos, reversas] = await Promise.all([
-          kitResp.json(), cajaResp.json(), reversaResp.json(),
-        ]);
-        return { kits, ingresos, reversas };
-      },
       async verificarAusenciaKit(id) {
         if (U?.rol !== "ADM") throw new Error("La verificación de venta QA requiere una sesión administradora.");
         if (!/^QA-KIT-\d{13}$/.test(String(id))) throw new Error("Identificador temporal de venta QA inválido.");
