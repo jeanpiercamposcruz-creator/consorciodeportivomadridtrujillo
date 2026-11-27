@@ -2038,24 +2038,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Rechazar actualizaciones de alumnos desde clientes sin snapshot financiero', async () => {
+    type HerramientaSnapshotQA = {
+      probarBloqueoClienteAntiguoQA: () => Promise<{ status: number; detalle: string }>;
+    };
     const resultado = await page.evaluate(async () => {
-      const consultar = eval('sb') as (ruta: string, init?: RequestInit) => Promise<Response>;
-      const lectura = await consultar('/rest/v1/alumnos?select=id&limit=1');
-      if (!lectura.ok) throw new Error('No se pudo obtener una matrícula QA para la prueba de versión antigua.');
-      const filas = await lectura.json() as Array<{ id: string }>;
-      if (!filas.length) throw new Error('No hay matrículas para probar el bloqueo de clientes antiguos.');
-      const intento = await consultar('/rest/v1/rpc/erp_persistir_lote', {
-        method: 'POST',
-        body: JSON.stringify({
-          p_payload: [{
-            name: 'alumnos',
-            insert: [],
-            update: [{ id: filas[0].id }],
-            delete: [],
-          }],
-        }),
-      });
-      return { status: intento.status, detalle: await intento.text() };
+      const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaSnapshotQA }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No está habilitada la prueba de snapshot financiero QA.');
+      return api.probarBloqueoClienteAntiguoQA();
     });
     expect(resultado.status).toBeGreaterThanOrEqual(400);
     expect(resultado.detalle).toMatch(/40001|desactualizada|snapshot/i);
