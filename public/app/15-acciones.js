@@ -163,6 +163,7 @@ const ON_CHANGE = {
     }
     S.fee = fee;
     save();
+    R(); // Refleja inmediatamente el nuevo estado de "Pagó" / "Sin costo".
   },
   preM: (el) => {
     PF.m = el.value;
