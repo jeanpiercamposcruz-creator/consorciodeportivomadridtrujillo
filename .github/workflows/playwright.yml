@@ -86,6 +86,7 @@ jobs:
             console.log('No se pudo interpretar el informe posterior:', String(error));
           }
           NODE
+          npm audit --audit-level=moderate
 
       - name: Upload post-remediation npm audit report
         if: ${{ !cancelled() }}
