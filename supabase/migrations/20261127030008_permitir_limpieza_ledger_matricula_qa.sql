@@ -1,9 +1,7 @@
--- Endurecer la excepción de limpieza del ledger de campo:
--- el prefijo QA-ATT- por sí solo no autoriza borrar movimientos.
 CREATE OR REPLACE FUNCTION public.fn_validar_reversion_pago_matricula()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path TO 'pg_catalog', 'public'
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'pg_catalog', 'public'
 AS $function$
 DECLARE
   v_original_id text;
@@ -21,8 +19,7 @@ BEGIN
       RETURN OLD;
     END IF;
 
-    -- Las reversiones de una matrícula temporal solo se pueden retirar
-    -- durante limpieza controlada por un administrador.
+    -- Eliminar solo movimientos de fixtures QA-MAT exactos y bajo rol ADM.
     IF OLD.detalle ~ '^[0-9]{6}
 
     -- La excepción QA requiere sesión administradora, un alumno temporal
@@ -136,9 +133,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.fn_validar_reversion_pago_matricula() FROM PUBLIC, anon, authenticated;
+$function$
 
        AND public.rol_actual() = 'ADM'
        AND EXISTS (
@@ -259,9 +254,7 @@ REVOKE ALL ON FUNCTION public.fn_validar_reversion_pago_matricula() FROM PUBLIC,
   END IF;
   RETURN NEW;
 END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.fn_validar_reversion_pago_matricula() FROM PUBLIC, anon, authenticated;
+$function$
 
        )
        AND (
@@ -383,6 +376,7 @@ REVOKE ALL ON FUNCTION public.fn_validar_reversion_pago_matricula() FROM PUBLIC,
   END IF;
   RETURN NEW;
 END;
-$function$;
+$function$
+
 
 REVOKE ALL ON FUNCTION public.fn_validar_reversion_pago_matricula() FROM PUBLIC, anon, authenticated;
