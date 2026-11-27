@@ -1559,23 +1559,40 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async probarBloqueoClienteAntiguoQA() {
         if (U?.rol !== "ADM") throw new Error("La prueba de snapshot requiere una sesión administradora QA.");
-        // El RPC debe rechazar el payload por ausencia del snapshot antes de
-        // buscar/bloquear una fila; se usa un ID inexistente para no tocar datos.
-        const respuesta = await sb("/rest/v1/rpc/erp_persistir_lote", {
-          method: "POST",
-          // Esta prueba valida el rechazo transaccional del RPC en Supabase QA.
-          // No debe confundirse una respuesta lenta del backend con un rechazo correcto.
-          timeout: 90000,
-          body: JSON.stringify({
-            p_payload: [{
-              name: "alumnos",
-              insert: [],
-              update: [{ id: "QA-CLIENTE-ANTIGUO-TEST" }],
-              delete: [],
-            }],
-          }),
+        // Payload idempotente y sin escrituras: el RPC debe rechazarlo por
+        // ausencia del snapshot financiero antes de buscar o bloquear filas.
+        const body = JSON.stringify({
+          p_payload: [{
+            name: "alumnos",
+            insert: [],
+            update: [{ id: "QA-CLIENTE-ANTIGUO-TEST" }],
+            delete: [],
+          }],
         });
-        return { status: respuesta.status, detalle: await respuesta.text() };
+        let ultimoError = null;
+        // La estadística de PostgreSQL mostró una ejecución media de ~10 ms
+        // (máximo <85 ms). Si la llamada se aborta, es un fallo transitorio
+        // de transporte/API y no lentitud de la función SQL. Reintentar solo
+        // este payload sin efectos secundarios evita falsos negativos de red.
+        for (let intento = 1; intento <= 3; intento++) {
+          try {
+            const respuesta = await sb("/rest/v1/rpc/erp_persistir_lote", {
+              method: "POST",
+              timeout: 15000,
+              body,
+            });
+            const detalle = await respuesta.text();
+            return { status: respuesta.status, detalle };
+          } catch (error) {
+            ultimoError = error;
+            const abortado = error instanceof Error && error.name === "AbortError";
+            const red = error instanceof TypeError || (error instanceof Error && /network|fetch/i.test(error.message));
+            if ((!abortado && !red) || intento === 3) break;
+            await new Promise((resolve) => setTimeout(resolve, 250 * intento));
+          }
+        }
+        throw new Error("La prueba de snapshot no obtuvo respuesta HTTP tras 3 intentos no mutantes: " +
+          String(ultimoError));
       },
       async roundTripCaja(id) {
         if (U?.rol !== "ADM") throw new Error("La prueba de Caja requiere una sesión administradora QA.");
