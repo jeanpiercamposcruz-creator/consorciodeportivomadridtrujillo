@@ -829,6 +829,33 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       }
     };
     await cerrarComprobante();
+    // Prueba negativa: un identificador que no sea inequívocamente QA debe
+    // rechazarse antes de consultar o borrar cualquier registro.
+    const rechazoLimpiezaReal = await page.evaluate(async () => {
+      const api = (window as unknown as {
+        __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
+      }).__ERP_QA_PERSISTENCIA__;
+      if (!api) throw new Error('No está habilitada la limpieza QA.');
+      try {
+        await api.cleanupAsistenciaQA({
+          alumnoId: 'REAL-STUDENT-NO-DELETE',
+          alumnoDni: '12345678',
+          horarioId: 'NO-TOCAR',
+          sedeId: 'NO-TOCAR',
+          grupo: 'NO-TOCAR|0',
+          fecha: '2026-11-27',
+          fee: 5,
+          feeOriginal: 5,
+          asistenciaId: '00000000-0000-4000-8000-000000000001',
+          cajaId: '00000000-0000-4000-8000-000000000002',
+        });
+        return '';
+      } catch (error) {
+        return String(error);
+      }
+    });
+    expect(rechazoLimpiezaReal).toContain('IDs temporales de asistencia o tarifa original inválidos');
+
     const datos = await page.evaluate(async () => {
       const api = (window as unknown as {
         __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA;
