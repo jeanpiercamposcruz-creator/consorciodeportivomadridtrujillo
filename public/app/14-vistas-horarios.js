@@ -693,20 +693,73 @@ function mkA(t, r, ok) {
 }
 function mkP(r, pc) {
   const fee = monto(S.fee ?? 5);
-  if (pc && (fee === null || fee <= 0))
-    return toast("Configura un pago de campo mayor que cero antes de marcar Pagó.");
+  if (pc && fee === null)
+    return toast("El pago de campo debe ser un importe válido no negativo, con máximo dos decimales.");
   let x = S.asis.find((x) => x.f === today() && x.t === "A" && x.ref === r && x.h === AS.h);
   if (!x) {
     x = { f: today(), t: "A", ref: r, h: AS.h };
     S.asis.push(x);
   }
-  x.pc = pc;
-  const k = `campo|${today()}|${r}|${AS.h}`;
-  S.caja = S.caja.filter((c) => c.k !== k);
+
+  const base = `campo|${today()}|${r}|${AS.h}`;
+  const ingresos = S.caja.filter((c) =>
+    c.t === "I" && (c.k === base || String(c.k || "").startsWith(base + "|")),
+  );
+  const activos = ingresos.filter((ingreso) => {
+    const revertido = S.caja
+      .filter((c) => c.t === "E" && c.k === `reversion-campo:${ingreso._id}`)
+      .reduce((total, c) => total + (+c.m || 0), 0);
+    return (+ingreso.m || 0) - revertido > 0.009;
+  });
+
   if (pc) {
-    const a = S.alu.find((a) => a.id === r);
-    S.caja.push({ f: today(), sede: a.sede, t: "I", c: "Pago de campo", d: r, m: fee, k });
+    const actual = activos.find((p) => p._id === x.pcId) || activos[0];
+    if (actual) {
+      if (x.pc === true && x.pcId === actual._id) return;
+      x.pc = true;
+      x.pcId = actual._id;
+    } else {
+      x.pc = true;
+      x.pcId = null;
+      if (fee > 0) {
+        const alumno = S.alu.find((a) => a.id === r);
+        if (!alumno) return toast("No se encontró el alumno para registrar el pago de campo.");
+        const movementId = window.__ERP_QA_NEXT_CAJA_ID__ || uid();
+        if (window.__ERP_QA_NEXT_CAJA_ID__) delete window.__ERP_QA_NEXT_CAJA_ID__;
+        x.pcId = movementId;
+        S.caja.push({
+          _id: movementId,
+          f: today(),
+          sede: alumno.sede,
+          t: "I",
+          c: "Pago de campo",
+          d: r,
+          m: fee,
+          k: base + "|" + movementId,
+        });
+      }
+    }
+  } else {
+    const pagoActivo = activos.find((p) => !x.pcId || p._id === x.pcId) || activos[0];
+    x.pc = false;
+    x.pcId = null;
+    if (pagoActivo) {
+      const reversado = S.caja.some((c) => c.k === `reversion-campo:${pagoActivo._id}`);
+      if (!reversado) {
+        S.caja.push({
+          _id: uid(),
+          f: today(),
+          sede: pagoActivo.sede,
+          t: "E",
+          c: "Reversión de pago de campo",
+          d: r,
+          m: pagoActivo.m,
+          k: `reversion-campo:${pagoActivo._id}`,
+        });
+      }
+    }
   }
+
   save();
   R();
 }
