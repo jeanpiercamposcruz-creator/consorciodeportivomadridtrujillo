@@ -21,7 +21,7 @@ let TK = null,
 
 let REFRESHING = null;
 
-async function sb(path, o = {}, retry = 1, transientRetry = 2) {
+async function sb(path, o = {}, retry = 1, transientRetry = 2, transientAttempt = 0) {
   const method = String(o.method || "GET").toUpperCase();
   const retryable = method === "GET" || method === "HEAD";
   const ctl = new AbortController();
@@ -42,8 +42,8 @@ async function sb(path, o = {}, retry = 1, transientRetry = 2) {
   } catch (e) {
     clearTimeout(to);
     if (retryable && transientRetry > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 250 * (3 - transientRetry)));
-      return sb(path, o, retry, transientRetry - 1);
+      await new Promise((resolve) => setTimeout(resolve, Math.min(16000, 500 * 2 ** transientAttempt)));
+      return sb(path, o, retry, transientRetry - 1, transientAttempt + 1);
     }
     throw e;
   } finally {
@@ -53,8 +53,8 @@ async function sb(path, o = {}, retry = 1, transientRetry = 2) {
   // PostgREST puede devolver PGRST002/503 transitorios cuando su pool no
   // consigue una conexión. Reintentar solo lecturas evita duplicar escrituras.
   if (retryable && [502, 503, 504].includes(r.status) && transientRetry > 0) {
-    await new Promise((resolve) => setTimeout(resolve, 250 * (3 - transientRetry)));
-    return sb(path, o, retry, transientRetry - 1);
+    await new Promise((resolve) => setTimeout(resolve, Math.min(16000, 500 * 2 ** transientAttempt)));
+    return sb(path, o, retry, transientRetry - 1, transientAttempt + 1);
   }
 
   if (r.status === 401 && RT && retry) {
@@ -65,7 +65,7 @@ async function sb(path, o = {}, retry = 1, transientRetry = 2) {
       );
 
     await REFRESHING;
-    return sb(path, o, 0, transientRetry);
+    return sb(path, o, 0, transientRetry, transientAttempt);
   }
 
   return r;
@@ -102,9 +102,12 @@ async function auth(body, q) {
   } catch (e) {}
 }
 async function sess() {
-  const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`),
-    j = await r.json();
-  if (!r.ok || !j.length || j[0].rol !== "ADM") throw "rol";
+  // El pool de PostgREST puede tardar en recuperar conexiones. La lectura
+  // del perfil es idempotente y admite reintentos escalonados.
+  const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`, {}, 1, 6);
+  if (!r.ok) throw new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
+  const j = await r.json();
+  if (!j.length || j[0].rol !== "ADM") throw "rol";
   U = { id: "ADMIN", nom: EM, rol: "ADM" };
   V = "home";
 }
