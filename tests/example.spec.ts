@@ -469,6 +469,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(creado.database.tipo_contrato).toBe('Planilla');
       expect(Number(creado.database.precio_hora)).toBe(32.5);
       expect(Number(creado.database.sueldo_fijo)).toBe(250);
+      const personalId = String(creado.database.id);
+      expect(personalId).toMatch(/^PER-ENT-/);
 
       await page.locator('#p_ff').fill('2031-12-31');
       await page.locator('#p_p').fill('34.75');
@@ -495,14 +497,16 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
       await page.locator('button[data-f="perTab"][data-i="c"]').click();
       const filaContrato = page.locator('table').last().locator('tr')
-        .filter({ hasText: 'QA Contrato Temporal' }).first();
+        .filter({ hasText: personalId });
+      await expect(filaContrato).toHaveCount(1);
       await expect(filaContrato).toContainText('2031-12-31');
       await expect(filaContrato).toContainText('34.75');
       await expect(filaContrato).toContainText('275.50');
 
       await page.locator('button[data-f="perTab"][data-i="p"]').click();
       const filaPago = page.locator('table').last().locator('tr')
-        .filter({ hasText: 'QA Contrato Temporal' }).first();
+        .filter({ hasText: personalId });
+      await expect(filaPago).toHaveCount(1);
       await expect(filaPago).toContainText('34.75');
       await expect(filaPago).toContainText('275.50');
 
@@ -538,7 +542,8 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       await page.getByText('Personal y Planillas', { exact: true }).first().click();
       await page.locator('button[data-f="perTab"][data-i="p"]').click();
       const filaPagoAsistencia = page.locator('table').last().locator('tr')
-        .filter({ hasText: 'QA Contrato Temporal' }).first();
+        .filter({ hasText: personalId });
+      await expect(filaPagoAsistencia).toHaveCount(1);
       const celdasPago = await filaPagoAsistencia.locator('td').allTextContents();
       const numero = (valor: string) => Number(valor.replace(/[^\d.-]/g, ''));
       const tarifa = numero(celdasPago[3] || '');
