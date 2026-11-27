@@ -172,7 +172,10 @@ function payBtn(b) {
 
 /* Ejecuta la acción original (sin cambiarla), retiene el re-dibujado y anima solo si hubo un cobro real */
 function payRun(b, fn, metric, tk) {
-  if (PAYB) return; // Un segundo cobro durante una operación activa nunca debe ejecutar fn().
+  if (PAYB) {
+    toast("Espera a que termine la operación de pago anterior.");
+    return; // Un segundo cobro durante una operación activa nunca debe ejecutar fn().
+  }
   if (!b || !b.isConnected) return fn();
   const m0 = metric(),
     R0 = R;
@@ -260,7 +263,10 @@ const cajaPay = (s, b) => {
   }
 
   // Los egresos manuales también necesitan bloqueo anti doble clic.
-  if (PAYB) return;
+  if (PAYB) {
+    toast("Espera a que termine la operación de Caja anterior.");
+    return;
+  }
   PAYB = 1;
   const cantidadAntes = S.caja.length;
   if (b) b.disabled = true;
