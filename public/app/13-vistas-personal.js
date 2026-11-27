@@ -153,6 +153,7 @@ function addPer() {
   if (!tc || !fi) return toast("Tipo de contrato y fecha de inicio son obligatorios");
   if ((fi && !fechaOk(fi)) || (ff && !fechaOk(ff))) return toast("Fecha inválida");
   if (fi && ff && ff < fi) return toast("La fecha de fin no puede ser anterior al inicio");
+  if (est === "1" && ff && ff < today()) return toast("No puedes guardar o activar un contrato con fecha de fin vencida");
   if (!["1", "0"].includes(est)) return toast("Estado inválido");
   if (S.personal.some((p) => p.dni === d && p.id !== EP)) return toast("Ese DNI ya está registrado");
   const x = {
