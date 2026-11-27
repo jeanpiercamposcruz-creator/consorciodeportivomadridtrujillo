@@ -17,7 +17,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60000);
+    test.setTimeout(120000);
     if (!url || !usuario || !password) {
       throw new Error('Faltan ERP_URL, ERP_USER o ERP_PASSWORD.');
     }
@@ -45,12 +45,27 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         '. Diagnóstico: ' + diagnosticos.join(' | '));
     }
 
-    await page.locator('#lu').fill(usuario);
-    await page.locator('#lp').fill(password);
-    await page.getByRole('button', { name: /Iniciar sesión/i }).click();
-
-    await expect(page.getByText('Alumnos activos'))
-      .toBeVisible({ timeout: 55000 });
+    const dashboard = page.getByText('Alumnos activos');
+    let ultimoAviso = '';
+    for (let intento = 1; intento <= 3; intento++) {
+      await page.locator('#lu').fill(usuario);
+      await page.locator('#lp').fill(password);
+      await page.getByRole('button', { name: /Iniciar sesión/i }).click();
+      try {
+        await expect(dashboard).toBeVisible({ timeout: 18000 });
+        return;
+      } catch (error) {
+        ultimoAviso = await page.locator('#toast').innerText().catch(() => '');
+        const transitorio = /problema temporal de conexión|no se pudo conectar|no se pudo leer la base de datos|error 50[234]/i.test(ultimoAviso);
+        if (!transitorio || intento === 3) {
+          throw new Error('El acceso QA no llegó al dashboard. Intento ' + intento +
+            '/3. Aviso: ' + ultimoAviso + '. Diagnóstico: ' + diagnosticos.join(' | ') +
+            '. Error: ' + String(error));
+        }
+        await page.waitForTimeout(1500 * intento);
+      }
+    }
+    throw new Error('El acceso QA no llegó al dashboard tras 3 intentos. Último aviso: ' + ultimoAviso);
   });
 
   test.afterAll(async () => {
@@ -2124,9 +2139,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     };
     let respuesta: import('@playwright/test').APIResponse | null = null;
     let ultimoError: unknown = null;
-    // Usar APIRequestContext evita el AbortController/CORS del navegador.
-    // La función SQL es rápida; el payload es no mutante y se puede reintentar.
-    for (let intento = 1; intento <= 3; intento++) {
+    let ultimoEstado = 0;
+    let ultimoDetalle = '';
+    // APIRequestContext evita el AbortController/CORS del navegador. La RPC
+    // rechaza este payload antes de escribir y la función tarda milisegundos;
+    // se reintentan únicamente fallos de transporte/5xx transitorios.
+    for (let intento = 1; intento <= 5; intento++) {
       try {
         respuesta = await page.request.post(
           contexto.url + '/rest/v1/rpc/erp_persistir_lote',
@@ -2140,16 +2158,23 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
             },
           },
         );
-        break;
+        ultimoEstado = respuesta.status();
+        ultimoDetalle = await respuesta.text();
+        if (![502, 503, 504].includes(ultimoEstado) || intento === 5) break;
+        respuesta = null;
       } catch (error) {
         ultimoError = error;
-        if (intento === 3) break;
-        await new Promise((resolve) => setTimeout(resolve, 250 * intento));
+        if (intento === 5) break;
       }
+      await new Promise((resolve) => setTimeout(resolve, Math.min(4000, 500 * 2 ** (intento - 1))));
     }
-    if (!respuesta) throw new Error('La RPC de snapshot no respondió tras 3 intentos: ' + String(ultimoError));
-    expect(respuesta.status()).toBe(409);
-    expect(await respuesta.text()).toMatch(/40001|desactualizada|snapshot/i);
+    if (!respuesta) {
+      throw new Error('La RPC de snapshot no respondió de forma estable tras 5 intentos. ' +
+        'Último HTTP: ' + ultimoEstado + '. Detalle: ' + ultimoDetalle +
+        '. Error de transporte: ' + String(ultimoError));
+    }
+    expect(respuesta.status(), 'Respuesta de la RPC de snapshot: ' + ultimoDetalle).toBe(409);
+    expect(ultimoDetalle).toMatch(/40001|desactualizada|snapshot/i);
   });
 
   test('Persistir y recuperar el ingreso de matrícula y su distribución en Caja desde Supabase QA', async () => {
