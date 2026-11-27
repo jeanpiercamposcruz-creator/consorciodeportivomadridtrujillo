@@ -105,7 +105,11 @@ async function sess() {
   // El pool de PostgREST puede tardar en recuperar conexiones. La lectura
   // del perfil es idempotente y admite reintentos escalonados.
   const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`, {}, 1, 6);
-  if (!r.ok) throw new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
+  if (!r.ok) {
+    const error = new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
+    error.status = r.status;
+    throw error;
+  }
   const j = await r.json();
   if (!j.length || j[0].rol !== "ADM") throw "rol";
   U = { id: "ADMIN", nom: EM, rol: "ADM" };
