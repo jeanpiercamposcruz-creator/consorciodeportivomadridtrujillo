@@ -176,7 +176,33 @@ function payRun(b, fn, metric, tk) {
     toast("Espera a que termine la operación de pago anterior.");
     return; // Un segundo cobro durante una operación activa nunca debe ejecutar fn().
   }
-  if (!b || !b.isConnected) return fn();
+  if (!b || !b.isConnected) {
+    // Aunque el botón haya desaparecido por un redibujado, la operación
+    // financiera debe seguir serializada y esperar la confirmación de Supabase.
+    const m0 = metric();
+    PAYB = 1;
+    let resultado;
+    try {
+      resultado = fn();
+    } catch (e) {
+      PAYB = 0;
+      throw e;
+    }
+    return Promise.resolve(resultado)
+      .then(() => {
+        if (metric() <= m0) return;
+        return sv.then(() => {
+          if (!SAVE_OK) throw new Error("no guardado");
+        });
+      })
+      .catch((e) => {
+        console.error("No se pudo confirmar la operación financiera sin botón visible.", e);
+        toast("No se pudo confirmar el pago. Verifica Caja antes de volver a intentarlo.");
+      })
+      .finally(() => {
+        PAYB = 0;
+      });
+  }
   const m0 = metric(),
     R0 = R;
   let pend = false;
