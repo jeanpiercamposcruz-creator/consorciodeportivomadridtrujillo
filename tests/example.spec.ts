@@ -1974,6 +1974,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const dni = String(randomInt(10_000_000, 99_999_999));
     type HerramientaQA = {
       prepararIdMatricula: (dni: string) => Promise<string>;
+      verificarAusenciaMatriculaQA: (dni: string) => Promise<number>;
       cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
     };
     try {
@@ -2017,12 +2018,11 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         await expect(page.locator('#toast')).not.toContainText('Matrícula guardada');
 
         const filas = await page.evaluate(async (dniPrueba) => {
-          const consultar = eval('sb') as (ruta: string) => Promise<Response>;
-          const response = await consultar('/rest/v1/alumnos?dni=eq.' + encodeURIComponent(dniPrueba) + '&select=id');
-          if (!response.ok) throw new Error('No se pudo verificar la matrícula fallida en Supabase QA.');
-          return response.json();
+          const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaQA }).__ERP_QA_PERSISTENCIA__;
+          if (!api) throw new Error('No está habilitada la verificación autenticada de matrícula QA.');
+          return api.verificarAusenciaMatriculaQA(dniPrueba);
         }, dni);
-        expect(filas).toHaveLength(0);
+        expect(filas).toBe(0);
         await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
       } finally {
         await page.unroute(rpcPath, bloquear);
