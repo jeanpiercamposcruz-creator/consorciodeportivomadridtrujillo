@@ -1047,8 +1047,9 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
 
         const asistenciaRuta = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId);
         const alumnoRuta = "/rest/v1/alumnos?id=eq." + encodeURIComponent(datos.alumnoId);
-        const cajaRuta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId) +
-          "&fecha=eq." + encodeURIComponent(datos.fecha);
+        // Buscar todos los movimientos del fixture: una reversión de limpieza
+        // puede tener fecha posterior a la asistencia original.
+        const cajaRuta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId);
         const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias] = await Promise.all([
           sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id,pago_campo,pago_campo_movimiento_id"),
           sb(cajaRuta + "&select=id,fecha,sede_id,tipo,concepto,detalle,monto,origen"),
