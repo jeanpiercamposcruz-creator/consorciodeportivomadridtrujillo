@@ -150,7 +150,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$function$
+$function$;
 
 
 REVOKE ALL ON FUNCTION public.fn_validar_reversion_pago_matricula() FROM PUBLIC, anon, authenticated;
