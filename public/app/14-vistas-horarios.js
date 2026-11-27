@@ -900,7 +900,7 @@ VW.caja = () => {
         ["E", "Egreso"],
       ]) +
       "</select>",
-  )}${fl("Concepto", "<select id=c_c>" + o(["Matrícula / mensualidad", "Indumentaria", "Pago de campo", "Pago de alquiler", "Planilla de entrenadores", "Compras", "Otros"].filter((x) => U.rol === "ADM" || !/alquiler|Planilla/.test(x)).map((x) => [x, x])) + "</select>")}${fl("Detalle", "<input id=c_d>")}${fl("Monto (S/)", "<input id=c_m type=number min=0>")}</div><div class=row><button data-f="addCaja" data-i="${esc(s)}">Registrar movimiento</button></div></div><div class=card><h3>Saldo de ${esc(sn(s))}: ${money(b)}</h3>${tbl(
+  )}${fl("Concepto", "<select id=c_c>" + o(["Matrícula / mensualidad", "Indumentaria", "Pago de campo", "Pago de alquiler", "Planilla de entrenadores", "Compras", "Otros"].filter((x) => U.rol === "ADM" || !/alquiler|Planilla/.test(x)).map((x) => [x, x]), "", "Selecciona un concepto") + "</select>")}${fl("Detalle", "<input id=c_d>")}${fl("Monto (S/)", "<input id=c_m type=number min=0>")}</div><div class=row><button data-f="addCaja" data-i="${esc(s)}">Registrar movimiento</button></div></div><div class=card><h3>Saldo de ${esc(sn(s))}: ${money(b)}</h3>${tbl(
     ["Fecha", "Tipo", "Concepto", "Detalle", "Trazabilidad", "Monto"],
     L.slice()
       .reverse()
