@@ -53,6 +53,8 @@ test('limpia los documentos subidos si falla el guardado del pre-registro', asyn
   try {
     await page.goto(new URL('#prereg', url).toString(), { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Pre-registro de alumno' })).toBeVisible();
+    await expect(page.locator('#pp_dp option[value="DEP-FUT"]')).toHaveCount(1);
+    await expect(page.locator('#pp_sd option[value="SED-CAN"]')).toHaveCount(1);
 
     await page.locator('#pp_m').selectOption('Presencial');
     await page.locator('#pp_n').fill('QA TEMPORAL');
