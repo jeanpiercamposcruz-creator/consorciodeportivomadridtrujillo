@@ -917,7 +917,8 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           window.__ERP_QA_NEXT_CAJA_ID__ = cajaId;
           return {
             alumnoId, alumnoDni: dni, horarioId: horario.id, sedeId: horario.sede,
-            grupo: horario.dep + "|" + horario.cat, fecha, fee: Number(S.fee ?? 5),
+            grupo: horario.dep + "|" + horario.cat, fecha,
+            fee: Number(S.fee ?? 5), feeOriginal: Number(S.fee ?? 5),
             asistenciaId, cajaId,
           };
         } catch (error) {
