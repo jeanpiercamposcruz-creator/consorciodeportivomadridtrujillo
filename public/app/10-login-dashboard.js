@@ -47,6 +47,10 @@ async function doLogin2() {
   try {
     await sess();
   } catch (e) {
+    console.error(e);
+    if (e?.status >= 500 || /Failed to fetch|network|timed out|No se pudo validar el perfil/i.test(e?.message || "")) {
+      return toast("No se pudo validar el perfil por un problema temporal de conexión con la base de datos. Intenta de nuevo.");
+    }
     return toast("Este usuario no tiene permiso para entrar al sistema.");
   }
   try {
