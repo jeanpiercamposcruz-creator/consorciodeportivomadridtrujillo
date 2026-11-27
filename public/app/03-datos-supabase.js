@@ -55,12 +55,15 @@ async function sb(path, o = {}, retry = 1, transientRetry = 1, transientAttempt 
   // PostgREST puede devolver PGRST002/503 transitorios cuando su pool no
   // consigue una conexión. Reintentar solo lecturas evita duplicar escrituras.
   if (retryable && [502, 503, 504].includes(r.status) && transientRetry > 0) {
+    // Consumir el cuerpo antes de reintentar libera la respuesta HTTP anterior.
+    await r.text().catch(() => "");
     const espera = Math.min(16000, 500 * 2 ** transientAttempt);
     await new Promise((resolve) => setTimeout(resolve, Math.round(espera * (0.75 + Math.random() * 0.5))));
     return sb(path, o, retry, transientRetry - 1, transientAttempt + 1);
   }
 
   if (r.status === 401 && RT && retry) {
+    await r.text().catch(() => "");
     REFRESHING =
       REFRESHING ||
       auth({ refresh_token: RT }, "refresh_token").finally(
@@ -111,6 +114,7 @@ async function sess() {
   // si sigue indisponible, se libera el intento y se permite reintentar el login.
   const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${UID}`, {}, 1, 1);
   if (!r.ok) {
+    await r.text().catch(() => "");
     const error = new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
     error.status = r.status;
     throw error;
@@ -209,7 +213,10 @@ const TB = [
     read: async () => {
       if (U?.rol === "ADM") return all("personal");
       const r = await sb("/rest/v1/rpc/personal_directorio", { method: "POST", body: "{}" });
-      if (!r.ok) throw new Error("No se pudo cargar el directorio público del personal.");
+      if (!r.ok) {
+        await r.text().catch(() => "");
+        throw new Error("No se pudo cargar el directorio público del personal.");
+      }
       return await r.json();
     },
   },
@@ -388,7 +395,10 @@ async function ver() {
     // La lectura de versión solo sincroniza el sondeo entre pestañas;
     // nunca debe dejar una escritura de negocio esperando indefinidamente.
     const r = await sb("/rest/v1/erp_meta?id=eq.1&select=ver", { timeout: 5000 });
-    if (!r.ok) return;
+    if (!r.ok) {
+      await r.text().catch(() => "");
+      return;
+    }
     const rows = await r.json();
     if (rows[0] && Number.isFinite(Number(rows[0].ver))) VER = Number(rows[0].ver);
   } catch (e) {}
@@ -1866,7 +1876,10 @@ async function subirArch(f, carpeta, tipo) {
       timeout: 90000,
       body: f,
     });
-  if (!r.ok) throw "subida";
+  if (!r.ok) {
+    await r.text().catch(() => "");
+    throw "subida";
+  }
   return path;
 }
 async function verDoc(path) {
@@ -1876,7 +1889,10 @@ async function verDoc(path) {
       method: "POST",
       body: JSON.stringify({ expiresIn: 120 }),
     });
-    if (!r.ok) throw 0;
+    if (!r.ok) {
+      await r.text().catch(() => "");
+      throw 0;
+    }
     const j = await r.json(),
       u = SB + "/storage/v1" + j.signedURL;
     if (!w) return toast("Permite las ventanas emergentes para ver el archivo");
