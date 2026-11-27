@@ -121,7 +121,7 @@ function perDatos() {
         (x) =>
           `<tr><td>${esc(sn(x.sede))}</td><td>${esc(x.hr)}</td><td>${esc(x.hs)}</td><td><button class="s r act" data-f=perSedDel data-i="${esc(x.id)}" title="Quitar" aria-label="Quitar">${iac("trash")}</button></td></tr>`,
       ),
-    )}<div class=row><select id=ps_s>${o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre]))}</select><input id=ps_h placeholder="Horario (vacío = se toma de Horarios)"><input id=ps_r type=number min=0 placeholder="Horas sem."><button data-f=perSedAdd>Asignar sede</button></div><p class=mu>Total de horas semanales: <b>${th}</b></p></div><div class=card><h3>Certificaciones y acreditaciones</h3>${tbl(
+    )}<div class=row><select id=ps_s>${o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre]))}</select><input id=ps_h placeholder="Horario (vacío = se toma de Horarios)"><input id=ps_r type=number min=0 max=168 step=0.01 placeholder="Horas sem."><button data-f=perSedAdd>Asignar sede</button></div><p class=mu>Total de horas semanales: <b>${th}</b></p></div><div class=card><h3>Certificaciones y acreditaciones</h3>${tbl(
       ["Certificación", "Entidad", "Vencimiento", "Estado", ""],
       CL.map(
         (x) =>
@@ -203,7 +203,7 @@ function perSedAdd() {
   const a = autoSede(EP, sid),
     hr = limpiar(v("ps_h"), 80) || a.resumen,
     hs = v("ps_r") === "" ? a.horas : monto(v("ps_r"));
-  if (hs === null) return toast("Horas semanales inválidas");
+  if (hs === null || hs > 168) return toast("Las horas semanales deben estar entre 0 y 168.");
   S.psedes.push({ id: uid(), pid: EP, sede: sid, hr, hs });
   save("Sede asignada");
   R();
