@@ -28,3 +28,5 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
+
+REVOKE ALL ON FUNCTION public.fn_proteger_contrato_alumno_con_pagos() FROM PUBLIC, anon, authenticated;
