@@ -694,7 +694,15 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         const payload = [
           {
             name: "personal",
-            insert: [{ id: personalId, nombres: "QA Atomicidad", rol: "ENT", activo: 0, permite_varias_sedes: false }],
+            insert: [{
+              id: personalId,
+              nombres: "QA Atomicidad",
+              rol: "ENT",
+              activo: 0,
+              permite_varias_sedes: false,
+              tipo_contrato: "Por horas",
+              fecha_inicio: today(),
+            }],
             update: [],
             delete: [],
           },
