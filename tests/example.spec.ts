@@ -815,7 +815,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
       const tarifaCampo = page.locator('input[data-ch="setFee"]');
       await tarifaCampo.fill('0');
-      await tarifaCampo.dispatchEvent('change');
+      await tarifaCampo.press('Tab');
       await expect(page.locator('#toast')).toContainText('El pago de campo debe ser mayor que cero');
       await expect(tarifaCampo).toHaveValue(String(datos.fee));
 
