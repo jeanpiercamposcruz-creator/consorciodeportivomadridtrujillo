@@ -697,6 +697,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
     await expect(page.locator('#toast')).toContainText('Monto mensual inválido');
 
+    for (const importe of ['100000', '100.001']) {
+      await page.locator('#c_m').fill(importe);
+      await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
+      await expect(page.locator('#toast')).toContainText('Monto mensual inválido');
+      await expect(page.locator('#c_m')).toHaveValue(importe);
+    }
+
     await page.locator('#c_m').fill('100');
     await page.locator('#c_i').fill(fechas.inicio);
     await page.locator('#c_f').fill(fechas.inicio);
