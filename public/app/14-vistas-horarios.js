@@ -639,7 +639,7 @@ VW.asis = () => {
       S.asis.find((x) => x.f === today() && x.t === t && x.ref === r && x.h === AS.h) || {};
   const row = (t, r, n) => {
     const c = rec(t, r);
-    return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">${Number(S.fee ?? 5) === 0 ? "Sin costo" : "Pagó"}</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
+    return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">${Number(S.fee ?? 5) === 0 && !pagoCampoActivo(r, AS.h) ? "Sin costo" : "Pagó"}</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
   };
   let list = "";
   if (H && AS.t === "A")
@@ -690,6 +690,16 @@ function mkA(t, r, ok) {
   else S.asis.push({ f: today(), t, ref: r, h: AS.h, ok });
   save();
   R();
+}
+function pagoCampoActivo(r, h, fecha = today()) {
+  const base = `campo|${fecha}|${r}|${h}`;
+  return S.caja.some((ingreso) => {
+    if (ingreso.t !== "I" || (ingreso.k !== base && !String(ingreso.k || "").startsWith(base + "|"))) return false;
+    const revertido = S.caja
+      .filter((movimiento) => movimiento.t === "E" && movimiento.k === `reversion-campo:${ingreso._id}`)
+      .reduce((total, movimiento) => total + (+movimiento.m || 0), 0);
+    return (+ingreso.m || 0) - revertido > 0.009;
+  });
 }
 function mkP(r, pc) {
   const fee = monto(S.fee ?? 5);
