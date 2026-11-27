@@ -21,10 +21,11 @@ let TK = null,
 
 let REFRESHING = null;
 
-async function sb(path, o = {}, retry = 1) {
-  const ctl = new AbortController(),
-    to = setTimeout(() => ctl.abort(), o.timeout || 20000);
-
+async function sb(path, o = {}, retry = 1, transientRetry = 2) {
+  const method = String(o.method || "GET").toUpperCase();
+  const retryable = method === "GET" || method === "HEAD";
+  const ctl = new AbortController();
+  const to = setTimeout(() => ctl.abort(), o.timeout || 20000);
   let r;
 
   try {
@@ -38,8 +39,22 @@ async function sb(path, o = {}, retry = 1) {
         ...(o.headers || {}),
       },
     });
+  } catch (e) {
+    clearTimeout(to);
+    if (retryable && transientRetry > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 250 * (3 - transientRetry)));
+      return sb(path, o, retry, transientRetry - 1);
+    }
+    throw e;
   } finally {
     clearTimeout(to);
+  }
+
+  // PostgREST puede devolver PGRST002/503 transitorios cuando su pool no
+  // consigue una conexión. Reintentar solo lecturas evita duplicar escrituras.
+  if (retryable && [502, 503, 504].includes(r.status) && transientRetry > 0) {
+    await new Promise((resolve) => setTimeout(resolve, 250 * (3 - transientRetry)));
+    return sb(path, o, retry, transientRetry - 1);
   }
 
   if (r.status === 401 && RT && retry) {
@@ -50,11 +65,12 @@ async function sb(path, o = {}, retry = 1) {
       );
 
     await REFRESHING;
-    return sb(path, o, 0);
+    return sb(path, o, 0, transientRetry);
   }
 
   return r;
 }
+
 async function auth(body, q) {
   const r = await fetch(SB + "/auth/v1/token?grant_type=" + q, {
     method: "POST",
