@@ -286,12 +286,14 @@ const cajaPay = (s, b) => {
     });
 };
 const campoPay = (r, b) =>
-  payRun(
-    b,
-    () => mkP(r, true),
-    () => S.caja.length,
-    () => ({ c: S.caja[S.caja.length - 1] }),
-  );
+  Number(S.fee ?? 5) === 0
+    ? mkP(r, true)
+    : payRun(
+        b,
+        () => mkP(r, true),
+        () => S.caja.length,
+        () => ({ c: S.caja[S.caja.length - 1] }),
+      );
 function matPay(b) {
   if (PAYB) return;
   const old = ED ? S.alu.find((x) => x.id === ED) : null,
