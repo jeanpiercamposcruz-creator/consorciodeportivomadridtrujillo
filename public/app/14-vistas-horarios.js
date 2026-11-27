@@ -915,7 +915,7 @@ function gerRow(s, ym) {
       .reduce((t, x) => t + x.m, 0),
     kc = S.kits.filter((k) => k.est !== "Anulada" && k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
-      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym))
+      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym) && x.f <= today())
       .reduce((t, x) => {
         const h = S.hor.find((h) => h.id === x.h);
         const p = S.personal.find((p) => p.id === x.ref);
