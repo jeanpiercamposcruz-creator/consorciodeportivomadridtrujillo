@@ -107,7 +107,9 @@ function validarPago(f) {
     e = [];
   if (m === null || m <= 0) e.push("Monto inválido");
   if (!["I", "E"].includes(f.t)) e.push("Tipo inválido");
-  return { d: { m, t: f.t, c: limpiar(f.c, 60), d: limpiar(f.d, 120) }, e };
+  const concepto = limpiar(f.c, 60);
+  if (!concepto) e.push("Concepto obligatorio");
+  return { d: { m, t: f.t, c: concepto, d: limpiar(f.d, 120) }, e };
 }
 const o = (a, val, ph) =>
   (ph !== undefined ? `<option value="">${ph}</option>` : "") +
