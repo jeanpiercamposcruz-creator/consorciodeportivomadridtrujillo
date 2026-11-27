@@ -813,6 +813,12 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(verificado.asistencia.pago_campo).toBeNull();
       expect(verificado.restored.asistio).toBe(true);
 
+      const tarifaCampo = page.locator('input[data-ch="setFee"]');
+      await tarifaCampo.fill('0');
+      await tarifaCampo.dispatchEvent('change');
+      await expect(page.locator('#toast')).toContainText('El pago de campo debe ser mayor que cero');
+      await expect(tarifaCampo).toHaveValue(String(datos.fee));
+
       await page.locator(
         'button[data-f="mkP"][data-i="' + datos.alumnoId + '"][data-j="1"]'
       ).click();
