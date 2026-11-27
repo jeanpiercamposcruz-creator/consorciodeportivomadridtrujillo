@@ -375,10 +375,20 @@ async function pull() {
     await ver();
     return;
   }
-  // 1) descargar TODO primero (si algo falla aquí, S y SN siguen intactos)
-  const raw = {};
-  for (const t of TB)
-    raw[t.n] = t.n === "ajustes" ? aj : t.read ? await t.read() : t.opt ? await all(t.n).catch(() => []) : await all(t.n);
+  // 1) Descargar todas las tablas en paralelo antes de tocar S o SN.
+  // La lectura secuencial multiplicaba el timeout de 20 s por cada tabla y
+  // podía dejar una recarga completa esperando varios minutos.
+  const entradas = await Promise.all(TB.map(async (t) => [
+    t.n,
+    t.n === "ajustes"
+      ? aj
+      : t.read
+        ? await t.read()
+        : t.opt
+          ? await all(t.n).catch(() => [])
+          : await all(t.n),
+  ]));
+  const raw = Object.fromEntries(entradas);
   // 2) reemplazar el estado de golpe, sin ningún await en medio
   S = {
     sedes: [],
