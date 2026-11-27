@@ -72,7 +72,7 @@ const FN = {
   ed: (i) => ed(i),
   carnet: (i) => carnet(i),
   mkA: (t, r, k) => mkA(t, r, k === "1"),
-  mkP: (r, k, z, b) => (k === "1" ? campoPay(r, b) : mkP(r, false)),
+  mkP: (r, k, z, b) => (k === "1" ? campoPay(r, b) : campoDebe(r, b)),
   addCaja: (i, j, k, b) => cajaPay(i, b),
 };
 /* Acciones que antes eran onclick="..." embebidos en el HTML */
