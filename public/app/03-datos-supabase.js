@@ -1530,6 +1530,33 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           restored: { id: recuperada.id, m: recuperada.m, a: recuperada.a, s: recuperada.s, e: recuperada.e },
         };
       },
+      async forzarGeneracionCarnetQA(dni) {
+        if (U?.rol !== "ADM") throw new Error("La prueba de carnet requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de carnet inválido.");
+        const alumno = S.alu.find((x) => x.dni === dni);
+        if (!alumno) throw new Error("No se encontró el alumno temporal para generar el carnet.");
+        // Simular un registro antiguo sin token para probar la persistencia real.
+        alumno.qt = "";
+        carnet(alumno.id);
+        return { id: alumno.id };
+      },
+      async consultarTokenCarnetQA(dni) {
+        if (U?.rol !== "ADM") throw new Error("La consulta de carnet requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de carnet inválido.");
+        await sv;
+        const respuesta = await sb("/rest/v1/alumnos?select=qr_token&dni=eq." + encodeURIComponent(dni));
+        if (!respuesta.ok) throw new Error("No se pudo consultar el token QR en Supabase QA.");
+        const filas = await respuesta.json();
+        return filas[0]?.qr_token ?? null;
+      },
+      async verificarAusenciaMatriculaQA(dni) {
+        if (U?.rol !== "ADM") throw new Error("La verificación de matrícula requiere una sesión administradora QA.");
+        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de matrícula inválido.");
+        await sv;
+        const respuesta = await sb("/rest/v1/alumnos?select=id&dni=eq." + encodeURIComponent(dni));
+        if (!respuesta.ok) throw new Error("No se pudo comprobar la matrícula fallida en Supabase QA.");
+        return (await respuesta.json()).length;
+      },
       async probarBloqueoClienteAntiguoQA() {
         if (U?.rol !== "ADM") throw new Error("La prueba de snapshot requiere una sesión administradora QA.");
         await sv;
