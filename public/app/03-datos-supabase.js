@@ -1532,7 +1532,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async forzarGeneracionCarnetQA(dni) {
         if (U?.rol !== "ADM") throw new Error("La prueba de carnet requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de carnet inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de carnet inválido.");
         const alumno = S.alu.find((x) => x.dni === dni);
         if (!alumno) throw new Error("No se encontró el alumno temporal para generar el carnet.");
         // Simular un registro antiguo sin token para probar la persistencia real.
@@ -1542,7 +1542,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async consultarTokenCarnetQA(dni) {
         if (U?.rol !== "ADM") throw new Error("La consulta de carnet requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de carnet inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de carnet inválido.");
         await sv;
         const respuesta = await sb("/rest/v1/alumnos?select=qr_token&dni=eq." + encodeURIComponent(dni));
         if (!respuesta.ok) throw new Error("No se pudo consultar el token QR en Supabase QA.");
@@ -1551,7 +1551,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
       },
       async verificarAusenciaMatriculaQA(dni) {
         if (U?.rol !== "ADM") throw new Error("La verificación de matrícula requiere una sesión administradora QA.");
-        if (!/^\\d{8}$/.test(String(dni))) throw new Error("DNI temporal de matrícula inválido.");
+        if (!/^\d{8}$/.test(String(dni))) throw new Error("DNI temporal de matrícula inválido.");
         await sv;
         const respuesta = await sb("/rest/v1/alumnos?select=id&dni=eq." + encodeURIComponent(dni));
         if (!respuesta.ok) throw new Error("No se pudo comprobar la matrícula fallida en Supabase QA.");
