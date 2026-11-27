@@ -52,10 +52,15 @@ async function doLogin2() {
     await sess();
   } catch (e) {
     console.error(e);
-    if (e?.status >= 500 || /Failed to fetch|network|timed out|No se pudo validar el perfil/i.test(e?.message || "")) {
-      return toast("No se pudo validar el perfil por un problema temporal de conexión con la base de datos. Intenta de nuevo.");
-    }
-    return toast("Este usuario no tiene permiso para entrar al sistema.");
+    const mensaje =
+      e?.status >= 500 || /Failed to fetch|network|timed out|No se pudo validar el perfil/i.test(e?.message || "")
+        ? "No se pudo validar el perfil por un problema temporal de conexión con la base de datos. Intenta de nuevo."
+        : "Este usuario no tiene permiso para entrar al sistema.";
+    // Auth puede emitir tokens antes de que PostgREST valide el perfil.
+    // Si la validación falla, revocar/limpiar esa sesión parcial evita dejar
+    // credenciales residuales mientras el usuario permanece en el login.
+    out();
+    return toast(mensaje);
   }
   try {
     await pull();
@@ -71,7 +76,7 @@ const out = () => {
   if (typeof R_REAL === "function") R = R_REAL; // payRun() pudo dejar R() anulada
   PAYB = 0;
   U = null;
-  TK = RT = null;
+  TK = RT = UID = null;
   KS = 0;
   V = "home";
   try {
