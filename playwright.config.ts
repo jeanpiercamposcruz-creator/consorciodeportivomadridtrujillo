@@ -18,10 +18,19 @@ if (url) {
   const esQA =
     destino.hostname ===
     'consorciodeportivomadridtrujillo-aolm-git-auditor-d3ba91-marget.vercel.app';
+  const supabaseQA =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ===
+    'https://yiredilknlwbzwvwlqyx.supabase.co';
+
+  if (esLocal && !supabaseQA) {
+    throw new Error(
+      'Bloqueado: las pruebas locales solo pueden conectarse al proyecto Supabase QA autorizado.'
+    );
+  }
 
   if (!esLocal && (!esQA || destino.protocol !== 'https:')) {
     throw new Error(
-      'Bloqueado: las pruebas solo pueden ejecutarse en localhost o en el despliegue Preview autorizado de QA mediante HTTPS.'
+      'Bloqueado: las pruebas remotas solo pueden ejecutarse en el Preview HTTPS autorizado de QA.'
     );
   }
 }
