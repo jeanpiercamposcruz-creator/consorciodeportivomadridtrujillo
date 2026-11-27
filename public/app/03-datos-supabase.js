@@ -359,7 +359,12 @@ async function all(n) {
     i = 0;
   for (;;) {
     const r = await sb(`/rest/v1/${n}?select=*&order=id&limit=1000&offset=${i}`);
-    if (!r.ok) throw n;
+    if (!r.ok) {
+      const detalle = await r.text().catch(() => "");
+      const error = new Error(`No se pudo leer ${n} (${r.status}): ${detalle}`);
+      error.status = r.status;
+      throw error;
+    }
     const j = await r.json();
     o = o.concat(j);
     if (j.length < 1000) return o;
@@ -391,19 +396,28 @@ async function pull() {
     await ver();
     return;
   }
-  // 1) Descargar todas las tablas en paralelo antes de tocar S o SN.
-  // La lectura secuencial multiplicaba el timeout de 20 s por cada tabla y
-  // podía dejar una recarga completa esperando varios minutos.
-  const entradas = await Promise.all(TB.map(async (t) => [
-    t.n,
-    t.n === "ajustes"
-      ? aj
-      : t.read
-        ? await t.read()
-        : t.opt
-          ? await all(t.n).catch(() => [])
-          : await all(t.n),
-  ]));
+  // Limitar la concurrencia de lecturas evita agotar el pool de PostgREST
+  // (PGRST003/PGRST002) durante el inicio. Las tablas opcionales solo se omiten
+  // si realmente no existen; errores de conexión no se convierten en arrays vacíos.
+  const entradas = [];
+  const concurrenciaLectura = 4;
+  for (let i = 0; i < TB.length; i += concurrenciaLectura) {
+    const lote = TB.slice(i, i + concurrenciaLectura);
+    const resultado = await Promise.all(lote.map(async (t) => [
+      t.n,
+      t.n === "ajustes"
+        ? aj
+        : t.read
+          ? await t.read()
+          : t.opt
+            ? await all(t.n).catch((e) => {
+                if (e?.status === 404 && /PGRST205|not found|does not exist/i.test(e.message)) return [];
+                throw e;
+              })
+            : await all(t.n),
+    ]));
+    entradas.push(...resultado);
+  }
   const raw = Object.fromEntries(entradas);
   // 2) reemplazar el estado de golpe, sin ningún await en medio
   S = {
