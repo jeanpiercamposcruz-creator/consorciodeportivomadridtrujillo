@@ -56,6 +56,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     // await; limpiarlas evita que los traces/reportes de CI las adjunten.
     await page.locator('#lu').fill('');
     await page.locator('#lp').fill('');
+    await expect(page.locator('#lp')).toHaveValue('');
     try {
       await expect(dashboard).toBeVisible({ timeout: 20000 });
     } catch (error) {
