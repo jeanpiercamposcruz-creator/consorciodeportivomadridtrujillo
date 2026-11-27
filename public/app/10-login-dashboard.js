@@ -106,8 +106,12 @@ let CS = { u: null, m: null, r: 6, v: "d", mo: today().slice(0, 7) };
 const uMes = (m) => {
   const c = S.caja.filter((x) => x.f.startsWith(m)),
     ing = c.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
-    eg = c.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
-    kc = S.kits.filter((k) => k.f.startsWith(m)).reduce((t, k) => t + k.c, 0),
+    // Alquiler y planilla se descuentan por separado abajo; excluirlos evita duplicar egresos.
+    eg = c
+      .filter((x) => x.t === "E" && !["Pago de alquiler", "Planilla de entrenadores"].includes(x.c))
+      .reduce((t, x) => t + x.m, 0),
+    // Una venta anulada no debe seguir restando su costo de confección a la utilidad.
+    kc = S.kits.filter((k) => k.est !== "Anulada" && k.f.startsWith(m)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
       .filter((x) => x.t === "P" && x.ok && x.f.startsWith(m))
       .reduce((t, x) => {
