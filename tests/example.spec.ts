@@ -66,6 +66,20 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     }
   };
 
+  // La navegación es idempotente: varias pruebas consecutivas pueden dejar
+  // el ERP ya situado en el directorio, sin que exista un botón de navegación.
+  const irDirectorio = async () => {
+    const encabezado = page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true });
+    if (!(await encabezado.isVisible().catch(() => false))) {
+      const acceso = page.locator(
+        'button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]'
+      ).first();
+      await expect(acceso).toBeVisible({ timeout: 10000 });
+      await acceso.click();
+    }
+    await expect(encabezado).toBeVisible({ timeout: 10000 });
+  };
+
   test.beforeEach(async () => {
     await cerrarDialogoResidual();
   });
@@ -81,7 +95,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
   test('Validar formulario de nueva matrícula sin guardar datos', async () => {
     // El inicio es el dashboard. Entramos al módulo Directorio de Alumnos desde su acceso directo.
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
 
@@ -122,7 +136,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       }, dni);
       expect(preparado).toBe('RPC');
 
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
       await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
       await page.getByRole('button', { name: /Nueva matrícula/i }).click();
       await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
@@ -176,7 +190,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Rechazar nombres inválidos sin guardar matrícula', async () => {
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
 
@@ -189,13 +203,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.locator('#m_nom')).toHaveValue('123');
 
     // Salimos sin guardar: la prueba no crea ni modifica alumnos.
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
   });
 
 
   test('Rechazar fecha de nacimiento fuera de rango y monto de matrícula inválido', async () => {
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
     await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
@@ -226,7 +240,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Rechazar DNI duplicado sin guardar matrícula', async () => {
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
 
     const dniExistente = await page.locator('#dt table tr').evaluateAll((rows) => {
@@ -254,7 +268,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   });
 
   test('Filtrar alumnos por estado y restablecer filtros', async () => {
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
 
     const filas = page.locator('#dt table tr');
@@ -275,7 +289,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
   test('Buscar alumnos sin modificar registros', async () => {
     // Volvemos al directorio desde el menú lateral; la búsqueda solo filtra la vista.
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
 
     // La función tbl() coloca también el encabezado dentro de tbody; contamos todas las filas.
@@ -304,7 +318,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
   test('Abrir ficha de alumno y cancelar sin guardar cambios', async () => {
     const encabezadoDirectorio = page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true });
     if (!(await encabezadoDirectorio.isVisible())) {
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
     }
     await expect(encabezadoDirectorio).toBeVisible();
 
@@ -1012,7 +1026,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByText('Ventas de Indumentaria', { exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Nueva venta', exact: true })).toBeVisible();
 
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
 
@@ -1037,7 +1051,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupKit: (id: string) => Promise<{ removed: boolean }>;
     };
     try {
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
       await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
       const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
 
@@ -1113,7 +1127,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupKit: (id: string) => Promise<{ removed: boolean }>;
     };
     try {
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
       await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
       const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
 
@@ -1239,7 +1253,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupKit: (id: string) => Promise<{ removed: boolean }>;
     };
     try {
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
       await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
       const codigoAlumno = (await page.locator('#dt table tr').nth(1).locator('td').first().innerText()).trim();
 
@@ -1482,7 +1496,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
 
   test('Rechazar archivos adjuntos con formato no permitido o tamaño excesivo', async () => {
-    await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+    await irDirectorio();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: /Nueva matrícula/i }).click();
     await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
@@ -1903,7 +1917,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
     };
     try {
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
       await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
       await page.getByRole('button', { name: /Nueva matrícula/i }).click();
       await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
@@ -2069,7 +2083,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       cleanupMatricula: (dni: string) => Promise<{ removed: boolean; id?: string }>;
     };
     try {
-      await page.locator('button[data-i="dir"][data-f="go"], button[data-i="dir"][data-f="nav"]').first().click();
+      await irDirectorio();
       await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
       await page.getByRole('button', { name: /Nueva matrícula/i }).click();
       await expect(page.getByRole('heading', { name: /Nueva matrícula/i })).toBeVisible();
