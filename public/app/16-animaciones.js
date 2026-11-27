@@ -249,15 +249,42 @@ function payRun(b, fn, metric, tk) {
 }
 
 const kitPay = () => saveKit();
-const cajaPay = (s, b) =>
-  v("c_t") === "I"
-    ? payRun(
-        b,
-        () => addCaja(s),
-        () => S.caja.length,
-        () => ({ c: S.caja[S.caja.length - 1] }),
-      )
-    : addCaja(s);
+const cajaPay = (s, b) => {
+  if (v("c_t") === "I") {
+    return payRun(
+      b,
+      () => addCaja(s),
+      () => S.caja.length,
+      () => ({ c: S.caja[S.caja.length - 1] }),
+    );
+  }
+
+  // Los egresos manuales también necesitan bloqueo anti doble clic.
+  if (PAYB) return;
+  PAYB = 1;
+  const cantidadAntes = S.caja.length;
+  if (b) b.disabled = true;
+  try {
+    addCaja(s);
+  } catch (e) {
+    PAYB = 0;
+    if (b) b.disabled = false;
+    throw e;
+  }
+  if (S.caja.length === cantidadAntes) {
+    PAYB = 0;
+    if (b) b.disabled = false;
+    return;
+  }
+  return sv
+    .then(() => {
+      if (!SAVE_OK) throw new Error("no guardado");
+    })
+    .finally(() => {
+      PAYB = 0;
+      if (b) b.disabled = false;
+    });
+};
 const campoPay = (r, b) =>
   payRun(
     b,
