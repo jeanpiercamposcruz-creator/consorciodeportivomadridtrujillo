@@ -416,7 +416,15 @@ async function flush() {
   const payload = W.map(([t, ins, upd]) => ({
     name: t.n,
     insert: ins,
-    update: upd,
+    // Para alumnos se adjunta el importe visto al cargar el registro.
+    // La RPC lo compara bajo bloqueo antes de aceptar cualquier actualización.
+    // jsonb_populate_recordset ignora esta propiedad auxiliar.
+    update: t.n === "alumnos"
+      ? upd.map((r) => ({
+          ...r,
+          __expected_monto_pagado: JSON.parse(SN[t.n]?.get(r.id) || "{}").monto_pagado ?? null,
+        }))
+      : upd,
     delete: delByTable.get(t.n) || [],
   }));
   if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co" && U?.rol === "ADM") {
@@ -469,10 +477,13 @@ function save(mensajeExito = "") {
         }
         console.error(e);
         const duplicado = e === "dup" || String(e).startsWith("dup:");
+        const conflicto = /40001|La matrícula fue modificada en otra sesión/.test(String(e));
         toast(
           duplicado
             ? "Otro equipo creó el mismo código a la vez. Se recargaron los datos: repite tu registro."
-            : "No se pudo guardar: revisa la conexión o tus permisos",
+            : conflicto
+              ? "La matrícula cambió en otra sesión. Se recargaron los datos; revisa los importes y vuelve a intentarlo."
+              : "No se pudo guardar: revisa la conexión o tus permisos",
         );
         // El lote RPC es atómico: si falla, recuperamos el estado confirmado
         // por Supabase para no dejar cambios optimistas que nunca se persistieron.
