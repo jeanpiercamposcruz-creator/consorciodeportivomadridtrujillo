@@ -86,3 +86,5 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
+
+REVOKE ALL ON FUNCTION public.fn_validar_ingreso_pago_campo() FROM PUBLIC, anon, authenticated;
