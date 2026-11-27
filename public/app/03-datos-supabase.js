@@ -1530,6 +1530,25 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           restored: { id: recuperada.id, m: recuperada.m, a: recuperada.a, s: recuperada.s, e: recuperada.e },
         };
       },
+      async probarBloqueoClienteAntiguoQA() {
+        if (U?.rol !== "ADM") throw new Error("La prueba de snapshot requiere una sesión administradora QA.");
+        await sv;
+        const alumno = S.alu.find((x) => x?.id);
+        if (!alumno) throw new Error("No hay una matrícula disponible para probar el bloqueo de clientes antiguos.");
+        const respuesta = await sb("/rest/v1/rpc/erp_persistir_lote", {
+          method: "POST",
+          timeout: 30000,
+          body: JSON.stringify({
+            p_payload: [{
+              name: "alumnos",
+              insert: [],
+              update: [{ id: alumno.id }],
+              delete: [],
+            }],
+          }),
+        });
+        return { status: respuesta.status, detalle: await respuesta.text() };
+      },
       async roundTripCaja(id) {
         if (U?.rol !== "ADM") throw new Error("La prueba de Caja requiere una sesión administradora QA.");
         if (!/^QA-PERSIST-CAJA-[A-Za-z0-9-]+$/.test(String(id))) throw new Error("Identificador temporal de Caja inválido.");
