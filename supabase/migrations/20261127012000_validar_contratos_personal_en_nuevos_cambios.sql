@@ -7,6 +7,7 @@ SET search_path TO 'pg_catalog', 'public'
 AS $function$
 DECLARE
   v_contrato_modificado boolean := false;
+  v_hoy_peru date := (now() AT TIME ZONE 'America/Lima')::date;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     v_contrato_modificado :=
@@ -44,7 +45,7 @@ BEGIN
       MESSAGE = 'La fecha de fin no puede ser anterior a la fecha de inicio.';
   END IF;
 
-  IF NEW.activo = 1 AND NEW.fecha_fin IS NOT NULL AND NEW.fecha_fin < CURRENT_DATE THEN
+  IF NEW.activo = 1 AND NEW.fecha_fin IS NOT NULL AND NEW.fecha_fin < v_hoy_peru THEN
     RAISE EXCEPTION USING
       ERRCODE = '23514',
       CONSTRAINT = 'personal_contrato_activo_no_vencido_check',
