@@ -44,3 +44,5 @@ CREATE TRIGGER trg_exigir_reversion_campo_completa
 BEFORE INSERT ON public.caja_movimientos
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_exigir_reversion_campo_completa();
+
+REVOKE ALL ON FUNCTION public.fn_exigir_reversion_campo_completa() FROM PUBLIC, anon, authenticated;
