@@ -832,6 +832,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
         recargar?: boolean
       ) => Promise<ResultadoAsistenciaQA>;
       cleanupAsistenciaQA: (datos: DatosAsistenciaQA) => Promise<{ removed: boolean; feeRestored: number }>;
+      obtenerContextoRpcQA: () => { url: string; apikey: string; accessToken: string };
     };
 
     test.setTimeout(120000);
@@ -955,8 +956,37 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
       expect(verificado.reversion).toHaveLength(0);
       expect(verificado.currentCajaId).toBe(datos.cajaId);
       expect(Number(verificado.caja[0].monto)).toBe(5);
-      // El pago abre el comprobante modal; cerrarlo antes de interactuar con la tabla.
+      // Prueba negativa a nivel de PostgREST: una asistencia QA con un ingreso
+      // activo no puede borrarse directamente ni siquiera con sesión ADM.
+      // El rechazo debe preservar la asistencia y su vínculo al movimiento.
       await cerrarComprobante();
+      const contextoPagoActivo = await page.evaluate(() => {
+        const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaAsistenciaQA }).__ERP_QA_PERSISTENCIA__;
+        if (!api) throw new Error('No está disponible el contexto de seguridad QA.');
+        return api.obtenerContextoRpcQA();
+      });
+      const rutaAsistenciaQA = contextoPagoActivo.url + '/rest/v1/asistencias?id=eq.' +
+        encodeURIComponent(datos.asistenciaId);
+      const headersQA = {
+        apikey: contextoPagoActivo.apikey,
+        Authorization: 'Bearer ' + contextoPagoActivo.accessToken,
+        Prefer: 'return=minimal',
+      };
+      const borradoPagoActivo = await page.request.delete(rutaAsistenciaQA, {
+        timeout: 15000,
+        headers: headersQA,
+      });
+      expect(borradoPagoActivo.status()).toBe(409);
+      expect(await borradoPagoActivo.text()).toMatch(/23514|revertido|revertir|pago de campo/i);
+      const asistenciaProtegida = await page.request.get(
+        rutaAsistenciaQA + '&select=id,pago_campo,pago_campo_movimiento_id',
+        { timeout: 15000, headers: headersQA },
+      );
+      expect(asistenciaProtegida.ok()).toBeTruthy();
+      const asistenciaProtegidaRows = await asistenciaProtegida.json();
+      expect(asistenciaProtegidaRows).toHaveLength(1);
+      expect(asistenciaProtegidaRows[0].pago_campo).toBe(true);
+      expect(asistenciaProtegidaRows[0].pago_campo_movimiento_id).toBe(datos.cajaId);
 
       await debe.click();
       verificado = await page.evaluate(async (d) => {
