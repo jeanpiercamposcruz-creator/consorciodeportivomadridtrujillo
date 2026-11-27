@@ -578,6 +578,9 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
     await expect(page.locator('#p_fi')).toBeVisible();
     await expect(page.locator('#p_ff')).toBeVisible();
+    // La fila elegida puede ser un registro histórico incompleto; fijamos un tipo
+    // válido para que esta prueba aísle exclusivamente la validación del rango de fechas.
+    await page.locator('#p_tc').selectOption('Planilla');
     await page.locator('#p_fi').fill('2026-11-24');
     await page.locator('#p_ff').fill('2026-11-23');
     await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
