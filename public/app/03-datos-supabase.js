@@ -949,7 +949,14 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
         if (PAYB) throw new Error("La operación de pago de campo no liberó su bloqueo en 10 segundos.");
-        await sv;
+        const guardadoCompleto = await Promise.race([
+          sv.then(() => true),
+          new Promise((resolve) => setTimeout(() => resolve(false), 15000)),
+        ]);
+        if (!guardadoCompleto) {
+          throw new Error("La cola de persistencia no terminó en 15 segundos. Estado: " +
+            JSON.stringify({ busy, PAYB, SAVE_OK, ultimoError: window.__ERP_QA_LAST_SAVE_ERROR__ || null }));
+        }
         if (!SAVE_OK) throw new Error("El guardado de asistencia falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
 
         const asistenciaResp = await sb("/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId) +
@@ -1043,7 +1050,13 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         if (window.__ERP_QA_NEXT_ASISTENCIA_ID__ === datos.asistenciaId) delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
         if (window.__ERP_QA_NEXT_CAJA_ID__ === datos.cajaId) delete window.__ERP_QA_NEXT_CAJA_ID__;
-        await sv;
+        // La limpieza no puede quedarse bloqueada detrás de una cola defectuosa.
+        // Si una RPC tardía sigue pendiente, las FK y triggers impiden que recree
+        // registros huérfanos después de retirar el fixture exacto.
+        await Promise.race([
+          sv,
+          new Promise((resolve) => setTimeout(resolve, 10000)),
+        ]);
 
         const asistenciaRuta = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId);
         const alumnoRuta = "/rest/v1/alumnos?id=eq." + encodeURIComponent(datos.alumnoId);
