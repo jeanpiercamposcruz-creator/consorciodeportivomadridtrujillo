@@ -12,7 +12,7 @@ on:
     branches: [main, master]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   quality:
@@ -59,6 +59,40 @@ jobs:
         with:
           name: npm-audit-report
           path: npm-audit.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Apply safe npm security updates on QA branch
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/auditoria/primera-revision' }}
+        run: |
+          npm audit fix --package-lock-only --ignore-scripts || echo "npm audit fix informó que quedan avisos o no pudo aplicar todos los cambios."
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "[QA] Actualizar dependencias con parches de seguridad"
+            git push origin HEAD:refs/heads/auditoria/primera-revision
+          else
+            echo "No hay cambios semver-seguros pendientes en package-lock.json."
+          fi
+          npm ci
+          npm audit --json > npm-audit-after.json || true
+          node - <<'NODE'
+          const fs = require('node:fs');
+          try {
+            const report = JSON.parse(fs.readFileSync('npm-audit-after.json', 'utf8'));
+            console.log('Vulnerabilidades tras la remediación:', JSON.stringify(report.metadata?.vulnerabilities || {}));
+          } catch (error) {
+            console.log('No se pudo interpretar el informe posterior:', String(error));
+          }
+          NODE
+
+      - name: Upload post-remediation npm audit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-after-report
+          path: npm-audit-after.json
           retention-days: 14
           if-no-files-found: ignore
 
