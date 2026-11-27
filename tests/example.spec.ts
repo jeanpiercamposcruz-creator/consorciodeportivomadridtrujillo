@@ -213,6 +213,13 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.locator('#toast')).toContainText('Monto inválido');
     await expect(page.locator('#m_cm')).toHaveValue('100000');
 
+    // Un abono diario negativo nunca debe reducir el total pagado ni disparar una reversión.
+    await page.locator('#m_cm').fill('50');
+    await page.locator('#m_hoy').fill('-10');
+    await expect(page.locator('#m_hoy')).toHaveValue('0');
+    await expect(page.locator('#m_pag')).toHaveValue('0');
+    await expect(page.locator('#toast')).toContainText('El monto a pagar hoy no puede ser negativo');
+
     // Cancelar descarta los datos inválidos; no se crea una matrícula ni un movimiento de caja.
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
