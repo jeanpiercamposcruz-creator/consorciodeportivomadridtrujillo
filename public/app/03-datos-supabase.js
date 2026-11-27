@@ -939,81 +939,118 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
         }
         await sv;
         if (!SAVE_OK) throw new Error("El guardado de asistencia falló: " + (window.__ERP_QA_LAST_SAVE_ERROR__ || "sin detalle"));
+
         const asistenciaResp = await sb("/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId) +
-          "&select=id,fecha,tipo,alumno_id,horario_id,asistio,pago_campo");
-        const cajaResp = await sb("/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(datos.cajaId) +
+          "&select=id,fecha,tipo,alumno_id,horario_id,asistio,pago_campo,pago_campo_movimiento_id");
+        const cajaResp = await sb("/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId) +
+          "&fecha=eq." + encodeURIComponent(datos.fecha) +
           "&select=id,fecha,sede_id,tipo,concepto,detalle,monto,origen");
         const asistenciaCompResp = await sb("/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(datos.alumnoId) +
           "&horario_id=eq." + encodeURIComponent(datos.horarioId) + "&fecha=eq." +
           encodeURIComponent(datos.fecha) + "&tipo=eq.A&select=id");
-        const origen = "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId;
-        const cajaOrigenResp = await sb("/rest/v1/caja_movimientos?origen=eq." + encodeURIComponent(origen) + "&select=id");
-        if (!asistenciaResp.ok || !cajaResp.ok || !asistenciaCompResp.ok || !cajaOrigenResp.ok) {
+        if (!asistenciaResp.ok || !cajaResp.ok || !asistenciaCompResp.ok) {
           throw new Error("No se pudo consultar la persistencia real de asistencia y Caja.");
         }
+
         const asistenciasDb = await asistenciaResp.json();
-        const cajaDb = await cajaResp.json();
+        const cajaRows = await cajaResp.json();
         const asistenciasComp = await asistenciaCompResp.json();
-        const cajaOrigen = await cajaOrigenResp.json();
         if (asistenciasDb.length !== 1 || asistenciasComp.length !== 1 ||
             asistenciasComp[0].id !== datos.asistenciaId) {
           throw new Error("Supabase no contiene exactamente una asistencia para alumno, horario y fecha.");
         }
+
+        const base = "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId;
+        const ingresos = cajaRows.filter((x) => x.tipo === "I" && x.concepto === "Pago de campo" &&
+          (x.origen === base || String(x.origen || "").startsWith(base + "|")));
+        const reversiones = cajaRows.filter((x) => x.tipo === "E" && x.concepto === "Reversión de pago de campo" &&
+          String(x.origen || "").startsWith("reversion-campo:"));
+        if (cajaRows.some((x) => !ingresos.includes(x) && !reversiones.includes(x))) {
+          throw new Error("Caja contiene un movimiento ajeno al pago temporal de esta asistencia.");
+        }
+
         const asistencia = asistenciasDb[0];
+        const currentId = asistencia.pago_campo_movimiento_id || null;
         if (asistencia.alumno_id !== datos.alumnoId || asistencia.horario_id !== datos.horarioId ||
             asistencia.fecha !== datos.fecha || asistencia.tipo !== "A" || asistencia.asistio !== asistio ||
             (pagoCampo === null ? asistencia.pago_campo !== null : asistencia.pago_campo !== pagoCampo)) {
           throw new Error("La asistencia persistida no coincide con el estado solicitado.");
         }
-        if (pagoCampo === true) {
-          if (cajaDb.length !== 1 || cajaOrigen.length !== 1 || cajaOrigen[0].id !== datos.cajaId ||
-              cajaDb[0].origen !== origen || cajaDb[0].detalle !== datos.alumnoId ||
-              cajaDb[0].concepto !== "Pago de campo" || cajaDb[0].tipo !== "I" ||
-              Number(cajaDb[0].monto) !== datos.fee) {
-            throw new Error("Caja no conserva exactamente un ingreso por el pago de campo.");
+        if (pagoCampo === true && Number(datos.fee) > 0) {
+          const actual = ingresos.find((x) => x.id === currentId);
+          if (!currentId || !actual || Number(actual.monto) !== Number(datos.fee)) {
+            throw new Error("La asistencia no apunta al ingreso vigente de Caja.");
           }
-        } else if (cajaDb.length || cajaOrigen.length) {
-          throw new Error("Caja conserva un ingreso cuando el pago de campo está marcado como pendiente.");
+        } else if (pagoCampo !== true && currentId) {
+          throw new Error("Una asistencia pendiente conserva un vínculo a un ingreso de Caja.");
         }
+
+        for (const ingreso of ingresos) {
+          const partes = String(ingreso.origen || "").split("|");
+          if (partes.length === 5 && partes[4] !== ingreso.id) {
+            throw new Error("El origen del ingreso no coincide con su identificador.");
+          }
+          const reversa = reversiones.filter((x) => x.origen === "reversion-campo:" + ingreso.id);
+          if (ingreso.id === currentId) {
+            if (reversa.length) throw new Error("El ingreso vigente ya tiene una reversión registrada.");
+          } else if (reversa.length !== 1 || Number(reversa[0].monto) !== Number(ingreso.monto)) {
+            throw new Error("Un ingreso anterior no conserva su reversión compensatoria exacta.");
+          }
+        }
+        if (reversiones.some((x) => !ingresos.some((i) => x.origen === "reversion-campo:" + i.id))) {
+          throw new Error("Existe una reversión de campo sin ingreso original.");
+        }
+
         if (recargar) await pull();
         const restaurada = S.asis.find((x) => x._id === datos.asistenciaId);
-        const cajaRestaurada = S.caja.filter((x) => x._id === datos.cajaId);
+        const movimientosRestaurados = S.caja.filter((x) => x.d === datos.alumnoId && x.f === datos.fecha &&
+          (x.k === base || String(x.k || "").startsWith(base + "|") ||
+           String(x.k || "").startsWith("reversion-campo:")));
         if (!restaurada || restaurada.ok !== asistio ||
             (pagoCampo === null ? restaurada.pc !== undefined : restaurada.pc !== pagoCampo) ||
-            (pagoCampo === true ? cajaRestaurada.length !== 1 : cajaRestaurada.length !== 0)) {
-          throw new Error("El ERP no conserva el estado esperado de asistencia y Caja en memoria.");
+            (restaurada.pcId || null) !== currentId ||
+            (pagoCampo === true && Number(datos.fee) > 0 && !movimientosRestaurados.some((x) => x._id === currentId))) {
+          throw new Error("El ERP no conserva el estado y vínculo esperado de asistencia y Caja en memoria.");
         }
-        return { asistencia, caja: cajaDb, restored: { asistio: restaurada.ok, pagoCampo: restaurada.pc, caja: cajaRestaurada.length } };
+        return {
+          asistencia,
+          caja: ingresos,
+          reversion: reversiones,
+          currentCajaId: currentId,
+          restored: { asistio: restaurada.ok, pagoCampo: restaurada.pc, caja: movimientosRestaurados.length, currentCajaId: restaurada.pcId || null },
+        };
       },
       async cleanupAsistenciaQA(datos) {
         if (U?.rol !== "ADM") throw new Error("La limpieza requiere una sesión administradora QA.");
         if (!datos || !String(datos.alumnoId).startsWith("QA-ATT-") ||
             !/^\d{8}$/.test(String(datos.alumnoDni)) ||
             !/^[0-9a-f-]{36}$/i.test(String(datos.asistenciaId)) ||
-            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId))) {
-          throw new Error("IDs temporales de asistencia inválidos.");
+            !/^[0-9a-f-]{36}$/i.test(String(datos.cajaId)) ||
+            !Number.isFinite(Number(datos.feeOriginal))) {
+          throw new Error("IDs temporales de asistencia o tarifa original inválidos.");
         }
         if (window.__ERP_QA_NEXT_ASISTENCIA_ID__ === datos.asistenciaId) delete window.__ERP_QA_NEXT_ASISTENCIA_ID__;
         if (window.__ERP_QA_NEXT_CAJA_ID__ === datos.cajaId) delete window.__ERP_QA_NEXT_CAJA_ID__;
         await sv;
+
         const asistenciaRuta = "/rest/v1/asistencias?id=eq." + encodeURIComponent(datos.asistenciaId);
-        const cajaRuta = "/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(datos.cajaId);
         const alumnoRuta = "/rest/v1/alumnos?id=eq." + encodeURIComponent(datos.alumnoId);
-        const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias, otrasCajas] = await Promise.all([
+        const cajaRuta = "/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId) +
+          "&fecha=eq." + encodeURIComponent(datos.fecha);
+        const [asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias] = await Promise.all([
           sb(asistenciaRuta + "&select=id,fecha,tipo,alumno_id,horario_id"),
-          sb(cajaRuta + "&select=id,origen,detalle,concepto,tipo"),
+          sb(cajaRuta + "&select=id,fecha,sede_id,tipo,concepto,detalle,monto,origen"),
           sb(alumnoRuta + "&select=id,nombres,apellidos,dni,horario_id,sede_id,deporte_id"),
           sb("/rest/v1/asistencias?alumno_id=eq." + encodeURIComponent(datos.alumnoId) + "&select=id"),
-          sb("/rest/v1/caja_movimientos?detalle=eq." + encodeURIComponent(datos.alumnoId) + "&select=id,origen"),
         ]);
-        if (![asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias, otrasCajas].every((r) => r.ok)) {
+        if (![asistenciaCheck, cajaCheck, alumnoCheck, otrasAsistencias].every((r) => r.ok)) {
           throw new Error("No se pudo verificar la limpieza del alumno temporal QA.");
         }
+
         const asistencias = await asistenciaCheck.json();
-        const caja = await cajaCheck.json();
+        const cajas = await cajaCheck.json();
         const alumnos = await alumnoCheck.json();
         const asistenciasRelacionadas = await otrasAsistencias.json();
-        const cajasRelacionadas = await otrasCajas.json();
         if (alumnos.some((a) => a.nombres !== "QA" || a.apellidos !== "Asistencia Temporal" ||
             a.dni !== datos.alumnoDni || a.horario_id !== datos.horarioId ||
             a.sede_id !== datos.sedeId || a.deporte_id !== datos.grupo.split("|")[0])) {
@@ -1024,38 +1061,63 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
             asistenciasRelacionadas.some((x) => x.id !== datos.asistenciaId)) {
           throw new Error("La asistencia ya no coincide con el único registro temporal; se protege el registro.");
         }
-        const origen = "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId;
-        if (caja.some((x) => x.origen !== origen || x.detalle !== datos.alumnoId ||
-            x.concepto !== "Pago de campo" || x.tipo !== "I") ||
-            cajasRelacionadas.some((x) => x.id !== datos.cajaId && x.origen?.startsWith("campo|"))) {
-          throw new Error("El movimiento de Caja ya no coincide con el registro temporal; se protege el registro.");
+
+        const base = "campo|" + datos.fecha + "|" + datos.alumnoId + "|" + datos.horarioId;
+        const ingresos = cajas.filter((x) => x.tipo === "I" && x.concepto === "Pago de campo" &&
+          (x.origen === base || String(x.origen || "").startsWith(base + "|")));
+        const reversiones = cajas.filter((x) => x.tipo === "E" && x.concepto === "Reversión de pago de campo" &&
+          String(x.origen || "").startsWith("reversion-campo:"));
+        if (cajas.some((x) => !ingresos.includes(x) && !reversiones.includes(x)) ||
+            ingresos.some((x) => x.detalle !== datos.alumnoId || x.sede_id !== datos.sedeId ||
+              (String(x.origen).split("|").length === 5 && String(x.origen).split("|")[4] !== x.id)) ||
+            reversiones.some((x) => {
+              const original = ingresos.find((i) => x.origen === "reversion-campo:" + i.id);
+              return !original || Number(x.monto) !== Number(original.monto) || x.detalle !== datos.alumnoId;
+            })) {
+          throw new Error("Los movimientos de Caja ya no coinciden con el ledger temporal; se protegen.");
         }
+
         if (asistencias.length) {
           const borrado = await sb(asistenciaRuta, { method: "DELETE" });
           if (!borrado.ok) throw new Error("No se pudo eliminar la asistencia temporal: " + await borrado.text());
         }
-        if (caja.length) {
-          const borrado = await sb(cajaRuta, { method: "DELETE" });
-          if (!borrado.ok) throw new Error("No se pudo eliminar el pago temporal: " + await borrado.text());
+        for (const movimiento of [...reversiones, ...ingresos]) {
+          const borrado = await sb("/rest/v1/caja_movimientos?id=eq." + encodeURIComponent(movimiento.id), { method: "DELETE" });
+          if (!borrado.ok) throw new Error("No se pudo retirar un movimiento temporal de Caja: " + await borrado.text());
         }
         if (alumnos.length) {
           const borrado = await sb(alumnoRuta, { method: "DELETE" });
           if (!borrado.ok) throw new Error("No se pudo eliminar el alumno temporal: " + await borrado.text());
         }
+
         const [asistenciaFinal, cajaFinal, alumnoFinal] = await Promise.all([
-          sb(asistenciaRuta + "&select=id"), sb(cajaRuta + "&select=id"), sb(alumnoRuta + "&select=id"),
+          sb(asistenciaRuta + "&select=id"),
+          sb(cajaRuta + "&select=id"),
+          sb(alumnoRuta + "&select=id"),
         ]);
         if (![asistenciaFinal, cajaFinal, alumnoFinal].every((r) => r.ok) ||
             (await asistenciaFinal.json()).length || (await cajaFinal.json()).length ||
             (await alumnoFinal.json()).length) {
           throw new Error("La limpieza de asistencia QA dejó registros residuales.");
         }
+
         await pull();
-        if (S.asis.some((x) => x._id === datos.asistenciaId) || S.caja.some((x) => x._id === datos.cajaId) ||
+        if (S.asis.some((x) => x._id === datos.asistenciaId) ||
+            S.caja.some((x) => x.d === datos.alumnoId && x.f === datos.fecha) ||
             S.alu.some((x) => x.id === datos.alumnoId)) {
           throw new Error("El ERP todavía conserva los registros temporales de asistencia.");
         }
-        return { removed: true };
+        if (Number(S.fee ?? 5) !== Number(datos.feeOriginal)) {
+          S.fee = Number(datos.feeOriginal);
+          save();
+          await sv;
+          if (!SAVE_OK) throw new Error("No se pudo restaurar la tarifa original de campo en QA.");
+          await pull();
+        }
+        if (Number(S.fee ?? 5) !== Number(datos.feeOriginal)) {
+          throw new Error("La tarifa de campo no volvió a su valor original después de la prueba.");
+        }
+        return { removed: true, feeRestored: Number(S.fee ?? 5) };
       },
       async prepararPersonalContratoQA(dni) {
         if (U?.rol !== "ADM") throw new Error("La prueba de contrato requiere una sesión administradora QA.");
