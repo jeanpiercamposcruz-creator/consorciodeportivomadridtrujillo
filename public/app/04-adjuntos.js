@@ -165,11 +165,13 @@ async function adjLimpiar(id) {
     if (!j) return;
     const en = new Set([j.doc_dni_frente, j.doc_seguro, j.doc_ficha]),
       b = del.filter((x) => !en.has(x));
-    if (b.length)
-      await sb("/storage/v1/object/documentos", {
+    if (b.length) {
+      const r = await sb("/storage/v1/object/documentos", {
         method: "DELETE",
         body: JSON.stringify({ prefixes: b }),
       });
+      await r.text().catch(() => "");
+    }
   } catch (e) {}
 }
 /* Foto: recorte cuadrado centrado, 200x200 JPEG (se guarda en alumnos.foto como antes) */

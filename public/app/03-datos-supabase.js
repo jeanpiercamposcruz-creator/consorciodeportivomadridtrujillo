@@ -718,6 +718,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           if (filas.length) {
             r = await sb(ruta, { method: "DELETE" });
             if (!r.ok) throw new Error("No se pudo limpiar " + tabla + ": " + await r.text());
+            await r.text().catch(() => "");
           }
           r = await sb(ruta + "&select=id");
           if (!r.ok || (await r.json()).length) throw new Error("Quedaron registros temporales en " + tabla + ".");
@@ -1505,13 +1506,16 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           };
         } catch (error) {
           if (horarioInsertado) {
-            await sb("/rest/v1/horario_profesores?id=eq." + encodeURIComponent(horarioLinkId), { method: "DELETE" });
+            const r = await sb("/rest/v1/horario_profesores?id=eq." + encodeURIComponent(horarioLinkId), { method: "DELETE" });
+            await r.text().catch(() => "");
           }
           if (sedeInsertada) {
-            await sb("/rest/v1/personal_sedes?id=eq." + encodeURIComponent(sedeLinkId), { method: "DELETE" });
+            const r = await sb("/rest/v1/personal_sedes?id=eq." + encodeURIComponent(sedeLinkId), { method: "DELETE" });
+            await r.text().catch(() => "");
           }
           if (horarioTemporalInsertado) {
-            await sb("/rest/v1/horarios?id=eq." + encodeURIComponent(horario.id), { method: "DELETE" });
+            const r = await sb("/rest/v1/horarios?id=eq." + encodeURIComponent(horario.id), { method: "DELETE" });
+            await r.text().catch(() => "");
           }
           await pull();
           throw error;
