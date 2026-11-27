@@ -1565,7 +1565,7 @@ if (SB === "https://yiredilknlwbzwvwlqyx.supabase.co") {
           method: "POST",
           // Esta prueba valida el rechazo transaccional del RPC en Supabase QA.
           // No debe confundirse una respuesta lenta del backend con un rechazo correcto.
-          timeout: 30000,
+          timeout: 90000,
           body: JSON.stringify({
             p_payload: [{
               name: "alumnos",
