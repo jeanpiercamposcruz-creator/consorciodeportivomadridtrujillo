@@ -1,9 +1,11 @@
 name: ERP Quality Checks
 
 concurrency:
-  # Un solo flujo de pruebas por rama, aunque se disparen push y pull_request.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  # Supabase QA es compartido: ningún evento ni rama puede ejecutar pruebas
+  # concurrentes contra los mismos registros, IDs y ajustes globales.
+  group: erp-quality-supabase-qa
+  # No cancelar una ejecución activa: su cleanup debe terminar antes de la siguiente.
+  cancel-in-progress: false
 
 on:
   push:
