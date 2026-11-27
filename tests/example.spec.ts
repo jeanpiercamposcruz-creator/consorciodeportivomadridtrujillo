@@ -1048,11 +1048,6 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     const id = 'QA-KIT-' + randomInt(1_000_000_000_000, 9_999_999_999_999);
     type HerramientaKit = {
       prepararIdKit: (id: string) => Promise<string>;
-      consultarKitPersistido: (id: string) => Promise<{
-        kits: Array<{ id: string; estado: string }>;
-        ingresos: Array<{ id: string; monto: number | string }>;
-        reversas: Array<{ id: string }>;
-      }>;
       verificarAusenciaKit: (id: string) => Promise<{ kits: number; caja: number }>;
       cleanupKit: (id: string) => Promise<{ removed: boolean }>;
     };
@@ -1096,13 +1091,10 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
 
         const estado = await page.evaluate(async (idPrueba) => {
           const api = (window as unknown as { __ERP_QA_PERSISTENCIA__?: HerramientaKit }).__ERP_QA_PERSISTENCIA__;
-          if (!api) throw new Error('No está habilitada la consulta autenticada de ventas QA.');
-          return api.consultarKitPersistido(idPrueba);
+          if (!api) throw new Error('No está habilitada la verificación autenticada de ventas QA.');
+          return api.verificarAusenciaKit(idPrueba);
         }, id);
-        expect(estado.kits).toHaveLength(1);
-        expect(estado.kits[0].estado).toBe('Activa');
-        expect(estado.ingresos).toBe(1);
-        expect(estado.reversas).toBe(0);
+        expect(estado).toEqual({ kits: 0, caja: 0 });
       } finally {
         await page.unroute(rpcPath, bloquear);
       }
