@@ -1252,12 +1252,19 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await expect(page.getByRole('button', { name: 'Registrar movimiento', exact: true })).toBeVisible();
 
     const registrar = page.getByRole('button', { name: 'Registrar movimiento', exact: true });
+    await page.locator('#c_c').selectOption('Otros');
     for (const monto of ['', '0', '-1', '100000']) {
       await page.locator('#c_m').fill(monto);
       await registrar.click();
       await expect(page.locator('#toast')).toContainText('Monto inválido');
       await expect(registrar).toBeVisible();
     }
+
+    await page.locator('#c_m').fill('10');
+    await page.locator('#c_c').selectOption('');
+    await registrar.click();
+    await expect(page.locator('#toast')).toContainText('Concepto obligatorio');
+
     // Todas las entradas se rechazan antes de añadir un movimiento a caja.
   });
 
