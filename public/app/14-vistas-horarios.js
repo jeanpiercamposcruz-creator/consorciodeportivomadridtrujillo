@@ -318,11 +318,14 @@ async function saveAlu() {
     hoy: monto(v("m_hoy") || 0) ?? 0,
   });
   const centimos = (n) => Math.round((Number(n) || 0) * 100);
-  if (old && (+old.pag || 0) > 0 &&
+  const tieneAbonosCuotas = old && S.cuotas.some(
+    (cuota) => cuota.aid === old.id && (+cuota.a || 0) > 0.009,
+  );
+  if (old && ((+old.pag || 0) > 0.009 || tieneAbonosCuotas) &&
       (centimos(old.cm) !== centimos(d.cm) ||
        centimos(old.cmen) !== centimos(d.cmen) ||
        (+old.mes || 0) !== (+d.mes || 0)))
-    return toast("No puedes modificar los importes o meses del contrato mientras existan pagos registrados. Primero revierte el pago y luego actualiza el contrato.");
+    return toast("No puedes modificar los importes o meses del contrato mientras existan pagos registrados. Primero revierte todos los pagos y luego actualiza el contrato.");
   const totalContrato = Math.round(((+d.cm || 0) + (+d.cmen || 0) * (+d.mes || 0)) * 100) / 100;
   if ((+d.pag || 0) > totalContrato + 0.009)
     return toast("El monto pagado no puede superar el total de matrícula y mensualidades contratadas.");
