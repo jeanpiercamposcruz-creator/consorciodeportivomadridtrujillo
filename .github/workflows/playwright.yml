@@ -79,7 +79,7 @@ jobs:
         env:
           ERP_URL: ${{ secrets.ERP_URL }}
         run: |
-          if [ -n "$ERP_URL" ] && curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -Fq 'qa-source-audit-20261127-01'; then
+          if [ -n "$ERP_URL" ] && curl --fail --silent --show-error "${ERP_URL%/}/app/03-datos-supabase.js" 2>/dev/null | grep -Fq 'qa-source-audit-20261127-02'; then
             echo "La vista previa corresponde al marcador de esta revisión QA."
             echo "deployed=true" >> "$GITHUB_OUTPUT"
           else
@@ -87,7 +87,7 @@ jobs:
             echo "deployed=false" >> "$GITHUB_OUTPUT"
             {
               echo "### Playwright omitido"
-              echo "La vista previa QA no contiene `qa-source-audit-20261127-01`. Se ejecutaron los controles estáticos, pero no se atribuyen resultados E2E a esta revisión."
+              echo "La vista previa QA no contiene `qa-source-audit-20261127-02`. Se ejecutaron los controles estáticos, pero no se atribuyen resultados E2E a esta revisión."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
