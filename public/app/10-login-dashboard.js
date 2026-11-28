@@ -54,9 +54,11 @@ async function doLogin2() {
   } catch (e) {
     console.error(e);
     const mensaje =
-      e?.status >= 500 || /Failed to fetch|network|timed out|No se pudo validar el perfil/i.test(e?.message || "")
-        ? "No se pudo validar el perfil por un problema temporal de conexión con la base de datos. Intenta de nuevo."
-        : "Este usuario no tiene permiso para entrar al sistema.";
+      e === "personal"
+        ? "El perfil de entrenador no está vinculado a un registro de personal. Contacta con administración."
+        : e?.status >= 500 || /Failed to fetch|network|timed out|No se pudo validar el perfil/i.test(e?.message || "")
+          ? "No se pudo validar el perfil por un problema temporal de conexión con la base de datos. Intenta de nuevo."
+          : "Este usuario no tiene permiso para entrar al sistema.";
     // Auth puede emitir tokens antes de que PostgREST valide el perfil.
     // Si la validación falla, revocar/limpiar esa sesión parcial evita dejar
     // credenciales residuales mientras el usuario permanece en el login.
@@ -78,6 +80,9 @@ const out = () => {
   PAYB = 0;
   U = null;
   TK = RT = UID = null;
+  SESSION_VALIDATION = null;
+  SESSION_VALIDATION_UID = null;
+  SESSION_VALIDATED_UID = null;
   KS = 0;
   V = "home";
   try {
