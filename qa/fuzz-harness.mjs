@@ -123,6 +123,35 @@ class MockSupabase {
         Object.entries(this.db).filter(([name]) => !["erp_meta", "preregistros"].includes(name))
       ));
     }
+    if (u.pathname.endsWith("/rpc/erp_persistir_lote")) {
+      const payload = JSON.parse(rec.body || "{}").p_payload;
+      if (!Array.isArray(payload)) return resp(400, { message: "p_payload inválido" });
+      const staged = JSON.parse(JSON.stringify(this.db));
+      for (const op of payload) {
+        if (!op || typeof op.name !== "string" || !Array.isArray(staged[op.name])) {
+          return resp(400, { message: "tabla o payload inválido" });
+        }
+        const rows = staged[op.name];
+        const deletes = Array.isArray(op.delete) ? op.delete.map(String) : [];
+        const inserts = Array.isArray(op.insert) ? op.insert : [];
+        const updates = Array.isArray(op.update) ? op.update : [];
+        if (inserts.some((row) => rows.some((existing) => String(existing.id) === String(row.id)))) {
+          return resp(409, { code: "23505", message: "duplicate key" });
+        }
+        staged[op.name] = rows.filter((row) => !deletes.includes(String(row.id)));
+        for (const row of inserts) staged[op.name].push(row);
+        for (const row of updates) {
+          const index = staged[op.name].findIndex((existing) => String(existing.id) === String(row.id));
+          if (index < 0) return resp(409, { message: "registro a actualizar inexistente" });
+          const clean = { ...row };
+          delete clean.__expected_finanzas;
+          staged[op.name][index] = clean;
+        }
+      }
+      this.db = staged;
+      this.bump();
+      return resp(200, { ok: true });
+    }
     if (u.pathname.startsWith("/rest/v1/rpc/")) return resp(200, []);
     const m = /^\/rest\/v1\/([a-z_]+)$/.exec(u.pathname);
     if (!m) return resp(200, {});
@@ -262,7 +291,7 @@ caso("P1-b", "CRÍTICO", "save() durante un pull() lento (sin fallo de red) tamb
 caso("P2-a", "ALTO", "Ninguna petición a Supabase tiene timeout (AbortSignal); una petición colgada bloquea toda la cola de guardado", async (env) => {
   await env.login();
   const sinSignal = env.mock.calls.filter((c) => !c.hasSignal).length, totalPrev = env.mock.calls.length;
-  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/caja_movimientos") ? new Promise(() => {}) : undefined));
+  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/rpc/erp_persistir_lote") && (JSON.parse(r.body || "{}").p_payload || []).some((x) => x.name === "caja_movimientos" && x.insert.length) ? new Promise(() => {}) : undefined));
   env.run(`S.caja.push(${CAJA}); save()`);
   await sleep(400);
   const busy = env.run("busy");
@@ -274,7 +303,7 @@ caso("P2-a", "ALTO", "Ninguna petición a Supabase tiene timeout (AbortSignal); 
 });
 caso("P2-b", "ALTO", "Se emite recibo y '¡PAGADO!' aunque la BD rechace el guardado (UI optimista sin confirmación)", async (env) => {
   await env.login();
-  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/caja_movimientos") ? resp(500, { message: "db down" }) : undefined));
+  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/rpc/erp_persistir_lote") && (JSON.parse(r.body || "{}").p_payload || []).some((x) => x.name === "caja_movimientos" && x.insert.length) ? resp(500, { message: "db down" }) : undefined));
   env.setFields({ c_m: "50", c_t: "I", c_c: "Mensualidad", c_d: "" });
   env.ctx.__b = el("pay");
   env.run("globalThis.__rec = 0; recibo = () => { __rec++; }");
@@ -298,7 +327,7 @@ caso("P2-c", "ALTO", "Un error dentro del catch de save() (p. ej. R() lanza tras
   env.run('V="mat"; ED="NUEVO"; FRESH="NUEVO"');
   env.run(`S.alu.push({id:"NUEVO",nom:"Ana",ape:"X",dni:"",foto:"",hor:"",est:"Activo",mod:"Formativo",con:"Ninguna",sex:"F",nac:"2015-01-01",sede:"SED-CSJ",dep:S.deportes[0].id,cm:0,cmen:0,mes:1,pag:0,fecha:"2026-11-09",qt:"",dnf:"",dsg:"",dfm:""})`);
   let once = true;
-  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/alumnos") && once ? ((once = false), resp(409, { code: "23505" })) : undefined));
+  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/rpc/erp_persistir_lote") && (JSON.parse(r.body || "{}").p_payload || []).some((x) => x.name === "alumnos" && x.insert.length) && once ? ((once = false), resp(409, { code: "23505" })) : undefined));
   env.run("save()"); // otro admin creó el mismo código a la vez → 409 → pull() → R()
   await sleep(150);
   const busy = env.run("busy");
