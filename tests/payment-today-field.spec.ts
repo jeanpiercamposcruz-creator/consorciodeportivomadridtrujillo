@@ -99,7 +99,7 @@ test.describe('Coherencia del abono de hoy y el total pagado', () => {
     await page.locator('#lp').fill('qa-only-password');
     await page.getByRole('button', { name: /Iniciar sesión/i }).click();
 
-    await page.getByText('Matrículas y Alumnos', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'Directorio de Alumnos', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Directorio de Alumnos', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Abrir', exact: true }).first().click();
 
