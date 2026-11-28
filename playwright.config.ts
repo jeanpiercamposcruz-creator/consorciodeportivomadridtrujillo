@@ -18,7 +18,7 @@ if (url) {
   // Acepta únicamente Preview HTTPS de este proyecto y propietario en Vercel.
   // El identificador de cada deployment cambia en cada commit.
   const esQA =
-    /^consorciodeportivomadridtrujillo-[a-z0-9-]+-marget\\.vercel\\.app$/.test(
+    /^consorciodeportivomadridtrujillo-[a-z0-9-]+-marget\.vercel\.app$/.test(
       destino.hostname
     );
   const supabaseQA =
