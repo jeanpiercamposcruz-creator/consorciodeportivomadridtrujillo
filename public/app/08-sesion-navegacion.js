@@ -104,7 +104,8 @@ async function boot() {
       await pull();
     }
   } catch (e) {
-    U = null;
+    if (e === "rol" || e === "personal") out();
+    else U = null;
   } finally {
     BOOTING = false;
     R();
