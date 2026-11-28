@@ -118,6 +118,11 @@ class MockSupabase {
     }
     if (this.expired.has(rec.bearer)) return resp(401, { message: "JWT expired" });
     if (u.pathname === "/rest/v1/perfiles") return resp(200, [{ rol: "ADM" }]);
+    if (u.pathname.endsWith("/rpc/erp_obtener_lote")) {
+      return resp(200, Object.fromEntries(
+        Object.entries(this.db).filter(([name]) => !["erp_meta", "preregistros"].includes(name))
+      ));
+    }
     if (u.pathname.startsWith("/rest/v1/rpc/")) return resp(200, []);
     const m = /^\/rest\/v1\/([a-z_]+)$/.exec(u.pathname);
     if (!m) return resp(200, {});
