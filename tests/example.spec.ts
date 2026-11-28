@@ -1800,7 +1800,7 @@ test.describe.serial('Pruebas funcionales del ERP Consorcio Deportivo', () => {
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   });
 
-  test('Calcular reversiones parciales FIFO sin mutar ingresos ni exceder el saldo original', async () => {
+  test('Calcular reversiones parciales LIFO (último ingreso primero) sin mutar ingresos ni exceder el saldo original', async () => {
     const resultado = await page.evaluate(() => {
       type Movimiento = { _id?: string; d: string; t: string; c: string; m: number; k?: string };
       const fn = (window as unknown as {
