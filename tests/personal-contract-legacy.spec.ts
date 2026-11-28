@@ -79,7 +79,7 @@ test.describe('Edición de personal legado sin alterar contrato', () => {
         payloadGuardado = route.request().postDataJSON()?.p_payload;
         const personal = payloadGuardado?.find((x: any) => x.name === 'personal');
         const row = personal?.update?.find((x: any) => x.id === 'PER-REC-0001');
-        if (row) lote.personal[0].telefono = row.telefono;
+        if (row) { const target = lote.personal.find((x: any) => x.id === row.id); if (target) target.telefono = row.telefono; }
         return route.fulfill({ status: 204, body: '' });
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -92,7 +92,9 @@ test.describe('Edición de personal legado sin alterar contrato', () => {
 
     await page.getByRole('button', { name: 'Personal y Planillas', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Personal y Planillas', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Modificar', exact: true }).first().click();
+    const legacyRow = page.getByRole('row').filter({ hasText: 'PER-REC-0001' });
+    await expect(legacyRow).toBeVisible();
+    await legacyRow.getByRole('button', { name: 'Modificar', exact: true }).click();
 
     await expect(page.locator('#p_tc')).toHaveValue('');
     await expect(page.locator('#p_fi')).toHaveValue('');
