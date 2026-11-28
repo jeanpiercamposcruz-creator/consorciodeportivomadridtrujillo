@@ -59,16 +59,6 @@ test.describe('Edición de personal legado sin alterar contrato', () => {
     await page.route('**/auth/v1/logout*', (route) =>
       route.fulfill({ status: 204, body: '' }),
     );
-    await page.route('**/rest/v1/rpc/erp_obtener_lote', async (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(lote) }),
-    );
-    await page.route('**/rest/v1/rpc/erp_persistir_lote', async (route) => {
-      payloadGuardado = route.request().postDataJSON();
-      const personal = payloadGuardado?.find((x: any) => x.name === 'personal');
-      const row = personal?.update?.find((x: any) => x.id === 'PER-REC-0001');
-      if (row) lote.personal[0].telefono = row.telefono;
-      await route.fulfill({ status: 204, body: '' });
-    });
     await page.route('**/rest/v1/**', async (route) => {
       const requestUrl = new URL(route.request().url());
       if (requestUrl.pathname.endsWith('/perfiles')) {
@@ -77,6 +67,20 @@ test.describe('Edición de personal legado sin alterar contrato', () => {
           contentType: 'application/json',
           body: JSON.stringify([{ rol: 'ADM' }]),
         });
+      }
+      if (requestUrl.pathname.endsWith('/rpc/erp_obtener_lote')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(lote),
+        });
+      }
+      if (requestUrl.pathname.endsWith('/rpc/erp_persistir_lote')) {
+        payloadGuardado = route.request().postDataJSON();
+        const personal = payloadGuardado?.find((x: any) => x.name === 'personal');
+        const row = personal?.update?.find((x: any) => x.id === 'PER-REC-0001');
+        if (row) lote.personal[0].telefono = row.telefono;
+        return route.fulfill({ status: 204, body: '' });
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     });
