@@ -496,7 +496,7 @@ caso("P4-e", "ALTO", "payRun() reemplaza la función global R() y, si la petici�
 
 /* ===== P5. ErpLoader / seguridad (comprobaciones estáticas sobre el código) ===== */
 const rd = (p) => { try { return fs.readFileSync(path.join(ROOT, p), "utf8"); } catch { return ""; } };
-const LOADER = rd("app/components/ErpLoader.tsx"), PROXY = rd("proxy.ts"), LAYOUT = rd("app/layout.tsx"), RATE_LIMIT = rd("supabase/migrations/20261128160000_rate_limit_preregistro_anonimo.sql");
+const LOADER = rd("app/components/ErpLoader.tsx"), PROXY = rd("proxy.ts"), LAYOUT = rd("app/layout.tsx"), RATE_LIMIT = rd("supabase/migrations/20261128160000_rate_limit_preregistro_anonimo.sql"), RPC_ADMIN = rd("supabase/migrations/20261128180000_rpc_admin_only.sql");
 const est = (id, nivel, titulo, cond, ok, mal) => caso(id, nivel, titulo, async () => ({ pass: !!cond(), detalle: cond() ? ok : mal }));
 est("P5-a", "MEDIO", "ErpLoader: scripts de CDN con Subresource Integrity (integrity + crossOrigin)", () => /integrity\s*=/.test(LOADER) || !/https?:\/\/[^"']*(cdnjs|jsdelivr|unpkg)/.test(LOADER), "SRI presente o librerías autoalojadas", "cdnjs se ejecuta sin SRI: si la CDN o el path se comprometen, corre código ajeno con la sesión de ADM");
 est("P5-b", "MEDIO", "ErpLoader: timeout al cargar scripts (CDN colgada)", () => /setTimeout|AbortController|Promise\.race/.test(LOADER), "hay timeout", "si la CDN no responde, loadScript() nunca resuelve: #app queda vacío (pantalla en blanco, sin mensaje)");
@@ -506,6 +506,7 @@ est("P5-e", "MEDIO", "out(): revoca la sesión en el servidor (/auth/v1/logout)"
 est("P5-f", "BAJO", "FN/ON_* son objetos sin prototipo (data-f='constructor' no resuelve a funciones heredadas)", () => /const FN\s*=\s*Object\.create\(null\)/.test(SRC) || /Object\.hasOwn\(FN/.test(SRC), "FN protegido", "FN['constructor'] y FN['__proto__'] existen; usar Object.create(null) o Object.hasOwn()");
 est("P5-g", "BAJO", "Sin código muerto de persistencia local (load()/mig() nunca se invocan)", () => (SRC.match(/\bload\(\)/g) || []).length !== 1, "sin código muerto", "load() y mig() no se llaman en ningún sitio (sessionStorage legado); mantenerlos invita a errores");
 est("P5-h", "ALTO", "Pre-registro público: límites por IP impuestos por triggers en PostgreSQL", () => /CREATE TRIGGER trg_limitar_pre_registros/i.test(RATE_LIMIT) && /CREATE TRIGGER trg_limitar_archivos_pre_registro/i.test(RATE_LIMIT) && /current_setting\('request\.headers'/i.test(RATE_LIMIT) && /cf-connecting-ip/i.test(RATE_LIMIT) && /ON CONFLICT/i.test(RATE_LIMIT), "rate-limit transaccional para filas y archivos", "el alta anónima no tiene límite servidor por IP y puede saturar la tabla/Storage aunque el honeypot del cliente se omita");
+est("P5-i", "ALTO", "RPC sensibles y generador de matrículas limitados a ADM", () => /IF v_rol IS DISTINCT FROM 'ADM' THEN/.test(RPC_ADMIN) && /IF public\.rol_actual\(\) IS DISTINCT FROM 'ADM' THEN/.test(RPC_ADMIN) && /if public\.rol_actual\(\) is distinct from 'ADM' then/.test(RPC_ADMIN), "erp_obtener_lote, erp_persistir_lote y siguiente_id_matricula exigen ADM", "un RPC conserva permisos heredados de REC/ENT y podría reabrir acceso si cambia rol_actual");
 
 /* ------------------------------ ejecución ------------------------------- */
 const ICON = { "CRÍTICO": "🟥", ALTO: "🟧", MEDIO: "🟨", BAJO: "🟦" };
