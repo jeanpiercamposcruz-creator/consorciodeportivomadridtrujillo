@@ -76,7 +76,7 @@ test.describe('Edición de personal legado sin alterar contrato', () => {
         });
       }
       if (requestUrl.pathname.endsWith('/rpc/erp_persistir_lote')) {
-        payloadGuardado = route.request().postDataJSON();
+        payloadGuardado = route.request().postDataJSON()?.p_payload;
         const personal = payloadGuardado?.find((x: any) => x.name === 'personal');
         const row = personal?.update?.find((x: any) => x.id === 'PER-REC-0001');
         if (row) lote.personal[0].telefono = row.telefono;
