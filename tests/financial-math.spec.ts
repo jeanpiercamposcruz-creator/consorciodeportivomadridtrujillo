@@ -2,8 +2,6 @@ import { expect, test } from '@playwright/test';
 
 const url = process.env.ERP_URL;
 
-type Cuota = { numero: number; abonado: number; saldo: number; estado: string };
-
 test.describe('Lógica financiera de matrícula, cuotas y reversiones', () => {
   test.skip(!url, 'Requiere ERP_URL del Preview QA.');
 
