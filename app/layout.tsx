@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { headers } from "next/headers";
 
 export const metadata: Metadata = {
   title: "ERP Consorcio Deportivo Madrid Trujillo",
@@ -15,7 +16,9 @@ export const viewport: Viewport = {
   viewportFit: "cover", // el CSS usa env(safe-area-inset-*)
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Forzar render dinámico para que Next aplique el nonce CSP único de proxy.ts.
+  await headers();
   return (
     <html lang="es">
       <head>
