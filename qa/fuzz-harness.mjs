@@ -496,12 +496,12 @@ caso("P4-e", "ALTO", "payRun() reemplaza la función global R() y, si la petici�
 
 /* ===== P5. ErpLoader / seguridad (comprobaciones estáticas sobre el código) ===== */
 const rd = (p) => { try { return fs.readFileSync(path.join(ROOT, p), "utf8"); } catch { return ""; } };
-const LOADER = rd("app/components/ErpLoader.tsx"), NEXTCFG = rd("next.config.ts");
+const LOADER = rd("app/components/ErpLoader.tsx"), PROXY = rd("proxy.ts"), LAYOUT = rd("app/layout.tsx");
 const est = (id, nivel, titulo, cond, ok, mal) => caso(id, nivel, titulo, async () => ({ pass: !!cond(), detalle: cond() ? ok : mal }));
 est("P5-a", "MEDIO", "ErpLoader: scripts de CDN con Subresource Integrity (integrity + crossOrigin)", () => /integrity\s*=/.test(LOADER) || !/https?:\/\/[^"']*(cdnjs|jsdelivr|unpkg)/.test(LOADER), "SRI presente o librerías autoalojadas", "cdnjs se ejecuta sin SRI: si la CDN o el path se comprometen, corre código ajeno con la sesión de ADM");
 est("P5-b", "MEDIO", "ErpLoader: timeout al cargar scripts (CDN colgada)", () => /setTimeout|AbortController|Promise\.race/.test(LOADER), "hay timeout", "si la CDN no responde, loadScript() nunca resuelve: #app queda vacío (pantalla en blanco, sin mensaje)");
 est("P5-c", "MEDIO", "ErpLoader/script.js: si falla jsQR el escáner avisa al usuario", () => /Lector QR no disponible/.test(SRC), "avisa", "con jsQR ausente loopCam() reintenta en silencio para siempre (el mensaje de ayuda solo se muestra tras ejecutar jsQR)");
-est("P5-d", "MEDIO", "CSP: script-src sin 'unsafe-inline'", () => !/script-src[^"`;]*'unsafe-inline'/.test(NEXTCFG), "sin unsafe-inline", "'unsafe-inline' en script-src anula gran parte de la protección anti-XSS (el refresh token vive en sessionStorage)");
+est("P5-d", "MEDIO", "CSP: nonce por solicitud y sin unsafe-inline en script-src", () => /crypto\.randomUUID\(\)/.test(PROXY) && /script-src[^\n]*nonce-\$\{nonce\}/.test(PROXY) && !/script-src[^\n]*unsafe-inline/.test(PROXY) && /await headers\(\)/.test(LAYOUT), "nonce dinámico validado", "falta nonce CSP por solicitud, render dinámico o sigue habilitado unsafe-inline en script-src");
 est("P5-e", "MEDIO", "out(): revoca la sesión en el servidor (/auth/v1/logout)", () => /auth\/v1\/logout/.test(SRC), "revoca", "out() solo borra variables locales; el refresh token sigue válido en Supabase");
 est("P5-f", "BAJO", "FN/ON_* son objetos sin prototipo (data-f='constructor' no resuelve a funciones heredadas)", () => /const FN\s*=\s*Object\.create\(null\)/.test(SRC) || /Object\.hasOwn\(FN/.test(SRC), "FN protegido", "FN['constructor'] y FN['__proto__'] existen; usar Object.create(null) o Object.hasOwn()");
 est("P5-g", "BAJO", "Sin código muerto de persistencia local (load()/mig() nunca se invocan)", () => (SRC.match(/\bload\(\)/g) || []).length !== 1, "sin código muerto", "load() y mig() no se llaman en ningún sitio (sessionStorage legado); mantenerlos invita a errores");
