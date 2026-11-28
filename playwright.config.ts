@@ -15,9 +15,12 @@ if (url) {
     destino.hostname === 'localhost' ||
     destino.hostname === '127.0.0.1';
 
+  // Acepta únicamente Preview HTTPS de este proyecto y propietario en Vercel.
+  // El identificador de cada deployment cambia en cada commit.
   const esQA =
-    destino.hostname ===
-    'consorciodeportivomadridtrujillo-aolm-git-auditor-d3ba91-marget.vercel.app';
+    /^consorciodeportivomadridtrujillo-[a-z0-9-]+-marget\\.vercel\\.app$/.test(
+      destino.hostname
+    );
   const supabaseQA =
     process.env.NEXT_PUBLIC_SUPABASE_URL ===
     'https://yiredilknlwbzwvwlqyx.supabase.co';
