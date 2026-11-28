@@ -28,7 +28,11 @@ const today = () => {
     const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
     return p.year + "-" + p.month + "-" + p.day;
   },
-  money = (n) => "S/ " + (+n || 0).toFixed(2);
+  // No convertir datos corruptos/ausentes en S/ 0.00: ocultaría descuadres financieros.
+  money = (n) => {
+    const value = Number(n);
+    return Number.isFinite(value) ? "S/ " + value.toFixed(2) : "—";
+  };
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"'`]/g,
