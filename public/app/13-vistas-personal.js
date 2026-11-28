@@ -121,7 +121,7 @@ function perDatos() {
         (x) =>
           `<tr><td>${esc(sn(x.sede))}</td><td>${esc(x.hr)}</td><td>${esc(x.hs)}</td><td><button class="s r act" data-f=perSedDel data-i="${esc(x.id)}" title="Quitar" aria-label="Quitar">${iac("trash")}</button></td></tr>`,
       ),
-    )}<div class=row><select id=ps_s>${o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre]))}</select><input id=ps_h placeholder="Horario (vacío = se toma de Horarios)"><input id=ps_r type=number min=0 placeholder="Horas sem."><button data-f=perSedAdd>Asignar sede</button></div><p class=mu>Total de horas semanales: <b>${th}</b></p></div><div class=card><h3>Certificaciones y acreditaciones</h3>${tbl(
+    )}<div class=row><select id=ps_s>${o(S.sedes.filter((s) => sedEst(s) === "Activa").map((s) => [s.id, s.nombre]))}</select><input id=ps_h placeholder="Horario (vacío = se toma de Horarios)"><input id=ps_r type=number min=0 max=168 step=0.01 placeholder="Horas sem."><button data-f=perSedAdd>Asignar sede</button></div><p class=mu>Total de horas semanales: <b>${th}</b></p></div><div class=card><h3>Certificaciones y acreditaciones</h3>${tbl(
       ["Certificación", "Entidad", "Vencimiento", "Estado", ""],
       CL.map(
         (x) =>
@@ -150,10 +150,26 @@ function addPer() {
   if (!["ENT", "ADM", "REC"].includes(r)) return toast("Rol inválido");
   if (pr === null || sf === null) return toast("Tarifa o sueldo fijo inválido");
   if ((tc && !PTIPOS.includes(tc)) || (jor && !PJOR.includes(jor))) return toast("Contrato o jornada inválidos");
-  if (!EP && (!tc || !fi)) return toast("Tipo de contrato y fecha de inicio son obligatorios");
+  if (!["1", "0"].includes(est)) return toast("Estado inválido");
+  const anterior = EP ? S.personal.find((p) => p.id === EP) : null;
+  if (EP && !anterior) return toast("El personal ya no existe. Recarga e inténtalo de nuevo.");
+  const contratoModificado = !anterior ||
+    tc !== (anterior.tc || "") ||
+    fi !== (anterior.fi || "") ||
+    ff !== (anterior.ff || "") ||
+    pr !== (+anterior.precio || 0) ||
+    sf !== (+anterior.sf || 0) ||
+    jor !== (anterior.jor || "");
+  const reactivando = !!anterior && est === "1" && Number(anterior.activo) !== 1;
+  const validarContrato = contratoModificado || reactivando;
+  // Los registros antiguos incompletos pueden editarse en campos ajenos al contrato.
+  // Cualquier contrato nuevo, cambio contractual o reactivación sí exige datos completos.
+  if (validarContrato && (!tc || !fi))
+    return toast("Tipo de contrato y fecha de inicio son obligatorios");
   if ((fi && !fechaOk(fi)) || (ff && !fechaOk(ff))) return toast("Fecha inválida");
   if (fi && ff && ff < fi) return toast("La fecha de fin no puede ser anterior al inicio");
-  if (!["1", "0"].includes(est)) return toast("Estado inválido");
+  if (validarContrato && est === "1" && ff && ff < today())
+    return toast("No puedes guardar o activar un contrato con fecha de fin vencida");
   if (S.personal.some((p) => p.dni === d && p.id !== EP)) return toast("Ese DNI ya está registrado");
   const x = {
     nom: n,
@@ -172,23 +188,20 @@ function addPer() {
     foto: IMG_OK.test(PFOTO || "") ? PFOTO : "",
     activo: +est,
   };
+  let mensajeExitoPersonal = "";
   if (EP) {
-    const t = S.personal.find((p) => p.id === EP);
-    if (!t) {
-      EP = null;
-      return toast("El personal ya no existe. Recarga e inténtalo de nuevo.");
-    }
+    const t = anterior;
     Object.assign(t, x);
     EP = null;
     PFOTO = "";
-    toast("Personal actualizado");
+    mensajeExitoPersonal = "Personal actualizado";
   } else {
     const id = `PER-${r}-${nx("PER-" + r, 4)}`;
     S.personal.push({ id, ...x });
     EP = id;
-    toast("Personal guardado: ya puedes asignarle sedes y certificaciones");
+    mensajeExitoPersonal = "Personal guardado: ya puedes asignarle sedes y certificaciones";
   }
-  save();
+  save(mensajeExitoPersonal);
   R();
 }
 function perSedAdd() {
@@ -201,10 +214,9 @@ function perSedAdd() {
   const a = autoSede(EP, sid),
     hr = limpiar(v("ps_h"), 80) || a.resumen,
     hs = v("ps_r") === "" ? a.horas : monto(v("ps_r"));
-  if (hs === null) return toast("Horas semanales inválidas");
+  if (hs === null || hs > 168) return toast("Las horas semanales deben estar entre 0 y 168.");
   S.psedes.push({ id: uid(), pid: EP, sede: sid, hr, hs });
-  save();
-  toast("Sede asignada");
+  save("Sede asignada");
   R();
 }
 function perSedDel(id) {
@@ -220,8 +232,7 @@ function perCerAdd() {
   const x = { id: uid(), pid: EP, cert: c, ent: limpiar(v("pc_e"), 60), ven };
   x.est = certEst(x);
   S.pcert.push(x);
-  save();
-  toast("Certificación agregada");
+  save("Certificación agregada");
   R();
 }
 function perCerDel(id) {
@@ -260,6 +271,13 @@ const togP = (id) => {
   const p = S.personal.find((x) => x.id === id);
   if (!p) return;
   if (p === U) return toast("No puedes desactivarte");
+  if (!p.activo) {
+    if (!PTIPOS.includes(p.tc) || !p.fi || !fechaOk(p.fi))
+      return toast("No puedes activar personal sin tipo de contrato y fecha de inicio válidos");
+    if (p.ff && (!fechaOk(p.ff) || p.ff < today()))
+      return toast("No puedes activar personal con un contrato vencido o con fecha de fin inválida");
+    if (p.ff && p.ff < p.fi) return toast("La fecha de fin no puede ser anterior al inicio");
+  }
   p.activo = p.activo ? 0 : 1;
   save();
   R();

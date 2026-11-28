@@ -118,6 +118,40 @@ class MockSupabase {
     }
     if (this.expired.has(rec.bearer)) return resp(401, { message: "JWT expired" });
     if (u.pathname === "/rest/v1/perfiles") return resp(200, [{ rol: "ADM" }]);
+    if (u.pathname.endsWith("/rpc/erp_obtener_lote")) {
+      return resp(200, Object.fromEntries(
+        Object.entries(this.db).filter(([name]) => !["erp_meta", "preregistros"].includes(name))
+      ));
+    }
+    if (u.pathname.endsWith("/rpc/erp_persistir_lote")) {
+      const payload = JSON.parse(rec.body || "{}").p_payload;
+      if (!Array.isArray(payload)) return resp(400, { message: "p_payload inválido" });
+      const staged = JSON.parse(JSON.stringify(this.db));
+      for (const op of payload) {
+        if (!op || typeof op.name !== "string" || !Array.isArray(staged[op.name])) {
+          return resp(400, { message: "tabla o payload inválido" });
+        }
+        const rows = staged[op.name];
+        const deletes = Array.isArray(op.delete) ? op.delete.map(String) : [];
+        const inserts = Array.isArray(op.insert) ? op.insert : [];
+        const updates = Array.isArray(op.update) ? op.update : [];
+        if (inserts.some((row) => rows.some((existing) => String(existing.id) === String(row.id)))) {
+          return resp(409, { code: "23505", message: "duplicate key" });
+        }
+        staged[op.name] = rows.filter((row) => !deletes.includes(String(row.id)));
+        for (const row of inserts) staged[op.name].push(row);
+        for (const row of updates) {
+          const index = staged[op.name].findIndex((existing) => String(existing.id) === String(row.id));
+          if (index < 0) return resp(409, { message: "registro a actualizar inexistente" });
+          const clean = { ...row };
+          delete clean.__expected_finanzas;
+          staged[op.name][index] = clean;
+        }
+      }
+      this.db = staged;
+      this.bump();
+      return resp(200, { ok: true });
+    }
     if (u.pathname.startsWith("/rest/v1/rpc/")) return resp(200, []);
     const m = /^\/rest\/v1\/([a-z_]+)$/.exec(u.pathname);
     if (!m) return resp(200, {});
@@ -257,7 +291,7 @@ caso("P1-b", "CRÍTICO", "save() durante un pull() lento (sin fallo de red) tamb
 caso("P2-a", "ALTO", "Ninguna petición a Supabase tiene timeout (AbortSignal); una petición colgada bloquea toda la cola de guardado", async (env) => {
   await env.login();
   const sinSignal = env.mock.calls.filter((c) => !c.hasSignal).length, totalPrev = env.mock.calls.length;
-  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/caja_movimientos") ? new Promise(() => {}) : undefined));
+  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/rpc/erp_persistir_lote") && (JSON.parse(r.body || "{}").p_payload || []).some((x) => x.name === "caja_movimientos" && x.insert.length) ? new Promise(() => {}) : undefined));
   env.run(`S.caja.push(${CAJA}); save()`);
   await sleep(400);
   const busy = env.run("busy");
@@ -269,7 +303,7 @@ caso("P2-a", "ALTO", "Ninguna petición a Supabase tiene timeout (AbortSignal); 
 });
 caso("P2-b", "ALTO", "Se emite recibo y '¡PAGADO!' aunque la BD rechace el guardado (UI optimista sin confirmación)", async (env) => {
   await env.login();
-  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/caja_movimientos") ? resp(500, { message: "db down" }) : undefined));
+  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/rpc/erp_persistir_lote") && (JSON.parse(r.body || "{}").p_payload || []).some((x) => x.name === "caja_movimientos" && x.insert.length) ? resp(500, { message: "db down" }) : undefined));
   env.setFields({ c_m: "50", c_t: "I", c_c: "Mensualidad", c_d: "" });
   env.ctx.__b = el("pay");
   env.run("globalThis.__rec = 0; recibo = () => { __rec++; }");
@@ -293,7 +327,7 @@ caso("P2-c", "ALTO", "Un error dentro del catch de save() (p. ej. R() lanza tras
   env.run('V="mat"; ED="NUEVO"; FRESH="NUEVO"');
   env.run(`S.alu.push({id:"NUEVO",nom:"Ana",ape:"X",dni:"",foto:"",hor:"",est:"Activo",mod:"Formativo",con:"Ninguna",sex:"F",nac:"2015-01-01",sede:"SED-CSJ",dep:S.deportes[0].id,cm:0,cmen:0,mes:1,pag:0,fecha:"2026-11-09",qt:"",dnf:"",dsg:"",dfm:""})`);
   let once = true;
-  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/alumnos") && once ? ((once = false), resp(409, { code: "23505" })) : undefined));
+  env.mock.hooks.push((r) => (r.method === "POST" && r.path.endsWith("/rpc/erp_persistir_lote") && (JSON.parse(r.body || "{}").p_payload || []).some((x) => x.name === "alumnos" && x.insert.length) && once ? ((once = false), resp(409, { code: "23505" })) : undefined));
   env.run("save()"); // otro admin creó el mismo código a la vez → 409 → pull() → R()
   await sleep(150);
   const busy = env.run("busy");
@@ -462,16 +496,19 @@ caso("P4-e", "ALTO", "payRun() reemplaza la función global R() y, si la petici�
 
 /* ===== P5. ErpLoader / seguridad (comprobaciones estáticas sobre el código) ===== */
 const rd = (p) => { try { return fs.readFileSync(path.join(ROOT, p), "utf8"); } catch { return ""; } };
-const LOADER = rd("app/components/ErpLoader.tsx"), NEXTCFG = rd("next.config.ts");
+const LOADER = rd("app/components/ErpLoader.tsx"), PROXY = rd("proxy.ts"), LAYOUT = rd("app/layout.tsx"), RATE_LIMIT = rd("supabase/migrations/20261128160000_rate_limit_preregistro_anonimo.sql"), RPC_ADMIN = rd("supabase/migrations/20261128180000_rpc_admin_only.sql"), UI_HELPERS = rd("public/app/09-ui-helpers.js"), PERSONAL_UPSERT = rd("supabase/migrations/20261128193000_preservar_personal_legacy_en_upsert.sql");
 const est = (id, nivel, titulo, cond, ok, mal) => caso(id, nivel, titulo, async () => ({ pass: !!cond(), detalle: cond() ? ok : mal }));
 est("P5-a", "MEDIO", "ErpLoader: scripts de CDN con Subresource Integrity (integrity + crossOrigin)", () => /integrity\s*=/.test(LOADER) || !/https?:\/\/[^"']*(cdnjs|jsdelivr|unpkg)/.test(LOADER), "SRI presente o librerías autoalojadas", "cdnjs se ejecuta sin SRI: si la CDN o el path se comprometen, corre código ajeno con la sesión de ADM");
 est("P5-b", "MEDIO", "ErpLoader: timeout al cargar scripts (CDN colgada)", () => /setTimeout|AbortController|Promise\.race/.test(LOADER), "hay timeout", "si la CDN no responde, loadScript() nunca resuelve: #app queda vacío (pantalla en blanco, sin mensaje)");
 est("P5-c", "MEDIO", "ErpLoader/script.js: si falla jsQR el escáner avisa al usuario", () => /Lector QR no disponible/.test(SRC), "avisa", "con jsQR ausente loopCam() reintenta en silencio para siempre (el mensaje de ayuda solo se muestra tras ejecutar jsQR)");
-est("P5-d", "MEDIO", "CSP: script-src sin 'unsafe-inline'", () => !/script-src[^"`;]*'unsafe-inline'/.test(NEXTCFG), "sin unsafe-inline", "'unsafe-inline' en script-src anula gran parte de la protección anti-XSS (el refresh token vive en sessionStorage)");
+est("P5-d", "MEDIO", "CSP: nonce por solicitud y sin unsafe-inline en script-src", () => /crypto\.randomUUID\(\)/.test(PROXY) && /script-src[^\n]*nonce-\$\{nonce\}/.test(PROXY) && !/script-src[^\n]*unsafe-inline/.test(PROXY) && /await headers\(\)/.test(LAYOUT), "nonce dinámico validado", "falta nonce CSP por solicitud, render dinámico o sigue habilitado unsafe-inline en script-src");
 est("P5-e", "MEDIO", "out(): revoca la sesión en el servidor (/auth/v1/logout)", () => /auth\/v1\/logout/.test(SRC), "revoca", "out() solo borra variables locales; el refresh token sigue válido en Supabase");
 est("P5-f", "BAJO", "FN/ON_* son objetos sin prototipo (data-f='constructor' no resuelve a funciones heredadas)", () => /const FN\s*=\s*Object\.create\(null\)/.test(SRC) || /Object\.hasOwn\(FN/.test(SRC), "FN protegido", "FN['constructor'] y FN['__proto__'] existen; usar Object.create(null) o Object.hasOwn()");
 est("P5-g", "BAJO", "Sin código muerto de persistencia local (load()/mig() nunca se invocan)", () => (SRC.match(/\bload\(\)/g) || []).length !== 1, "sin código muerto", "load() y mig() no se llaman en ningún sitio (sessionStorage legado); mantenerlos invita a errores");
-est("P5-h", "ALTO", "Alta anónima de pre-registros: anti-bot validado en servidor (el honeypot pp_w es solo cliente)", () => /turnstile|hcaptcha|recaptcha|captcha/i.test(SRC), "captcha presente", "el formulario público y la subida a Storage son llamables directamente con la anon key: sin CAPTCHA/rate-limit ni CHECK/políticas que impongan tamaño y tipo en servidor");
+est("P5-h", "ALTO", "Pre-registro público: límites por IP impuestos por triggers en PostgreSQL", () => /CREATE TRIGGER trg_limitar_pre_registros/i.test(RATE_LIMIT) && /CREATE TRIGGER trg_limitar_archivos_pre_registro/i.test(RATE_LIMIT) && /current_setting\('request\.headers'/i.test(RATE_LIMIT) && /cf-connecting-ip/i.test(RATE_LIMIT) && /ON CONFLICT/i.test(RATE_LIMIT), "rate-limit transaccional para filas y archivos", "el alta anónima no tiene límite servidor por IP y puede saturar la tabla/Storage aunque el honeypot del cliente se omita");
+est("P5-i", "ALTO", "RPC sensibles y generador de matrículas limitados a ADM", () => RPC_ADMIN.includes("IF v_rol IS DISTINCT FROM ''ADM'' THEN") && RPC_ADMIN.includes("IF public.rol_actual() IS DISTINCT FROM ''ADM'' THEN") && RPC_ADMIN.includes("if public.rol_actual() is distinct from ''ADM'' then"), "erp_obtener_lote, erp_persistir_lote y siguiente_id_matricula exigen ADM", "un RPC conserva permisos heredados de REC/ENT y podría reabrir acceso si cambia rol_actual");
+est("P5-j", "ALTO", "Todos los módulos del ERP se limitan a ADM en la navegación", () => { const m = UI_HELPERS.match(/const M = \[([\s\S]*?)\n\];/); return !!m && !/\b(?:REC|ENT)\b/.test(m[1]) && (m[1].match(/\["ADM"\]/g) || []).length === 10; }, "10 módulos con permiso exclusivo ADM", "la matriz de navegación conserva permisos REC/ENT aunque autenticación y RLS sean exclusivos ADM");
+est("P5-k", "ALTO", "UPSERT conserva contratos legados solo si no cambia campos contractuales", () => PERSONAL_UPSERT.includes("SELECT p.activo, p.tipo_contrato, p.fecha_inicio, p.fecha_fin") && PERSONAL_UPSERT.includes("IF NOT v_contrato_modificado THEN") && PERSONAL_UPSERT.includes("TG_OP = 'INSERT'"), "legacy intacto permitido; alta/cambio/reactivación siguen validados", "el trigger puede rechazar ediciones ajenas al contrato por el BEFORE INSERT del UPSERT");
 
 /* ------------------------------ ejecución ------------------------------- */
 const ICON = { "CRÍTICO": "🟥", ALTO: "🟧", MEDIO: "🟨", BAJO: "🟦" };

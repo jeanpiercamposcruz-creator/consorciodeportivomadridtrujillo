@@ -136,11 +136,13 @@ function payBtn(b) {
     cls = b.className,
     sw = b.style.width,
     sh = b.style.height,
+    disabled = b.disabled,
     small = b.classList.contains("s");
   b.style.width = w + "px";
   b.style.height = h + "px";
   void b.offsetWidth;
   b.classList.add("paybtn", "paying");
+  b.disabled = true;
   b.innerHTML = "<i class=pf></i><span class=pl>Procesando…</span>";
   b.style.width = Math.max(w, small ? 112 : 196) + "px";
   const t0 = performance.now();
@@ -151,6 +153,7 @@ function payBtn(b) {
         setTimeout(() => {
           b.classList.remove("paying");
           b.classList.add("paid");
+          b.disabled = disabled;
           b.innerHTML =
             '<svg class=pk viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class=pl>¡PAGADO!</span>';
           setTimeout(res, 800);
@@ -159,6 +162,7 @@ function payBtn(b) {
     },
     cancel() {
       b.className = cls;
+      b.disabled = disabled;
       b.style.width = sw;
       b.style.height = sh;
       b.innerHTML = html;
@@ -168,7 +172,37 @@ function payBtn(b) {
 
 /* Ejecuta la acción original (sin cambiarla), retiene el re-dibujado y anima solo si hubo un cobro real */
 function payRun(b, fn, metric, tk) {
-  if (PAYB || !b || !b.isConnected) return fn();
+  if (PAYB) {
+    toast("Espera a que termine la operación de pago anterior.");
+    return; // Un segundo cobro durante una operación activa nunca debe ejecutar fn().
+  }
+  if (!b || !b.isConnected) {
+    // Aunque el botón haya desaparecido por un redibujado, la operación
+    // financiera debe seguir serializada y esperar la confirmación de Supabase.
+    const m0 = metric();
+    PAYB = 1;
+    let resultado;
+    try {
+      resultado = fn();
+    } catch (e) {
+      PAYB = 0;
+      throw e;
+    }
+    return Promise.resolve(resultado)
+      .then(() => {
+        if (metric() <= m0) return;
+        return sv.then(() => {
+          if (!SAVE_OK) throw new Error("no guardado");
+        });
+      })
+      .catch((e) => {
+        console.error("No se pudo confirmar la operación financiera sin botón visible.", e);
+        toast("No se pudo confirmar el pago. Verifica Caja antes de volver a intentarlo.");
+      })
+      .finally(() => {
+        PAYB = 0;
+      });
+  }
   const m0 = metric(),
     R0 = R;
   let pend = false;
@@ -243,35 +277,150 @@ function payRun(b, fn, metric, tk) {
   return r;
 }
 
-const kitPay = () => saveKit();
-const cajaPay = (s, b) =>
-  v("c_t") === "I"
-    ? payRun(
-        b,
-        () => addCaja(s),
-        () => S.caja.length,
-        () => ({ c: S.caja[S.caja.length - 1] }),
-      )
-    : addCaja(s);
-const campoPay = (r, b) =>
-  payRun(
+const kitPay = () => {
+  if (PAYB) {
+    toast("Espera a que termine la operación financiera anterior.");
+    return;
+  }
+  const anterior = sv;
+  PAYB = 1;
+  try {
+    saveKit();
+  } catch (e) {
+    PAYB = 0;
+    throw e;
+  }
+  // Si la validación detuvo saveKit(), no se generó una nueva escritura.
+  if (sv === anterior) {
+    PAYB = 0;
+    return;
+  }
+  return sv
+    .then(() => {
+      if (!SAVE_OK) throw new Error("no guardado");
+    })
+    .finally(() => {
+      PAYB = 0;
+    });
+};
+const cajaPay = (s, b) => {
+  if (v("c_t") === "I") {
+    return payRun(
+      b,
+      () => addCaja(s),
+      () => S.caja.length,
+      () => ({ c: S.caja[S.caja.length - 1] }),
+    );
+  }
+
+  // Los egresos manuales también necesitan bloqueo anti doble clic.
+  if (PAYB) {
+    toast("Espera a que termine la operación de Caja anterior.");
+    return;
+  }
+  PAYB = 1;
+  const cantidadAntes = S.caja.length;
+  if (b) b.disabled = true;
+  try {
+    addCaja(s);
+  } catch (e) {
+    PAYB = 0;
+    if (b) b.disabled = false;
+    throw e;
+  }
+  if (S.caja.length === cantidadAntes) {
+    PAYB = 0;
+    if (b) b.disabled = false;
+    return;
+  }
+  return sv
+    .then(() => {
+      if (!SAVE_OK) throw new Error("no guardado");
+    })
+    .finally(() => {
+      PAYB = 0;
+      if (b) b.disabled = false;
+    });
+};
+const campoPay = (r, b) => {
+  if (PAYB) {
+    toast("Espera a que termine el registro de pago anterior.");
+    return;
+  }
+  if (Number(S.fee ?? 5) === 0) {
+    // Sin costo también es una transición persistida: bloquear acciones paralelas.
+    PAYB = 1;
+    let resultado;
+    try {
+      resultado = mkP(r, true);
+    } catch (e) {
+      PAYB = 0;
+      throw e;
+    }
+    return Promise.resolve(resultado || sv)
+      .then(() => {
+        if (!SAVE_OK) throw new Error("no guardado");
+      })
+      .finally(() => {
+        PAYB = 0;
+      });
+  }
+  return payRun(
     b,
     () => mkP(r, true),
     () => S.caja.length,
     () => ({ c: S.caja[S.caja.length - 1] }),
   );
+};
+const campoDebe = (r) => {
+  if (PAYB) {
+    toast("Espera a que termine el registro anterior antes de cambiar el pago.");
+    return;
+  }
+  // Marcar "Debe" revierte un ingreso y debe serializarse igual que un cobro.
+  PAYB = 1;
+  let resultado;
+  try {
+    resultado = mkP(r, false);
+  } catch (e) {
+    PAYB = 0;
+    throw e;
+  }
+  return Promise.resolve(resultado || sv)
+    .then(() => {
+      if (!SAVE_OK) throw new Error("no guardado");
+    })
+    .finally(() => {
+      PAYB = 0;
+    });
+};
 function matPay(b) {
+  if (PAYB) return;
   const old = ED ? S.alu.find((x) => x.id === ED) : null,
     m = monto(v("m_pag") || 0),
     d = (m || 0) - (old ? old.pag : 0);
-  return d > 0
-    ? payRun(
-        b,
-        saveAlu,
-        () => S.caja.length,
-        () => ({ c: S.caja[S.caja.length - 1] }),
-      )
-    : saveAlu();
+  if (d > 0) {
+    return payRun(
+      b,
+      saveAlu,
+      () => S.caja.length,
+      () => ({ c: S.caja[S.caja.length - 1] }),
+    );
+  }
+  // También serializar ediciones y reversiones: no todas usan la animación de cobro.
+  PAYB = 1;
+  let resultado;
+  try {
+    resultado = saveAlu();
+  } catch (e) {
+    PAYB = 0;
+    throw e;
+  }
+  return Promise.resolve(resultado)
+    .then(() => sv)
+    .finally(() => {
+      PAYB = 0;
+    });
 }
 
 function barcode(s) {

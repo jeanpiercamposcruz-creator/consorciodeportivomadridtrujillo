@@ -1,0 +1,7 @@
+alter table public.contratos_alquiler validate constraint contratos_alquiler_fechas_validas_check;
+alter table public.contratos_alquiler validate constraint contratos_alquiler_monto_positivo_check;
+alter table public.contratos_alquiler validate constraint contratos_alquiler_url_segura_check;
+alter table public.personal validate constraint personal_fechas_contrato_validas_check;
+alter table public.personal validate constraint personal_tarifas_no_negativas_check;
+alter table public.personal validate constraint personal_tipo_contrato_valido_check;
+alter table public.kits_ventas validate constraint kits_ventas_estado_valido_check;

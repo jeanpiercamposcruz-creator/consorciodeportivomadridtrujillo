@@ -72,7 +72,7 @@ const FN = {
   ed: (i) => ed(i),
   carnet: (i) => carnet(i),
   mkA: (t, r, k) => mkA(t, r, k === "1"),
-  mkP: (r, k, z, b) => (k === "1" ? campoPay(r, b) : mkP(r, false)),
+  mkP: (r, k, z, b) => (k === "1" ? campoPay(r, b) : campoDebe(r, b)),
   addCaja: (i, j, k, b) => cajaPay(i, b),
 };
 /* Acciones que antes eran onclick="..." embebidos en el HTML */
@@ -155,8 +155,15 @@ const ON_CHANGE = {
   upHor: () => upHor(),
   restaurar: (el) => restaurar(el),
   setFee: (el) => {
-    S.fee = +el.value || 0;
+    const fee = monto(el.value);
+    if (fee === null) {
+      toast("El pago de campo debe ser un importe válido no negativo, con máximo dos decimales.");
+      el.value = String(S.fee ?? 5);
+      return;
+    }
+    S.fee = fee;
     save();
+    R(); // Refleja inmediatamente el nuevo estado de "Pagó" / "Sin costo".
   },
   preM: (el) => {
     PF.m = el.value;

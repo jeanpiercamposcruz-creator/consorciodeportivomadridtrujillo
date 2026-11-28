@@ -15,8 +15,14 @@ const catOk = (y) => y >= Y - 17 && y <= Y - 5;
 const sn = (id) => (S.sedes.find((x) => x.id === id) || {}).nombre || "-",
   dn = (id) => (S.deportes.find((x) => x.id === id) || {}).nombre || "-";
 const hrs = (h) => {
-  const t = (x) => +x.slice(0, 2) + x.slice(3) / 60;
-  return Math.max(0, t(h.fin) - t(h.ini));
+  const minutos = (valor) => {
+    const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(String(valor || ""));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+  };
+  const inicio = minutos(h?.ini), fin = minutos(h?.fin);
+  return Number.isFinite(inicio) && Number.isFinite(fin)
+    ? Math.max(0, (fin - inicio) / 60)
+    : 0;
 };
 const hl = (h) =>
   `${esc(sn(h.sede))} · ${esc(dn(h.dep))} ${esc(h.cat)} · ${DIAS[h.dia] ? DIAS[h.dia] + " " : ""}${esc(h.ini)}-${esc(h.fin)}`;
@@ -157,9 +163,10 @@ const XL = {
       "Pedido",
       "Entrega",
       "Precio público (S/)",
+      "Estado",
     ].concat(KS ? ["Costo (S/)", "Utilidad (S/)"] : []),
     S.kits.map((k) =>
-      [k.code, k.al, k.p, k.t, k.n, k.u, k.f, k.e, +k.pr].concat(KS ? [+k.c, k.pr - k.c] : []),
+      [k.code, k.al, k.p, k.t, k.n, k.u, k.f, k.e, +k.pr, k.est || "Activa"].concat(KS ? [+k.c, k.est === "Anulada" ? 0 : k.pr - k.c] : []),
     ),
   ],
   caja: () => {
@@ -231,11 +238,11 @@ const M = [
   ["sedes", "Sedes y Alquileres", "Sedes de terceros y costos fijos", ["ADM"], "sedes"],
   ["personal", "Personal y Planillas", "Entrenadores, horas y pago", ["ADM"], "personal"],
   ["horarios", "Horarios y Categorías", "Sede, deporte, categoría y hora", ["ADM"], "horarios"],
-  ["mat", "Matrículas y Alumnos", "Ficha del alumno y carnet", ["ADM", "REC"], "mat"],
-  ["dir", "Directorio de Alumnos", "Búsqueda, filtros y semáforo", ["ADM", "REC"], "dir"],
-  ["asis", "Toma de Asistencias", "Asistencia y pago de campo", ["ADM", "REC", "ENT"], "asis"],
-  ["kits", "Ventas de Indumentaria", "Kits, tallas y entregas", ["ADM", "REC"], "kits"],
-  ["caja", "Caja Chica y Finanzas", "Ingresos, egresos y saldo", ["ADM", "REC"], "caja"],
+  ["mat", "Matrículas y Alumnos", "Ficha del alumno y carnet", ["ADM"], "mat"],
+  ["dir", "Directorio de Alumnos", "Búsqueda, filtros y semáforo", ["ADM"], "dir"],
+  ["asis", "Toma de Asistencias", "Asistencia y pago de campo", ["ADM"], "asis"],
+  ["kits", "Ventas de Indumentaria", "Kits, tallas y entregas", ["ADM"], "kits"],
+  ["caja", "Caja Chica y Finanzas", "Ingresos, egresos y saldo", ["ADM"], "caja"],
   ["ger", "Dashboard Gerencial", "Utilidad neta por sede", ["ADM"], "ger"],
   ["pre", "Pre-registro", "Solicitudes de los padres", ["ADM"], "pre", 1],
 ];

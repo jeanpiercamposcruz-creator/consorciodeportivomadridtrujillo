@@ -2,6 +2,7 @@
 /* ==================================================================
    HORARIOS Y CATEGORÍAS (calendario semanal, un horario por día y categoría)
    ================================================================== */
+const QA_PAGOS_BUILD = "qa-pagos-v4-caja-auditoria-20261125";
 const tmin = (x) => +x.slice(0, 2) * 60 + +x.slice(3, 5),
   solapa = (a, b) => tmin(a.ini) < tmin(b.fin) && tmin(b.ini) < tmin(a.fin),
   mismaSes = (a, b) => a.sede === b.sede && a.dep === b.dep && a.ini === b.ini && a.fin === b.fin;
@@ -85,6 +86,8 @@ function addHor() {
   for (const p of ps) {
     const pe = S.personal.find((x) => x.id === p);
     if (!pe) return toast("Profesor inválido");
+    if (!S.psedes.some((x) => x.pid === p && x.sede === n.sede))
+      return toast(`${pe.nom} no está asignado a la sede seleccionada`);
     if (!pe.mv && S.hor.some((h) => h.est !== "Inactivo" && h.profs.includes(p) && h.sede !== n.sede))
       return toast(`${pe.nom} no tiene permitido dictar en varias sedes`);
   }
@@ -97,8 +100,7 @@ function addHor() {
       nuevos.push(h);
     }
   nuevos.forEach((h) => S.hor.push({ id: "HOR-" + nx("HOR", 4), ...h, est: "Activo", profs: [...ps] }));
-  save();
-  toast(nuevos.length === 1 ? "Horario guardado" : `${nuevos.length} horarios guardados`);
+  save(nuevos.length === 1 ? "Horario guardado" : `${nuevos.length} horarios guardados`);
   R();
 }
 const horEst = (id) => {
@@ -220,7 +222,7 @@ VW.mat = () => {
   const r = (k, x, t = "text", e = "") =>
     `<input id=m_${k} type=${t} value="${esc(x)}" data-r=1 class="${x ? "" : "bad"}" data-in=ck ${e}>`;
   adjInit(a);
-  return `<div class=card><h3>${ED ? "Ficha " + esc(ED) : PRE ? "Matrícula desde pre-registro (" + esc(PRE.modalidad) + ")" : "Nueva matrícula"} <span class=mu>· fecha ${esc(a.fecha || today())}</span></h3><p class=mu>Puedes guardar con datos pendientes: los campos en rojo se completan después.</p><div class=msec><h4 class=bh><span class=mnum>1</span>Datos del alumno</h4><div class=mtop><div class=mleft><div class="fg mfields">${fl("Nombres", `<input id=m_nom value="${esc(a.nom || "")}">`)}${fl("Apellidos", `<input id=m_ape value="${esc(a.ape || "")}">`)}${fl("DNI", r("dni", a.dni || "", "text", "maxlength=8 inputmode=numeric data-d=1"))}${fl("Sexo", "<select id=m_sex>" + o([["M", "Masculino"], ["F", "Femenino"]], a.sex) + "</select>")}${fl("Fecha de nacimiento", `<input id=m_nac type=date value="${esc(a.nac || "")}" data-ch=upHor>`)}${fl("Categoría y edad", '<b id=m_cat class="u-py-8">-</b>')}${fl("Seguro médico", r("seg", a.seg || ""))}</div><label class="chk"><input type=checkbox id=m_cons ${a.cons ? "checked" : ""}><span>Consentimiento de protección de datos personales (Ley N° 29733)</span></label></div><div class=mfoto><span class=mfoto-l>Foto del alumno</span><button type=button class="foto-box" id=foto_box data-f=adjFoto aria-label="Elegir foto del alumno">${fotoBox()}</button></div></div></div><div class=msec><h4 class=bh><span class=mnum>2</span>Apoderado y contacto</h4><div class=fg>${fl("Apoderado", r("an", a.an || ""))}${fl("Celular", r("ac", a.ac || "", "text", "maxlength=9 inputmode=numeric data-d=1"))}${fl("Correo", r("am", a.am || "", "email"))}</div></div><div class=mcols><div class=msec><h4 class=bh><span class=mnum>3</span>Inscripción, sede y horario</h4><div class=fg>${fl("Deporte", "<select id=m_dep data-ch=upHor>" + o(S.deportes.map((d) => [d.id, d.nombre]), a.dep) + "</select>")}${fl("Sede", "<select id=m_sed data-ch=upHor>" + o(S.sedes.map((d) => [d.id, d.nombre]), a.sede) + "</select>")}${fl("Horario", "<select id=m_hor></select>")}${fl("Condición", "<select id=m_con>" + o(["Ninguna", "Media Beca", "Becado"].map((x) => [x, x]), a.con) + "</select>")}${fl("Modalidad", "<select id=m_mod>" + o(["Formativo", "Competitivo"].map((x) => [x, x]), a.mod) + "</select>")}${fl("Estado", "<select id=m_est>" + o(["Activo", "Inactivo"].map((x) => [x, x]), a.est) + "</select>")}</div></div><div class=msec><h4 class=bh><span class=mnum>4</span>Facturación y cronograma de cuotas</h4><div class=bill><div class=fg>${fl("Costo matrícula (S/)", `<input id=m_cm data-in=cron type=number min=0 value="${esc(a.cm)}">`)}${fl("Costo mensualidad (S/)", `<input id=m_cmen data-in=cron type=number min=0 value="${esc(a.cmen)}">`)}${fl("Plan / Meses contratados", `<input id=m_mes data-in=cron type=number min=0 value="${esc(a.mes)}">`)}${fl("Monto pagado (S/)", `<input id=m_pag data-in=cron type=number min=0 value="${esc(a.pag)}">`)}${fl("Monto a pagar hoy (S/)", `<input id=m_hoy type=number min=0 data-in=cron value="${esc(a.hoy ?? 0)}">`)}${fl("Método de pago", "<select id=m_mp>" + o([["Efectivo", "Efectivo"], ["Transferencia", "Transferencia"], ["Yape/Plin", "Yape/Plin"]], a.mp || "Efectivo") + "</select>")}</div><div class="cron"><b>Cronograma de cuotas generado automáticamente</b><div id=cron_t></div></div></div></div></div><div class=row id=ad_r>${adjBoton()}</div><div class=row><button data-f=matPay>Guardar matrícula</button><button class=g data-f=limpiarMat>Limpiar formulario</button><button class=g data-f=carnetMat>Generar carnet</button><button class=g data-f=qrPadres>QR para padres</button><button class=g data-f=go data-i=mat>Cancelar</button></div></div>`;
+  return `<div class=card><h3>${ED ? "Ficha " + esc(ED) : PRE ? "Matrícula desde pre-registro (" + esc(PRE.modalidad) + ")" : "Nueva matrícula"} <span class=mu>· fecha ${esc(a.fecha || today())}</span></h3><p class=mu>Puedes guardar con datos pendientes: los campos en rojo se completan después.</p><div class=msec><h4 class=bh><span class=mnum>1</span>Datos del alumno</h4><div class=mtop><div class=mleft><div class="fg mfields">${fl("Nombres", `<input id=m_nom value="${esc(a.nom || "")}">`)}${fl("Apellidos", `<input id=m_ape value="${esc(a.ape || "")}">`)}${fl("DNI", r("dni", a.dni || "", "text", "maxlength=8 inputmode=numeric data-d=1"))}${fl("Sexo", "<select id=m_sex>" + o([["M", "Masculino"], ["F", "Femenino"]], a.sex) + "</select>")}${fl("Fecha de nacimiento", `<input id=m_nac type=date value="${esc(a.nac || "")}" data-ch=upHor>`)}${fl("Categoría y edad", '<b id=m_cat class="u-py-8">-</b>')}${fl("Seguro médico", r("seg", a.seg || ""))}</div><label class="chk"><input type=checkbox id=m_cons ${a.cons ? "checked" : ""}><span>Consentimiento de protección de datos personales (Ley N° 29733)</span></label></div><div class=mfoto><span class=mfoto-l>Foto del alumno</span><button type=button class="foto-box" id=foto_box data-f=adjFoto aria-label="Elegir foto del alumno">${fotoBox()}</button></div></div></div><div class=msec><h4 class=bh><span class=mnum>2</span>Apoderado y contacto</h4><div class=fg>${fl("Apoderado", r("an", a.an || ""))}${fl("Celular", r("ac", a.ac || "", "text", "maxlength=9 inputmode=numeric data-d=1"))}${fl("Correo", r("am", a.am || "", "email"))}</div></div><div class=mcols><div class=msec><h4 class=bh><span class=mnum>3</span>Inscripción, sede y horario</h4><div class=fg>${fl("Deporte", "<select id=m_dep data-ch=upHor>" + o(S.deportes.map((d) => [d.id, d.nombre]), a.dep) + "</select>")}${fl("Sede", "<select id=m_sed data-ch=upHor>" + o(S.sedes.map((d) => [d.id, d.nombre]), a.sede) + "</select>")}${fl("Horario", "<select id=m_hor></select>")}${fl("Condición", "<select id=m_con>" + o(["Ninguna", "Media Beca", "Becado"].map((x) => [x, x]), a.con) + "</select>")}${fl("Modalidad", "<select id=m_mod>" + o(["Formativo", "Competitivo"].map((x) => [x, x]), a.mod) + "</select>")}${fl("Estado", "<select id=m_est>" + o(["Activo", "Inactivo"].map((x) => [x, x]), a.est) + "</select>")}</div></div><div class=msec><h4 class=bh><span class=mnum>4</span>Facturación y cronograma de cuotas</h4><div class=bill><div class=fg>${fl("Costo matrícula (S/)", `<input id=m_cm data-in=cron type=number min=0 value="${esc(a.cm)}">`)}${fl("Costo mensualidad (S/)", `<input id=m_cmen data-in=cron type=number min=0 value="${esc(a.cmen)}">`)}${fl("Plan / Meses contratados", `<input id=m_mes data-in=cron type=number min=0 max=36 step=1 value="${esc(a.mes)}">`)}${fl("Monto pagado (S/)", `<input id=m_pag data-in=cron type=number min=0 value="${esc(a.pag)}">`)}${fl("Monto a pagar hoy (S/)", `<input id=m_hoy type=number min=0 step=0.01 data-in=cron value="0">`)}${fl("Método de pago", "<select id=m_mp>" + o([["Efectivo", "Efectivo"], ["Transferencia", "Transferencia"], ["Yape/Plin", "Yape/Plin"]], a.mp || "Efectivo") + "</select>")}</div><div class="cron"><b>Cronograma de cuotas generado automáticamente</b><div id=cron_t></div></div></div></div></div><div class=row id=ad_r>${adjBoton()}</div><div class=row><button data-f=matPay>Guardar matrícula</button><button class=g data-f=limpiarMat>Limpiar formulario</button><button class=g data-f=carnetMat>Generar carnet</button><button class=g data-f=qrPadres>QR para padres</button><button class=g data-f=go data-i=dir>Cancelar</button></div></div>`;
 };
 
 function upHor() {
@@ -243,6 +245,28 @@ function upHor() {
     "Sin horario aún",
   );
 }
+/* Asigna el tramo de un abono nuevo a matrícula y cuotas, conservando el detalle
+   dentro del movimiento de caja para que sobreviva a la sincronización con Supabase. */
+function distribuirAbonoMatricula(cm, cmen, meses, desde, hasta) {
+  const cent = (n) => Math.round((Math.max(0, +n || 0) + Number.EPSILON) * 100) / 100;
+  let inicio = cent(desde), fin = cent(hasta);
+  if (fin <= inicio) return [];
+  const tramos = [],
+    matricula = cent(cm),
+    mensualidad = cent(cmen),
+    totalMeses = Math.min(36, Math.max(0, parseInt(meses) || 0));
+  if (matricula > 0) tramos.push({ destino: "Matrícula", cuota: 0, inicio: 0, fin: matricula });
+  for (let n = 1; n <= totalMeses && mensualidad > 0; n++) {
+    const a = matricula + (n - 1) * mensualidad;
+    tramos.push({ destino: "Cuota", cuota: n, inicio: a, fin: a + mensualidad });
+  }
+  return tramos.map((t) => ({
+    destino: t.destino,
+    cuota: t.cuota,
+    monto: cent(Math.max(0, Math.min(fin, t.fin) - Math.max(inicio, t.inicio))),
+  })).filter((x) => x.monto > 0.009);
+}
+
 async function saveAlu() {
   const { d, e } = validarAlumno({
       nom: v("m_nom"),
@@ -267,23 +291,88 @@ async function saveAlu() {
   if (!S.sedes.some((s) => s.id === v("m_sed")) || !S.deportes.some((x) => x.id === v("m_dep")))
     e.push("Sede o deporte inválido");
   if (e.length) return toast(e[0]);
+  const mesesRaw = v("m_mes");
+  const mesesContratados = mesesRaw === "" ? 0 : Number(mesesRaw);
+  if (!Number.isInteger(mesesContratados) || mesesContratados < 0 || mesesContratados > 36)
+    return toast("Los meses contratados deben ser un número entero entre 0 y 36.");
   const old = ED ? S.alu.find((x) => x.id === ED) : null,
-    hh = S.hor.find((h) => h.id === v("m_hor"));
+    horarioId = v("m_hor"),
+    hh = horarioId ? S.hor.find((h) => h.id === horarioId) : null;
+  if (
+    horarioId &&
+    (!hh ||
+      hh.est === "Inactivo" ||
+      hh.sede !== v("m_sed") ||
+      hh.dep !== v("m_dep") ||
+      +hh.cat !== y)
+  )
+    return toast("El horario seleccionado no corresponde a la sede, deporte y categoría del alumno, o está inactivo.");
   Object.assign(d, {
     dep: v("m_dep"),
     sede: v("m_sed"),
     hor: hh ? hh.id : "",
     foto: IMG_OK.test(DW.foto || "") ? DW.foto : "",
-    mes: Math.min(36, Math.max(0, parseInt(v("m_mes")) || 0)),
+    mes: mesesContratados,
     cons: !!($("#m_cons") && $("#m_cons").checked),
     mp: ["Efectivo", "Transferencia", "Yape/Plin"].includes(v("m_mp")) ? v("m_mp") : "Efectivo",
     hoy: monto(v("m_hoy") || 0) ?? 0,
   });
+  const centimos = (n) => Math.round((Number(n) || 0) * 100);
+  const tieneAbonosCuotas = old && S.cuotas.some(
+    (cuota) => cuota.aid === old.id && (+cuota.a || 0) > 0.009,
+  );
+  if (old && ((+old.pag || 0) > 0.009 || tieneAbonosCuotas) &&
+      (centimos(old.cm) !== centimos(d.cm) ||
+       centimos(old.cmen) !== centimos(d.cmen) ||
+       (+old.mes || 0) !== (+d.mes || 0)))
+    return toast("No puedes modificar los importes o meses del contrato mientras existan pagos registrados. Primero revierte todos los pagos y luego actualiza el contrato.");
+  const totalContrato = Math.round(((+d.cm || 0) + (+d.cmen || 0) * (+d.mes || 0)) * 100) / 100;
+  if ((+d.pag || 0) > totalContrato + 0.009)
+    return toast("El monto pagado no puede superar el total de matrícula y mensualidades contratadas.");
   if (d.dni && S.alu.some((x) => x.dni === d.dni && x.id !== ED))
     return toast("Ese DNI ya está registrado");
-  const id = old ? old.id : nid(),
-    delta = d.pag - (old ? old.pag : 0),
+  let id = old ? old.id : "";
+  if (!old) {
+    const qaId = window.__ERP_QA_NEXT_ALUMNO_ID__;
+    const qaOverride =
+      SB === "https://yiredilknlwbzwvwlqyx.supabase.co" &&
+      U?.rol === "ADM" &&
+      /^QA-MAT-[0-9]{8}$/.test(String(qaId || "")) &&
+      !S.alu.some((a) => a.id === qaId);
+    if (qaOverride) {
+      id = nid();
+    } else {
+      const anio = Number(String(Y).slice(-2));
+      try {
+        const reserva = await sb("/rest/v1/rpc/siguiente_id_matricula", {
+          method: "POST",
+          body: JSON.stringify({ p_anio: anio }),
+        });
+        if (!reserva.ok) {
+          console.error("No se pudo reservar el código de matrícula:", await reserva.text());
+          return toast("No se pudo reservar un código de matrícula. No se guardó ningún cambio.");
+        }
+        id = await reserva.json();
+        const prefijo = String(anio).padStart(2, "0");
+        if (typeof id !== "string" || !new RegExp("^" + prefijo + "[0-9]{4}$").test(id) ||
+            S.alu.some((a) => a.id === id)) {
+          return toast("Supabase devolvió un código de matrícula inválido o repetido. No se guardó ningún cambio.");
+        }
+      } catch (error) {
+        console.error("Error reservando código de matrícula:", error);
+        return toast("No se pudo reservar un código de matrícula por un problema de conexión.");
+      }
+    }
+  }
+  const pagadoAnterior = old ? Math.max(0, +old.pag || 0) : 0,
+    delta = Math.round((d.pag - pagadoAnterior) * 100) / 100,
     dc = { qt: old && old.qt ? old.qt : tok() };
+  if (delta < 0) {
+    const reversas = calcularReversionesCaja(S.caja, id, -delta);
+    const disponible = reversas.reduce((s, x) => s + x.monto, 0);
+    if (Math.abs(disponible - -delta) > 0.009)
+      return toast("No se puede reducir el pago: los ingresos originales disponibles en caja no cubren la reversión.");
+  }
   try {
     await adjCommit(id);
   } catch (e) {
@@ -297,19 +386,36 @@ async function saveAlu() {
     id,
     S.alu.find((x) => x.id === id),
   );
-  if (delta > 0)
+  if (delta > 0) {
     S.caja.push({
+      _id: uid(),
       f: today(),
       sede: d.sede,
       t: "I",
       c: "Matrícula / mensualidad",
       d: id,
       m: delta,
+      // La aplicación por concepto/cuota queda ligada al ingreso original.
+      k: "matricula:" + id + "|aplicacion:" + encodeURIComponent(JSON.stringify(
+        distribuirAbonoMatricula(d.cm, d.cmen, d.mes, pagadoAnterior, d.pag),
+      )),
     });
+  } else if (delta < 0) {
+    calcularReversionesCaja(S.caja, id, -delta).forEach((x) => {
+      S.caja.push({
+        _id: uid(),
+        f: today(),
+        sede: d.sede,
+        t: "E",
+        c: "Reversión de pago de matrícula",
+        d: id,
+        m: x.monto,
+        k: "reversion:" + x.originalId,
+      });
+    });
+  }
   save();
-  adjLimpiar(id);
   const pf = falta(d);
-  toast(pf.length ? "Guardada con datos pendientes: " + pf.join(", ") : "Matrícula completa");
   if (PREID) {
     const pid = PREID;
     PREID = PRE = null;
@@ -321,12 +427,23 @@ async function saveAlu() {
       });
     }).catch(() => {});
   }
-  if (!old || FRESH === id) {
-    FRESH = id;
-    ED = id;
-    R();
-    toast("Matrícula guardada. Ya puedes generar el carnet.");
-  } else go("dir");
+  sv.then(() => {
+    if (!SAVE_OK) return;
+    adjLimpiar(id);
+    if (!old || FRESH === id) {
+      FRESH = id;
+      ED = id;
+      R();
+      toast(pf.length
+        ? "Matrícula guardada con datos pendientes: " + pf.join(", ")
+        : "Matrícula guardada. Ya puedes generar el carnet.");
+    } else {
+      go("dir");
+      toast(pf.length
+        ? "Matrícula actualizada con datos pendientes: " + pf.join(", ")
+        : "Matrícula actualizada");
+    }
+  });
 }
 const addMes = (f, n) => {
   const [y, m, d] = f.split("-").map(Number),
@@ -335,23 +452,62 @@ const addMes = (f, n) => {
   x.setUTCDate(Math.min(d, ult));
   return x.toISOString().slice(0, 10);
 };
-/* Cuotas = meses contratados × mensualidad. El monto pagado cubre primero la matrícula y luego las cuotas en orden. */
+/* Distribuye el pago primero a matrícula y luego a cuotas en orden cronológico. */
 function cronograma(a) {
   const n = Math.min(36, Math.max(0, parseInt(a.mes) || 0)),
-    m = +a.cmen || 0,
+    m = Math.max(0, Math.round((+a.cmen || 0) * 100) / 100),
+    matricula = Math.max(0, Math.round((+a.cm || 0) * 100) / 100),
     base = a.fecha || today(),
     r = [];
-  let resto = Math.max(0, (+a.pag || 0) - (+a.cm || 0));
+  let resto = Math.max(0, Math.round((+a.pag || 0) * 100) / 100),
+    pagadoMatricula = Math.min(matricula, resto);
+  resto = Math.round((resto - pagadoMatricula) * 100) / 100;
   for (let i = 1; i <= n; i++) {
-    const ok = resto >= m;
-    if (ok) resto -= m;
-    r.push({ n: i, f: addMes(base, i), m, e: ok ? "Pagada" : "Pendiente" });
+    const abonado = Math.min(m, resto),
+      saldo = Math.round((m - abonado) * 100) / 100,
+      e = saldo <= 0.009 ? "Pagada" : abonado > 0 ? "Parcial" : "Pendiente";
+    resto = Math.round((resto - abonado) * 100) / 100;
+    r.push({ n: i, f: addMes(base, i), m, a: abonado, s: saldo, e });
   }
-  return r;
+  return { cuotas: r, matricula: { m: matricula, a: pagadoMatricula, s: Math.round((matricula - pagadoMatricula) * 100) / 100 } };
 }
 function regenCuotas(id, a) {
-  S.cuotas = S.cuotas.filter((c) => c.aid !== id);
-  cronograma(a).forEach((c) => S.cuotas.push({ id: `CUO-${id}-${c.n}`, aid: id, ...c }));
+  const plan = cronograma(a).cuotas;
+  for (const c of plan) {
+    const existente = S.cuotas.find((x) => x.aid === id && +x.n === c.n);
+    if (existente) Object.assign(existente, c, { e: c.e });
+    else S.cuotas.push({ id: `CUO-${id}-${c.n}`, aid: id, ...c });
+  }
+  // No se eliminan cuotas históricas si se reduce el número de meses contratado.
+  S.cuotas.filter((x) => x.aid === id && !plan.some((c) => c.n === +x.n)).forEach((x) => {
+    x.e = "Anulada";
+  });
+}
+/* Calcula cuánto puede revertirse de cada ingreso, sin alterar ni borrar movimientos previos. */
+function calcularReversionesCaja(caja, alumnoId, importe) {
+  let pendiente = Math.round(Math.max(0, importe) * 100) / 100;
+  const ingresos = caja.filter((x) => x.d === alumnoId && x.t === "I" &&
+    (x.c === "Matrícula / mensualidad" || (typeof x.k === "string" && x.k.startsWith("matricula:" + alumnoId + "|"))));
+  const resultado = [];
+  // Revertir primero el ingreso más reciente, sin modificar los movimientos originales.
+  for (const ingreso of ingresos.slice().reverse()) {
+    // Los movimientos persistidos reciben _id desde la capa de datos. No inventar
+    // identificadores aquí: esta función también se usa para prevalidar el ajuste.
+    const originalId = ingreso._id;
+    if (!originalId) continue;
+    const revertido = caja.filter((x) => x.t === "E" && x.k === "reversion:" + originalId)
+      .reduce((s, x) => s + (+x.m || 0), 0);
+    const disponible = Math.max(0, Math.round(((+ingreso.m || 0) - revertido) * 100) / 100);
+    const monto = Math.min(disponible, pendiente);
+    if (monto > 0.009) {
+      resultado.push({ originalId, monto: Math.round(monto * 100) / 100 });
+      pendiente = Math.round((pendiente - monto) * 100) / 100;
+    }
+    if (pendiente <= 0.009) break;
+  }
+  // Si no alcanza el saldo original, devolver solo lo realmente reversible.
+  // saveAlu compara la suma con el importe solicitado y bloquea el guardado.
+  return resultado;
 }
 function cronRender() {
   const t = $("#cron_t");
@@ -364,24 +520,35 @@ function cronRender() {
       mes: v("m_mes"),
       pag: v("m_pag"),
     },
-    c = cronograma(a),
-    tot = (+a.cm || 0) + c.reduce((s, x) => s + x.m, 0),
+    plan = cronograma(a),
+    c = plan.cuotas,
+    tot = plan.matricula.m + c.reduce((s, x) => s + x.m, 0),
     hoy = today();
   t.innerHTML =
     tbl(
-      ["Cuota #", "Fecha venc.", "Monto S/", "Estado"],
+      ["Cuota #", "Fecha venc.", "Importe S/", "Abonado S/", "Saldo S/", "Estado"],
       c.map((x) => {
-        const venc = x.e === "Pendiente" && x.f < hoy;
-        return `<tr><td>${x.n}</td><td>${esc(x.f)}</td><td>${money(x.m)}</td><td><span class="b ${x.e === "Pagada" ? "ok" : "no"}">${venc ? "Vencida" : x.e}</span></td></tr>`;
+        const venc = x.e !== "Pagada" && x.f < hoy;
+        return `<tr><td>${x.n}</td><td>${esc(x.f)}</td><td>${money(x.m)}</td><td>${money(x.a)}</td><td>${money(x.s)}</td><td><span class="b ${x.e === "Pagada" ? "ok" : x.e === "Parcial" ? "wa" : "no"}">${venc && x.e !== "Parcial" ? "Vencida" : x.e}</span></td></tr>`;
       }),
-    ) + `<p><b>Monto total proyectado: ${money(tot)}</b> <span class=mu>(matrícula + cuotas)</span></p>`;
+    ) + `<p><b>Matrícula: ${money(plan.matricula.m)}</b> · Abonado: ${money(plan.matricula.a)} · Saldo: ${money(plan.matricula.s)}</p><p><b>Monto total proyectado: ${money(tot)}</b> <span class=mu>(matrícula + cuotas)</span></p>`;
 }
 /* "Monto a pagar hoy" y "Monto pagado" se mantienen coherentes; el flujo de caja sigue usando Monto pagado. */
 function cronSync(el) {
   const old = ED ? (S.alu.find((x) => x.id === ED) || {}).pag || 0 : 0,
     r2 = (n) => Math.round(n * 100) / 100;
-  if (el.id === "m_hoy" && $("#m_pag")) $("#m_pag").value = r2(old + (+el.value || 0));
-  else if (el.id === "m_pag" && $("#m_hoy")) $("#m_hoy").value = Math.max(0, r2((+el.value || 0) - old));
+  if (el.id === "m_hoy" && $("#m_pag")) {
+    const abonoHoy = Number(el.value);
+    if (Number.isFinite(abonoHoy) && abonoHoy < 0) {
+      el.value = "0";
+      $("#m_pag").value = r2(old);
+      toast("El monto a pagar hoy no puede ser negativo.");
+    } else {
+      $("#m_pag").value = r2(old + (Number.isFinite(abonoHoy) ? abonoHoy : 0));
+    }
+  } else if (el.id === "m_pag" && $("#m_hoy")) {
+    $("#m_hoy").value = Math.max(0, r2((+el.value || 0) - old));
+  }
   cronRender();
 }
 const fotoBox = () =>
@@ -390,9 +557,21 @@ const fotoBox = () =>
     : `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Elegir foto...</span>`;
 function carnet(id) {
   const a = S.alu.find((x) => x.id === id);
-  modal(
-    `<h3>${esc(a.nom + " " + a.ape)}</h3>${IMG_OK.test(a.foto || "") ? `<img src="${esc(a.foto)}" width=90 height=90 class="u-rounded-6">` : "<p class=mu>Sin foto</p>"}<p><b>${esc(a.id)}</b><br>${esc(dn(a.dep))} · CAT-${esc(a.nac.slice(0, 4))} · ${esc(sn(a.sede))}</p>${qr(carnetUrl(a))}<div class="row u-jc-center"><button data-f=print>Imprimir (PVC / papel)</button></div>`,
-  );
+  if (!a) return;
+  // Esperar a que Supabase confirme el qr_token antes de mostrar/imprimir el QR.
+  carnetUrl(a);
+  sv.then(() => {
+    if (!SAVE_OK) {
+      toast("No se pudo guardar el código QR. Inténtalo de nuevo antes de imprimir.");
+      return;
+    }
+    modal(
+      `<h3>${esc(a.nom + " " + a.ape)}</h3>${IMG_OK.test(a.foto || "") ? `<img src="${esc(a.foto)}" width=90 height=90 class="u-rounded-6">` : "<p class=mu>Sin foto</p>"}<p><b>${esc(a.id)}</b><br>${esc(dn(a.dep))} · CAT-${esc(a.nac.slice(0, 4))} · ${esc(sn(a.sede))}</p>${qr(carnetUrl(a))}<div class="row u-jc-center"><button data-f=print>Imprimir (PVC / papel)</button></div>`,
+    );
+  }).catch((e) => {
+    console.error("No se pudo confirmar el código QR:", e);
+    toast("No se pudo guardar el código QR. Inténtalo de nuevo.");
+  });
 }
 const ed = (id) => {
   V = "mat";
@@ -409,9 +588,9 @@ const dirL = () => {
       (!DF.e || (DF.e === "Incompleto" ? falta(a).length : a.est === DF.e)) &&
       (!DF.p || (DF.p === "Moroso") === deuda(a) > 0) &&
       (!q ||
-        (a.nom + " " + a.ape).toLowerCase().includes(q) ||
-        (a.dni || "").includes(q) ||
-        a.id.includes(q)),
+        (String(a.nom || "") + " " + String(a.ape || "")).toLowerCase().includes(q) ||
+        String(a.dni || "").includes(q) ||
+        String(a.id || "").includes(q)),
   );
 };
 const dirT = () =>
@@ -463,7 +642,7 @@ VW.asis = () => {
       S.asis.find((x) => x.f === today() && x.t === t && x.ref === r && x.h === AS.h) || {};
   const row = (t, r, n) => {
     const c = rec(t, r);
-    return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">Pagó</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
+    return `<tr><td>${n}</td><td><button class="s ${c.ok === true ? "" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="1">Asistió</button> <button class="s ${c.ok === false ? "r" : "g"}" data-f="mkA" data-i="${t}" data-j="${esc(r)}" data-k="0">Faltó</button></td>${t === "A" && U.rol !== "ENT" ? `<td><button class="s ${c.pc === true ? "" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="1">${Number(S.fee ?? 5) === 0 && !pagoCampoActivo(r, AS.h) ? "Sin costo" : "Pagó"}</button> <button class="s ${c.pc === false ? "r" : "g"}" data-f="mkP" data-i="${esc(r)}" data-j="0">Debe</button></td>` : ""}</tr>`;
   };
   let list = "";
   if (H && AS.t === "A")
@@ -500,7 +679,7 @@ VW.asis = () => {
       ["P", "Personal"],
     ],
     "Elige",
-  )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>Al marcar "Pagó" se registra un ingreso en la caja de la sede. Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
+  )}${fl("Pago de campo por alumno (S/)", `<input type=number min=0 step=0.01 ${U.rol === "ADM" ? "" : "disabled"} value="${S.fee ?? 5}" data-ch=setFee>`)}</div><div class=row><button data-f=qrFotoAbrir>Tomar foto del QR (cámara del celular)</button><button class=g data-f=scan>Escanear en vivo</button></div></div><div class=card>${list ? `<h3>${hl(H)} · ${today()}</h3><div class="row u-m-0-0-8"><button class="s ${AS.only ? "" : "g"}" data-f=toggleOnly>Solo los que asistieron</button></div>${list}<p class=mu>${Number(S.fee ?? 5) === 0 ? 'Al marcar "Sin costo" se liquida la asistencia sin crear un movimiento de Caja.' : 'Al marcar "Pagó" se registra un ingreso en la caja de la sede.'} Los alumnos inactivos no aparecen, pero conservan su historial.</p>` : "<p class=mu>Completa los 4 filtros para ver la lista.</p>"}</div>`;
 };
 const setA = (k, x) => {
   AS[k] = x;
@@ -515,21 +694,101 @@ function mkA(t, r, ok) {
   save();
   R();
 }
+function pagoCampoActivo(r, h, fecha = today()) {
+  const base = `campo|${fecha}|${r}|${h}`;
+  return S.caja.some((ingreso) => {
+    if (ingreso.t !== "I" || (ingreso.k !== base && !String(ingreso.k || "").startsWith(base + "|"))) return false;
+    const revertido = S.caja
+      .filter((movimiento) => movimiento.t === "E" && movimiento.k === `reversion-campo:${ingreso._id}`)
+      .reduce((total, movimiento) => total + (+movimiento.m || 0), 0);
+    return (+ingreso.m || 0) - revertido > 0.009;
+  });
+}
 function mkP(r, pc) {
+  const fee = monto(S.fee ?? 5);
+  if (pc && fee === null)
+    return toast("El pago de campo debe ser un importe válido no negativo, con máximo dos decimales.");
   let x = S.asis.find((x) => x.f === today() && x.t === "A" && x.ref === r && x.h === AS.h);
   if (!x) {
     x = { f: today(), t: "A", ref: r, h: AS.h };
     S.asis.push(x);
   }
-  x.pc = pc;
-  const k = `campo|${today()}|${r}|${AS.h}`;
-  S.caja = S.caja.filter((c) => c.k !== k);
+
+  const base = `campo|${today()}|${r}|${AS.h}`;
+  const ingresos = S.caja.filter((c) =>
+    c.t === "I" && (c.k === base || String(c.k || "").startsWith(base + "|")),
+  );
+  const activos = ingresos.filter((ingreso) => {
+    const revertido = S.caja
+      .filter((c) => c.t === "E" && c.k === `reversion-campo:${ingreso._id}`)
+      .reduce((total, c) => total + (+c.m || 0), 0);
+    return (+ingreso.m || 0) - revertido > 0.009;
+  });
+
   if (pc) {
-    const a = S.alu.find((a) => a.id === r);
-    S.caja.push({ f: today(), sede: a.sede, t: "I", c: "Pago de campo", d: r, m: S.fee ?? 5, k });
+    if (activos.length > 1) {
+      return toast("Se detectaron varios ingresos activos para esta asistencia. Marca «Debe» para revertirlos antes de volver a cobrar.");
+    }
+    const actual = activos[0];
+    if (actual) {
+      if (x.pc === true && x.pcId === actual._id) return;
+      x.pc = true;
+      x.pcId = actual._id;
+    } else {
+      x.pc = true;
+      x.pcId = null;
+      if (fee > 0) {
+        const alumno = S.alu.find((a) => a.id === r);
+        if (!alumno) return toast("No se encontró el alumno para registrar el pago de campo.");
+        const movementId = window.__ERP_QA_NEXT_CAJA_ID__ || uid();
+        if (window.__ERP_QA_NEXT_CAJA_ID__) delete window.__ERP_QA_NEXT_CAJA_ID__;
+        x.pcId = movementId;
+        S.caja.push({
+          _id: movementId,
+          f: today(),
+          sede: alumno.sede,
+          t: "I",
+          c: "Pago de campo",
+          d: r,
+          m: fee,
+          k: base + "|" + movementId,
+        });
+      }
+    }
+  } else {
+    // El ledger admite una sola reversión por ingreso de campo. Si encuentra
+    // una reversión parcial heredada, no crea otra ni desvincula la asistencia:
+    // requiere revisión controlada para no perder trazabilidad.
+    const reversasParciales = activos.filter((pagoActivo) => {
+      const yaRevertido = S.caja
+        .filter((c) => c.t === "E" && c.k === `reversion-campo:${pagoActivo._id}`)
+        .reduce((total, c) => total + (+c.m || 0), 0);
+      const pendiente = Math.round(((+pagoActivo.m || 0) - yaRevertido) * 100) / 100;
+      return yaRevertido > 0.009 && pendiente > 0.009;
+    });
+    if (reversasParciales.length) {
+      return toast("Existe una reversión parcial de campo. Se requiere revisión administrativa antes de cambiar el estado del pago.");
+    }
+
+    x.pc = false;
+    x.pcId = null;
+    for (const pagoActivo of activos) {
+      S.caja.push({
+        _id: uid(),
+        f: today(),
+        sede: pagoActivo.sede,
+        t: "E",
+        c: "Reversión de pago de campo",
+        d: r,
+        m: Math.round((+pagoActivo.m || 0) * 100) / 100,
+        k: `reversion-campo:${pagoActivo._id}`,
+      });
+    }
   }
+
   save();
   R();
+  return sv;
 }
 VW.kits = () => {
   const adm = KS && U.rol === "ADM",
@@ -544,13 +803,14 @@ VW.kits = () => {
         ) || {}
       : {};
   return `<div class=card><h3>${KE ? "Editar venta" : "Nueva venta"}</h3><div class=kitw><div class=kitf><div class=fg><label class="u-col-full">Buscar alumno (código, DNI, nombres o apellidos)<input id=k_q value="${esc(KQ)}" data-in=kitQ autocomplete=off placeholder="Escribe al menos 2 letras o números"></label><div id=k_res class="u-col-full"></div><input type=hidden id=k_a value="${esc(ed.aid || KSEL || "")}">${kSelHtml()}${fl("Prenda", "<select id=k_p>" + o(["Kit completo", "Polo", "Short", "Calcetines"].map((x) => [x, x]), ed.p || "Kit completo") + "</select>")}${fl("Talla", "<select id=k_t>" + o(["6", "8", "10", "12", "14", "S", "M", "L", "XL"].map((x) => [x, x]), ed.t || "6") + "</select>")}${fl("Nombre en camiseta", '<input id=k_n autocomplete=off placeholder="Ej. JUAN" data-in=shirtDraw value="' + esc(ed.n || "") + '">')}${fl("Número elegido", '<input id=k_u inputmode=numeric autocomplete=off maxlength=3 placeholder="00" data-in=kNumTyped value="' + esc(ed.u || KNUM || "") + '">')}${fl("Fecha de pedido", `<input id=k_f type=date value="${esc(ed.f || today())}">`)}${fl("Fecha de entrega", "<input id=k_e type=date value=" + esc(ed.e || "") + ">")}${fl("Precio público (S/)", "<input id=k_pr type=number min=0 value=" + esc(ed.pr ?? 90) + ">")}${fl("Costo de confección (S/)", "<input id=k_c type=number min=0 value=" + esc(ed.c ?? 45) + ">")}</div><div class=row><button data-f=kitPay>${KE ? "Guardar cambios" : "Registrar venta"}</button>${KE ? "<button class=g data-f=cancelKit>Cancelar</button>" : ""}</div></div>${shirtHtml()}</div></div><div class=card>${tbl(
-    ["Código", "Alumno", "Prenda", "Talla", "Camiseta", "Pedido", "Entrega", "Cobrado"].concat(
+    ["Código", "Alumno", "Prenda", "Talla", "Camiseta", "Pedido", "Entrega", "Cobrado", "Estado"].concat(
       adm ? ["Costo", "Utilidad", "Acciones"] : ["Acciones"],
     ),
-    S.kits.map(
-      (k) =>
-       `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td>${adm ? `<td>${money(k.c)}</td><td><b>${money(k.pr - k.c)}</b></td>` : ""}<td><button class="s g act" data-f=kitEd data-i="${esc(k._id || k.id || k.code || k.codigo || "")}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${esc(k._id || k.id || k.code || k.codigo || "")}" title="Eliminar" aria-label="Eliminar">${iac("trash")}</button></td></tr>`),
-  )}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
+    S.kits.map((k) => {
+      const anulada = k.est === "Anulada";
+      const key = esc(k._id || k.id || k.code || k.codigo || "");
+      return `<tr><td>${esc(k.code)}</td><td>${esc(k.al)}</td><td>${esc(k.p)}</td><td>${esc(k.t)}</td><td>${esc(k.n)} ${esc(k.u)}</td><td>${esc(k.f)}</td><td>${esc(k.e || "Pendiente")}</td><td>${money(k.pr)}</td><td><span class="b ${anulada ? "no" : "ok"}">${anulada ? "Anulada" : "Activa"}</span></td>${adm ? `<td>${money(k.c)}</td><td><b>${money(anulada ? 0 : k.pr - k.c)}</b></td>` : ""}<td>${anulada ? "—" : `<button class="s g act" data-f=kitEd data-i="${key}" title="Modificar" aria-label="Modificar">${iac("edit")}</button> <button class="s r act" data-f=delKit data-i="${key}" title="Anular" aria-label="Anular">${iac("trash")}</button>`}</td></tr>`;
+    }))}<div class=row><button class=g data-f=cp data-i=kits>Copiar para Excel</button>${U.rol === "ADM" ? `<button class=g data-f=toggleKS>${KS ? "Ocultar" : "Mostrar"} costos y utilidad</button>` : ""}</div>${adm ? `<p><b>Utilidad total de indumentaria: ${money(S.kits.filter((k) => k.est !== "Anulada").reduce((t, k) => t + k.pr - k.c, 0))}</b></p>` : ""}</div>`;
 };
 function saveKit() {
   const a = S.alu.find((x) => x.id === v("k_a"));
@@ -589,6 +849,8 @@ function saveKit() {
 
   if (!RX.fecha.test(v("k_f")) || (v("k_e") && !RX.fecha.test(v("k_e"))))
     return toast("Fechas inválidas");
+  if (v("k_e") && v("k_e") < v("k_f"))
+    return toast("La fecha de entrega no puede ser anterior a la fecha del pedido");
 
   const kit = {
     code: `KIT-${a.dep.slice(4)}-${v("k_t")}`,
@@ -603,33 +865,40 @@ function saveKit() {
     e: v("k_e"),
     pr,
     c: cc,
+    est: existingEdit?.est || "Activa",
   };
 
+  let mensajeGuardadoKit = "";
   if (editKey) {
     if (!existingEdit) {
       KE = null;
       return toast("La venta ya no existe. Recarga e inténtalo de nuevo.");
     }
-    Object.assign(existingEdit, kit);
-    const realId = String(existingEdit._id ?? existingEdit.id ?? editKey).trim();
-    const cx = S.caja.find(
-      (c) => String(c.k ?? "").trim() === "kit|" + realId || String(c.k ?? "").trim() === "kit|" + editKey
-    );
-    if (cx) {
-      Object.assign(cx, { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
-    } else {
-      S.caja.push({ f: kit.f, sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + realId });
+    if (existingEdit.est === "Anulada") return toast("Una venta anulada no se puede modificar.");
+    const realId = String(existingEdit._id ?? "").trim();
+    const movimientos = S.caja.filter((c) => String(c.k ?? "").trim() === "kit|" + realId);
+    if (!realId || movimientos.length !== 1) {
+      return toast("No se puede editar esta venta: su ingreso de Caja no está vinculado de forma única. No se modificó nada.");
     }
+    Object.assign(existingEdit, kit);
+    Object.assign(movimientos[0], { f: kit.f, sede: kit.sede, d: kit.aid, m: kit.pr, k: "kit|" + realId });
     KE = null;
-    toast("Venta actualizada");
+    mensajeGuardadoKit = "Venta actualizada";
   } else {
-    const id = nxl(S.kits, "KIT-", 4);
-    S.kits.push({ id, ...kit });
+    const qaId = window.__ERP_QA_NEXT_KIT_ID__;
+    const id =
+      SB === "https://yiredilknlwbzwvwlqyx.supabase.co" &&
+      U?.rol === "ADM" &&
+      /^QA-KIT-\d{13}$/.test(String(qaId || "")) &&
+      !S.kits.some((x) => x._id === qaId)
+        ? (delete window.__ERP_QA_NEXT_KIT_ID__, qaId)
+        : uid();
+    S.kits.push({ _id: id, ...kit });
     S.caja.push({ f: kit.f || today(), sede: kit.sede, t: "I", c: "Indumentaria", d: kit.aid, m: kit.pr, k: "kit|" + id });
-    toast("Venta registrada");
+    mensajeGuardadoKit = "Venta registrada";
   }
 
-  save();
+  save(mensajeGuardadoKit);
   KSEL = KNUM = KQ = "";
   R();
 }
@@ -651,19 +920,67 @@ function delKit(id) {
     return toast("La venta no se encontró en la lista");
   }
 
-  if (!confirm("¿Eliminar esta venta? También se quitará su ingreso en caja.")) return;
+  const realId = String(match._id ?? "").trim();
+  const movimientos = S.caja.filter((c) => String(c.k ?? "").trim() === "kit|" + realId);
+  if (match.est === "Anulada") return toast("La venta ya está anulada.");
+  if (!realId || movimientos.length !== 1 || movimientos[0].t !== "I" || movimientos[0].c !== "Indumentaria" || movimientos[0].sede !== match.sede || Math.abs((+movimientos[0].m || 0) - (+match.pr || 0)) >= 0.01) {
+    return toast("No se puede anular: el ingreso original de Caja no está vinculado y conciliado de forma única.");
+  }
+  if (S.caja.some((c) => c.k === "reversion-kit|" + realId)) return toast("La venta ya tiene una reversión registrada.");
+  if (!confirm("¿Anular esta venta? Se conservará el ingreso original y se registrará un egreso de reversión en Caja.")) return;
 
-  const realId = String(match._id ?? match.id ?? targetId).trim();
-  S.kits = S.kits.filter((k) => k !== match);
-  S.caja = S.caja.filter(
-    (c) =>
-      String(c.k ?? "").trim() !== "kit|" + realId &&
-      String(c.k ?? "").trim() !== "kit|" + targetId
-  );
-
+  // La reversión la crea el trigger trg_auditar_anulacion_kit dentro
+  // de la misma transacción que cambia el estado de la venta. No insertar otra
+  // fila aquí: duplicaría el movimiento protegido por origen único.
+  match.est = "Anulada";
   save();
-  toast("Venta eliminada");
+  sv = sv.then(async () => {
+    if (!SAVE_OK) return;
+    try {
+      await pull();
+      R();
+      toast("Venta anulada y reversión registrada en Caja");
+    } catch (e) {
+      console.error("La venta se anuló, pero no se pudo refrescar la vista de Caja.", e);
+      toast("Venta anulada. Recarga para actualizar la reversión de Caja.");
+    }
+  });
   R();
+}
+function cajaAuditoria(x) {
+  const origen = String(x.k || "");
+  if (origen.startsWith("matricula:")) {
+    const raw = origen.split("|aplicacion:")[1];
+    if (raw) {
+      try {
+        const partes = JSON.parse(decodeURIComponent(raw));
+        return partes.map((p) =>
+          `${p.destino}${p.cuota ? " " + p.cuota : ""}: ${money(p.monto)}`
+        ).join(" · ");
+      } catch (e) {
+        return "Abono de matrícula (detalle no disponible)";
+      }
+    }
+  }
+  if (origen.startsWith("reversion-campo:")) {
+    const id = origen.slice("reversion-campo:".length),
+      ingreso = S.caja.find((m) => m._id === id);
+    return ingreso
+      ? `Reversión vinculada al pago de campo del ${ingreso.f} por ${money(ingreso.m)}`
+      : `Reversión vinculada al pago de campo ${id}`;
+  }
+  if (origen.startsWith("reversion-kit|")) {
+    const id = origen.slice("reversion-kit|".length);
+    return `Reversión de venta de indumentaria ${id}`;
+  }
+  if (origen.startsWith("reversion:")) {
+    const id = origen.slice("reversion:".length),
+      ingreso = S.caja.find((m) => m._id === id);
+    return ingreso
+      ? `Reversión vinculada al ingreso del ${ingreso.f} por ${money(ingreso.m)}`
+      : `Reversión vinculada al ingreso ${id}`;
+  }
+  return "—";
 }
 VW.caja = () => {
   const s = AS.cs || S.sedes[0].id,
@@ -683,13 +1000,13 @@ VW.caja = () => {
         ["E", "Egreso"],
       ]) +
       "</select>",
-  )}${fl("Concepto", "<select id=c_c>" + o(["Matrícula / mensualidad", "Indumentaria", "Pago de campo", "Pago de alquiler", "Planilla de entrenadores", "Compras", "Otros"].filter((x) => U.rol === "ADM" || !/alquiler|Planilla/.test(x)).map((x) => [x, x])) + "</select>")}${fl("Detalle", "<input id=c_d>")}${fl("Monto (S/)", "<input id=c_m type=number min=0>")}</div><div class=row><button data-f="addCaja" data-i="${esc(s)}">Registrar movimiento</button></div></div><div class=card><h3>Saldo de ${esc(sn(s))}: ${money(b)}</h3>${tbl(
-    ["Fecha", "Tipo", "Concepto", "Detalle", "Monto"],
+  )}${fl("Concepto", "<select id=c_c>" + o(["Matrícula / mensualidad", "Indumentaria", "Pago de campo", "Pago de alquiler", "Planilla de entrenadores", "Compras", "Otros"].filter((x) => U.rol === "ADM" || !/alquiler|Planilla/.test(x)).map((x) => [x, x]), "", "Selecciona un concepto") + "</select>")}${fl("Detalle", "<input id=c_d>")}${fl("Monto (S/)", "<input id=c_m type=number min=0>")}</div><div class=row><button data-f="addCaja" data-i="${esc(s)}">Registrar movimiento</button></div></div><div class=card><h3>Saldo de ${esc(sn(s))}: ${money(b)}</h3>${tbl(
+    ["Fecha", "Tipo", "Concepto", "Detalle", "Trazabilidad", "Monto"],
     L.slice()
       .reverse()
       .map(
         (x) =>
-          `<tr><td>${esc(x.f)}</td><td><span class="b ${x.t === "I" ? "ok" : "no"}">${x.t === "I" ? "Ingreso" : "Egreso"}</span></td><td>${esc(x.c)}</td><td>${esc(x.d)}</td><td>${money(x.m)}</td></tr>`,
+          `<tr><td>${esc(x.f)}</td><td><span class="b ${x.t === "I" ? "ok" : "no"}">${x.t === "I" ? "Ingreso" : "Egreso"}</span></td><td>${esc(x.c)}</td><td>${esc(x.d)}</td><td>${esc(cajaAuditoria(x))}</td><td>${money(x.m)}</td></tr>`,
       ),
   )}<div class=row><button class=g data-f=cp data-i=caja>Copiar para Excel</button></div></div>`;
 };
@@ -704,13 +1021,47 @@ function addCaja(s) {
 let GR = "anio";
 const MFULL = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const WARN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/></svg>';
+
+if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabase.co") {
+  Object.defineProperty(window, "__ERP_QA_GERENCIAL__", {
+    configurable: true,
+    value: Object.freeze({
+      probarPlanillaFuturaQA() {
+        if (typeof U === "undefined" || U?.rol !== "ADM") {
+          throw new Error("La prueba gerencial requiere una sesión administradora QA.");
+        }
+        const p = S.personal.find((x) => Number(x.activo) === 1 && Number(x.precio) > 0);
+        const h = S.hor.find((x) => x.sede && hrs(x) > 0);
+        const s = h && S.sedes.find((x) => x.id === h.sede);
+        if (!p || !h || !s) throw new Error("No hay personal, horario y sede válidos para la prueba QA.");
+        const hoy = today();
+        const [y, m, d] = hoy.split("-").map(Number);
+        const fecha = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+        const mes = fecha.slice(0, 7);
+        const original = S.asis;
+        const antes = gerRow(s, mes).pl;
+        try {
+          S.asis = [...original, { t: "P", ref: p.id, ok: true, f: fecha, h: h.id }];
+          const despues = gerRow(s, mes).pl;
+          return { hoy, fecha, diferencia: despues - antes };
+        } finally {
+          S.asis = original;
+        }
+      },
+    }),
+  });
+}
+
 function gerRow(s, ym) {
   const mc = S.caja.filter((x) => x.sede === s.id && x.f.startsWith(ym)),
     ing = mc.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
-    eg = mc.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
-    kc = S.kits.filter((k) => k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
+    // Alquiler y planilla se calculan por separado abajo; no deben repetirse en "otros egresos".
+    eg = mc
+      .filter((x) => x.t === "E" && !["Pago de alquiler", "Planilla de entrenadores"].includes(x.c))
+      .reduce((t, x) => t + x.m, 0),
+    kc = S.kits.filter((k) => k.est !== "Anulada" && k.sede === s.id && k.f.startsWith(ym)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
-      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym))
+      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(ym) && x.f <= today())
       .reduce((t, x) => {
         const h = S.hor.find((h) => h.id === x.h);
         const p = S.personal.find((p) => p.id === x.ref);
@@ -719,7 +1070,12 @@ function gerRow(s, ym) {
   return { s, ing, eg, kc, pl, al: +s.costo, u: ing - eg - kc - pl - s.costo };
 }
 const gerIni = () =>
-  ([...S.caja.map((x) => x.f), ...S.alu.map((a) => a.fecha)].filter(Boolean).sort()[0] || today()).slice(0, 7);
+  ([
+    ...S.caja.map((x) => x.f),
+    ...S.alu.map((a) => a.fecha),
+    ...S.asis.map((x) => x.f),
+    ...S.kits.map((k) => k.f),
+  ].filter(Boolean).sort()[0] || today()).slice(0, 7);
 const gerU = (s, ym, ini) => (ym < ini ? 0 : gerRow(s, ym).u);
 const gerNet = (ym, ini) => S.sedes.reduce((t, s) => t + gerU(s, ym, ini), 0);
 const lastMonths = (ym, n) => {
@@ -792,7 +1148,14 @@ VW.ger = () => {
     parcial = GM === hoyYm,
     ini = gerIni(),
     yrs = [
-      ...new Set([+hoyYm.slice(0, 4), +yy, ...S.alu.map((a) => +(a.fecha || "").slice(0, 4)).filter(Boolean)]),
+      ...new Set([
+        +hoyYm.slice(0, 4),
+        +yy,
+        ...S.alu.map((a) => +(a.fecha || "").slice(0, 4)).filter(Boolean),
+        ...S.caja.map((x) => +(x.f || "").slice(0, 4)).filter(Boolean),
+        ...S.asis.map((x) => +(x.f || "").slice(0, 4)).filter(Boolean),
+        ...S.kits.map((k) => +(k.f || "").slice(0, 4)).filter(Boolean),
+      ]),
     ].sort(),
     rows = S.sedes.map((s) => ({ ...gerRow(s, GM), tr: lastMonths(GM, 6).map((m) => gerU(s, m, ini)) })),
     mx = Math.max(1, ...rows.map((r) => Math.abs(r.u))),

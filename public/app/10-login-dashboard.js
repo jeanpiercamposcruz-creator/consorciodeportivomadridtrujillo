@@ -14,6 +14,7 @@ function eye() {
 async function doLogin() {
   const b = $("#lb"),
     l = $("#ball");
+  if (BOOTING) return toast("Se está comprobando la sesión anterior. Espera un momento.");
   if (b.disabled) return;
   b.disabled = true;
   b.textContent = "Verificando...";
@@ -28,8 +29,12 @@ async function doLogin() {
 async function doLogin2() {
   if (KEY.startsWith("PEGA"))
     return toast("Falta pegar la clave pública de Supabase en el archivo");
+  // Capturar la contraseña y retirarla inmediatamente del DOM para que
+  // no permanezca visible en pantalla ni en snapshots/traces tras el intento.
+  const credenciales = { email: v("lu").toLowerCase(), password: $("#lp").value };
+  $("#lp").value = "";
   try {
-    await auth({ email: v("lu").toLowerCase(), password: $("#lp").value }, "password");
+    await auth(credenciales, "password");
   } catch (e) {
     console.error("login", e);
     return toast(
@@ -47,7 +52,16 @@ async function doLogin2() {
   try {
     await sess();
   } catch (e) {
-    return toast("Este usuario no tiene permiso para entrar al sistema.");
+    console.error(e);
+    const mensaje =
+      e?.status >= 500 || /Failed to fetch|network|timed out|No se pudo validar el perfil/i.test(e?.message || "")
+        ? "No se pudo validar el perfil por un problema temporal de conexión con la base de datos. Intenta de nuevo."
+        : "Este usuario no tiene permiso para entrar al sistema.";
+    // Auth puede emitir tokens antes de que PostgREST valide el perfil.
+    // Si la validación falla, revocar/limpiar esa sesión parcial evita dejar
+    // credenciales residuales mientras el usuario permanece en el login.
+    out();
+    return toast(mensaje);
   }
   try {
     await pull();
@@ -63,7 +77,10 @@ const out = () => {
   if (typeof R_REAL === "function") R = R_REAL; // payRun() pudo dejar R() anulada
   PAYB = 0;
   U = null;
-  TK = RT = null;
+  TK = RT = UID = null;
+  SESSION_VALIDATION = null;
+  SESSION_VALIDATION_UID = null;
+  SESSION_VALIDATED_UID = null;
   KS = 0;
   V = "home";
   try {
@@ -106,10 +123,15 @@ let CS = { u: null, m: null, r: 6, v: "d", mo: today().slice(0, 7) };
 const uMes = (m) => {
   const c = S.caja.filter((x) => x.f.startsWith(m)),
     ing = c.filter((x) => x.t === "I").reduce((t, x) => t + x.m, 0),
-    eg = c.filter((x) => x.t === "E").reduce((t, x) => t + x.m, 0),
-    kc = S.kits.filter((k) => k.f.startsWith(m)).reduce((t, k) => t + k.c, 0),
+    // Alquiler y planilla se descuentan por separado abajo; excluirlos evita duplicar egresos.
+    eg = c
+      .filter((x) => x.t === "E" && !["Pago de alquiler", "Planilla de entrenadores"].includes(x.c))
+      .reduce((t, x) => t + x.m, 0),
+    // Una venta anulada no debe seguir restando su costo de confección a la utilidad.
+    kc = S.kits.filter((k) => k.est !== "Anulada" && k.f.startsWith(m)).reduce((t, k) => t + k.c, 0),
     pl = S.asis
-      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(m))
+      // Una asistencia futura no es un servicio realizado ni un gasto devengado.
+      .filter((x) => x.t === "P" && x.ok && x.f.startsWith(m) && x.f <= today())
       .reduce((t, x) => {
         const h = S.hor.find((h) => h.id === x.h),
           p = S.personal.find((p) => p.id === x.ref);
@@ -217,4 +239,34 @@ function home() {
     .join(
       "",
     )}</div>`;
+}
+
+// Diagnóstico de regresión: solo se publica en el proyecto QA y no persiste cambios.
+if (window.__ERP_CONFIG__?.supabaseUrl === "https://yiredilknlwbzwvwlqyx.supabase.co") {
+  Object.defineProperty(window, "__ERP_QA_DASHBOARD__", {
+    configurable: true,
+    value: Object.freeze({
+      probarAsistenciaFuturaQA() {
+        if (typeof U === "undefined" || U?.rol !== "ADM") {
+          throw new Error("La prueba del dashboard requiere una sesión administradora QA.");
+        }
+        const p = S.personal.find((x) => Number(x.activo) === 1 && Number(x.precio) > 0);
+        const h = S.hor.find((x) => x.est !== "Inactivo" && hrs(x) > 0);
+        if (!p || !h) throw new Error("No hay personal con tarifa y horario válido para la prueba QA.");
+        const hoy = today();
+        const [y, m, d] = hoy.split("-").map(Number);
+        const fecha = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+        const mes = fecha.slice(0, 7);
+        const original = S.asis;
+        const antes = uMes(mes).u;
+        try {
+          S.asis = [...original, { t: "P", ref: p.id, ok: true, f: fecha, h: h.id }];
+          const despues = uMes(mes).u;
+          return { hoy, fecha, antes, despues, diferencia: despues - antes };
+        } finally {
+          S.asis = original;
+        }
+      },
+    }),
+  });
 }

@@ -117,13 +117,17 @@ function preBorrarArch(p) {
     sb("/storage/v1/object/documentos", {
       method: "DELETE",
       body: JSON.stringify({ prefixes: l }),
-    }).catch(() => {});
+    }).then((r) => r.text().catch(() => "")).catch(() => {});
 }
 async function preDel(id) {
   if (!confirm("¿Eliminar este pre-registro y sus archivos?")) return;
   const q = (PR || []).find((x) => x.id === id),
     r = await sb("/rest/v1/preregistros?id=eq." + encodeURIComponent(id), { method: "DELETE" });
-  if (!r.ok) return toast("No se pudo eliminar");
+  if (!r.ok) {
+    await r.text().catch(() => "");
+    return toast("No se pudo eliminar");
+  }
+  await r.text().catch(() => "");
   if (q) preBorrarArch(q);
   PR = PR.filter((x) => x.id !== id);
   PRN = PR.length;
@@ -139,6 +143,7 @@ const ocup = (a) => {
   S.kits.forEach((k) => {
     const b = S.alu.find((x) => x.id === k.aid);
     if (
+      k.est !== "Anulada" &&
       b &&
       b.id !== a.id &&
       b.mod === "Competitivo" &&

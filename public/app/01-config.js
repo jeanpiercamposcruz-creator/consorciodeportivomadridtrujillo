@@ -17,12 +17,22 @@ const v = (id) => {
   const e = document.getElementById(id);
   return e ? e.value.trim() : "";
 };
-/* Fecha LOCAL (Perú UTC-5). toISOString() es UTC y después de las 19:00 devolvía el día siguiente. */
+/* Fecha civil de Perú, independiente de la zona horaria del navegador o del servidor. */
 const today = () => {
-    const d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+    return p.year + "-" + p.month + "-" + p.day;
   },
-  money = (n) => "S/ " + (+n || 0).toFixed(2);
+  // No convertir datos corruptos/ausentes en S/ 0.00: ocultaría descuadres financieros.
+  money = (n) => {
+    const value = Number(n);
+    return Number.isFinite(value) ? "S/ " + value.toFixed(2) : "—";
+  };
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"'`]/g,
@@ -101,7 +111,9 @@ function validarPago(f) {
     e = [];
   if (m === null || m <= 0) e.push("Monto inválido");
   if (!["I", "E"].includes(f.t)) e.push("Tipo inválido");
-  return { d: { m, t: f.t, c: limpiar(f.c, 60), d: limpiar(f.d, 120) }, e };
+  const concepto = limpiar(f.c, 60);
+  if (!concepto) e.push("Concepto obligatorio");
+  return { d: { m, t: f.t, c: concepto, d: limpiar(f.d, 120) }, e };
 }
 const o = (a, val, ph) =>
   (ph !== undefined ? `<option value="">${ph}</option>` : "") +
