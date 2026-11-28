@@ -119,16 +119,46 @@ async function sess() {
   // Sin reintento automático: ante 503 se libera la sesión parcial y el
   // usuario puede reintentar después, sin multiplicar la presión del pool.
   const tarea = (async () => {
-    const r = await sb(`/rest/v1/perfiles?select=rol&user_id=eq.${uid}`, {}, 1, 0);
+    const r = await sb(`/rest/v1/perfiles?select=rol,personal_id&user_id=eq.${encodeURIComponent(uid)}`, {}, 1, 0);
     if (!r.ok) {
       await r.text().catch(() => "");
       const error = new Error(`No se pudo validar el perfil ERP (HTTP ${r.status}).`);
       error.status = r.status;
       throw error;
     }
-    const j = await r.json();
-    if (!j.length || j[0].rol !== "ADM") throw "rol";
-    U = { id: "ADMIN", nom: EM, rol: "ADM" };
+    const perfiles = await r.json();
+    const perfil = Array.isArray(perfiles) ? perfiles[0] : null;
+    const rol = perfil?.rol;
+    if (!perfil || !["ADM", "REC", "ENT"].includes(rol)) throw "rol";
+
+    let id = rol === "ADM" ? "ADMIN" : (perfil.personal_id || uid);
+    let nom = EM;
+    if (rol === "ENT") {
+      const personalId = String(perfil.personal_id || "").trim();
+      if (!personalId) throw "personal";
+      const personalResponse = await sb(
+        `/rest/v1/personal?select=id,nombres&id=eq.${encodeURIComponent(personalId)}`,
+        {},
+        1,
+        0,
+      );
+      if (!personalResponse.ok) {
+        await personalResponse.text().catch(() => "");
+        const error = new Error(`No se pudo validar el vínculo del entrenador (HTTP ${personalResponse.status}).`);
+        error.status = personalResponse.status;
+        throw error;
+      }
+      const personalRows = await personalResponse.json();
+      if (!Array.isArray(personalRows) || personalRows.length !== 1 || personalRows[0].id !== personalId) {
+        throw "personal";
+      }
+      id = personalId;
+      nom = personalRows[0].nombres || EM;
+    }
+
+    // Una sesión que se cerró mientras se consultaba el perfil no puede reabrir la interfaz.
+    if (UID !== uid) throw new Error("La sesión cambió durante la validación.");
+    U = { id, nom, rol };
     V = "home";
     SESSION_VALIDATED_UID = uid;
   })();
